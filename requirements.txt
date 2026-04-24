@@ -1,0 +1,6 @@
+google-generativeai
+gTTS>=2.3.0
+qrcode[pil]>=7.4.2
+reportlab>=4.2.0
+pillow>=10.0.0
+google-cloud-storage>=2.16.0

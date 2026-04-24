@@ -1,0 +1,38 @@
+{
+  "name": "next-writing-batch",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "clean": "rm -rf .next",
+    "dev:fresh": "npm run dev:stop && npm run clean && env -u NODE_OPTIONS next dev --hostname 0.0.0.0",
+    "dev:turbo": "env -u NODE_OPTIONS next dev --hostname 0.0.0.0 --turbo",
+    "dev:stop": "sh scripts/stop-dev.sh",
+    "dev": "env -u NODE_OPTIONS next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "node -e \"try{require('fs').accessSync('.next/BUILD_ID')}catch(e){console.error('Missing .next: run npm run build first');process.exit(1)}\" && env -u NODE_OPTIONS next start --hostname 0.0.0.0",
+    "lint": "next lint",
+    "seed:pending": "./.venv/bin/python3 batch/seed_pending_submission.py",
+    "check:setup": "./.venv/bin/python3 batch/check_setup.py"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "diff": "^7.0.0",
+    "heic2any": "^0.0.4",
+    "next": "15.3.0",
+    "nodemailer": "^8.0.5",
+    "pdfjs-dist": "^4.10.38",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/node": "22.15.17",
+    "@types/nodemailer": "^8.0.0",
+    "@types/react": "19.0.9",
+    "@types/react-dom": "19.0.3",
+    "eslint": "9.25.0",
+    "eslint-config-next": "15.3.0",
+    "typescript": "5.8.3"
+  }
+}

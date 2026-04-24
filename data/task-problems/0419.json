@@ -1,0 +1,17 @@
+{
+  "taskId": "0419",
+  "rubric": {
+    "maxTotal": 50,
+    "items": [
+      { "id": "content", "label": "内容", "max": 25 },
+      { "id": "grammar", "label": "文法・語法", "max": 25 }
+    ]
+  },
+  "problems": [
+    {
+      "problemId": "q1",
+      "title": "問1（グラフ・表）",
+      "question": "The following is a placeholder. Replace with your actual assignment text in Japanese/English as used in class.\n\n(1) Describe what the graph or table shows about households with dogs and cats (use percentages; do not confuse percentage with the number of households).\n\n(2) Give your opinion or interpretation in about 80–120 words, with at least one reason."
+    }
+  ]
+}

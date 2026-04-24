@@ -1,0 +1,25 @@
+{
+  "taskId": "2026_T1_matsuo",
+  "rubric": {
+    "maxTotal": 50,
+    "items": [
+      {
+        "id": "content",
+        "label": "内容",
+        "max": 25
+      },
+      {
+        "id": "grammar",
+        "label": "文法・語法",
+        "max": 25
+      }
+    ]
+  },
+  "problems": [
+    {
+      "problemId": "default",
+      "title": "2026年表現T１自由英作文へのプレリュード",
+      "question": "インターネットの問題点を英語で書きなさい。"
+    }
+  ]
+}
