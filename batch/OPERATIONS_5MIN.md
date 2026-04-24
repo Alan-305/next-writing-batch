@@ -19,7 +19,7 @@ cd /path/to/next-writing-batch
 **よくあるミス**: ターミナルで `python3` が `/usr/local/bin/python3` を指しているのに、`.venv` へ `pip install` だけした場合 — 実行も `./.venv/bin/python3` に揃えてください。
 
 3. 環境変数（`.env` ではなくシェルで export する想定）  
-   - **Day3**: `GEMINI_API_KEY`  
+   - **Day3**: `ANTHROPIC_API_KEY`  
    - **Day4（GCS）**: `GCS_BUCKET_NAME`, `GOOGLE_APPLICATION_CREDENTIALS`（サービスアカウントJSONのパス）  
    - **署名URL**: `GCS_SIGNED_URL_EXPIRE_DAYS`（省略時 **180** 日）  
    - GCS を初めて使う場合のコンソール手順は **「0.5 GCS 初回セットアップ」** を参照してください。
@@ -88,7 +88,7 @@ npm run seed:pending
 2. **taskId**（課題ID）、学籍ID、氏名、英文を入力して送信  
 3. 管理の **提出一覧** で `status=pending` になっていることを確認  
 
-## 2. Day3: Gemini 添削バッチ
+## 2. Day3: Claude 添削バッチ
 
 ```bash
 cd next-writing-batch   # 既にいるなら不要

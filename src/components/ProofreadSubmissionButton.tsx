@@ -87,7 +87,7 @@ export function ProofreadSubmissionButton({ submissionId, taskId, studentLabel, 
       disabled={!canRun || busy}
       title={
         canRun
-          ? "この提出だけ添削（Gemini バッチ）。processing の取り残しも再実行できます"
+          ? "この提出だけ添削（Claude バッチ）。processing の取り残しも再実行できます"
           : "pending / failed / processing のとき実行できます（済みは「添削やり直し」）"
       }
       onClick={() => void onClick()}
@@ -103,7 +103,7 @@ export function ProofreadSubmissionButton({ submissionId, taskId, studentLabel, 
   );
 }
 
-/** 課題・添削設定などを変えたあと、既に添削済み（done）の提出を Gemini で出し直す */
+/** 課題・添削設定などを変えたあと、既に添削済み（done）の提出を Claude で出し直す */
 export function RedoProofreadSubmissionButton({ submissionId, taskId, studentLabel }: CommonProps) {
   const [busy, setBusy] = useState(false);
 

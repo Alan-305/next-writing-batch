@@ -37,7 +37,7 @@ class NLEssayProofreadOutput:
 
 def _model_label(working_model: object) -> str:
     name = getattr(working_model, "model_name", None) or getattr(working_model, "_model", None)
-    return str(name or "gemini")
+    return str(name or "claude")
 
 
 def _generation_response_text(response: object) -> str:
@@ -148,4 +148,4 @@ def proofread_one(
             if attempt < max_retries - 1:
                 time.sleep(initial_backoff_s * (2**attempt))
 
-    raise RuntimeError(f"gemini_proofread_failed: {last_err or 'unknown_error'}")
+    raise RuntimeError(f"ai_proofread_failed: {last_err or 'unknown_error'}")

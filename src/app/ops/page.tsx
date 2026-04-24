@@ -54,7 +54,7 @@ export default function OpsHomePage() {
             <Link href="/ops/deliverables">納品ZIP</Link> — 一覧とダウンロード
           </li>
           <li>
-            <Link href="/ops/gemini-key">Gemini API キー</Link> — 1回保存して添削・読み取りで使う（任意）
+            <Link href="/ops/claude-key">Claude API キー</Link> — 1回保存して添削で使う（任意）
           </li>
         </ul>
       </div>

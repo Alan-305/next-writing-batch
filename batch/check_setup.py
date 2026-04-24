@@ -42,21 +42,21 @@ def main() -> int:
             print(f"  ./.venv/bin/pip install -r requirements.txt を試してください。")
             return False
 
-    pip_mod("google.generativeai", "google.generativeai")
+    pip_mod("anthropic")
     pip_mod("gtts")
     pip_mod("reportlab")
 
-    key = (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
-    key_file = root / "data" / "gemini_api_key.txt"
+    key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    key_file = root / "data" / "anthropic_api_key.txt"
     if key:
-        print("[OK] 環境変数に Gemini 用の API キーがあります。")
+        print("[OK] 環境変数に Claude 用の API キーがあります。")
     elif key_file.is_file() and key_file.read_text(encoding="utf-8").strip():
-        print("[OK] data/gemini_api_key.txt にキーが保存されています。")
+        print("[OK] data/anthropic_api_key.txt にキーが保存されています。")
     else:
         print("[要対応] API キーがありません。次のいずれかを行ってください:")
-        print("  ・.env.local に GEMINI_API_KEY=（あなたのキー）と書き、npm run dev を再起動")
-        print("  ・運用画面「Gemini API キー」から保存")
-        print("  ・このチェックの前に: export GEMINI_API_KEY='…'")
+        print("  ・.env.local に ANTHROPIC_API_KEY=（あなたのキー）と書き、npm run dev を再起動")
+        print("  ・運用画面「Claude API キー」から保存")
+        print("  ・このチェックの前に: export ANTHROPIC_API_KEY='…'")
         ok = False
 
     subs = root / "data" / "submissions.json"
@@ -77,9 +77,9 @@ def main() -> int:
         from gemini_working_model import get_working_model  # noqa: E402
 
         get_working_model()
-        print("[OK] Gemini モデルの準備までできました（API キーが有効なら通信も可能です）。")
+        print("[OK] Claude モデルの準備までできました（API キーが有効なら通信も可能です）。")
     except Exception as e:
-        print(f"[要対応] Gemini モデル初期化に失敗: {e}")
+        print(f"[要対応] Claude モデル初期化に失敗: {e}")
         ok = False
 
     try:

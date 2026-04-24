@@ -158,6 +158,35 @@ export function StudentReleaseEditor({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const reimportFromProofread = () => {
+    const mergedContent = coalesceText(
+      proofread?.content_comment ?? aiSplitComments.contentComment ?? "",
+    );
+    const mergedGrammar = coalesceText(
+      proofread?.grammar_comment ?? aiSplitComments.grammarComment ?? "",
+    );
+    const nextGeneral = coalesceText(proofread?.general_comment ?? "");
+    const nextFinalText = coalesceText(
+      proofread?.final_version ?? proofread?.final_essay ?? "",
+    );
+
+    const aiDedContent = Number(proofread?.content_deduction);
+    const aiDedGrammar = Number(proofread?.grammar_deduction);
+
+    setContentComment(mergedContent);
+    setGrammarComment(mergedGrammar);
+    if (nextGeneral) setGeneralComment(nextGeneral);
+    if (nextFinalText) setFinalText(nextFinalText);
+    if (Number.isFinite(aiDedContent)) {
+      setContentDeduction(clampInt(aiDedContent, 0, contentMax));
+    }
+    if (Number.isFinite(aiDedGrammar)) {
+      setGrammarDeduction(clampInt(aiDedGrammar, 0, grammarMax));
+    }
+    setMessage("最新の添削結果を修正入力へ再取り込みしました。保存するまで確定はされません。");
+    setError("");
+  };
+
   const effectiveScores = useMemo(() => {
     const next: Record<string, number> = { ...scores };
     if (contentItem) {
@@ -384,6 +413,20 @@ export function StudentReleaseEditor({
       </p>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={reimportFromProofread}
+          style={{
+            padding: "10px 14px",
+            fontSize: "0.95rem",
+            background: busy ? "#94a3b8" : "#475569",
+            color: "#fff",
+          }}
+          title="添削結果の内容解説を内容の指摘へ、文法解説を文法の指摘へ再取り込みします"
+        >
+          添削結果を再取り込み
+        </button>
         <button
           type="button"
           disabled={busy}

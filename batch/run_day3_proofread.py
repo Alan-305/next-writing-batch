@@ -14,21 +14,21 @@ def _project_root() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
-def _hydrate_gemini_key_from_disk() -> None:
-    """Next 運用画面で保存した data/gemini_api_key.txt を、ターミナルバッチでも使えるようにする。"""
-    if (os.environ.get("GEMINI_API_KEY") or "").strip() or (os.environ.get("GOOGLE_API_KEY") or "").strip():
+def _hydrate_claude_key_from_disk() -> None:
+    """Next 運用画面で保存した data/anthropic_api_key.txt を、ターミナルバッチでも使えるようにする。"""
+    if (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
         return
-    fp = os.path.join(_project_root(), "data", "gemini_api_key.txt")
+    fp = os.path.join(_project_root(), "data", "anthropic_api_key.txt")
     try:
         with open(fp, "r", encoding="utf-8") as f:
             key = (f.readline() or "").strip()
         if key:
-            os.environ["GEMINI_API_KEY"] = key
+            os.environ["ANTHROPIC_API_KEY"] = key
     except OSError:
         pass
 
 
-_hydrate_gemini_key_from_disk()
+_hydrate_claude_key_from_disk()
 
 from gemini_proofread import proofread_one
 from task_problems import resolve_proofreading_question
@@ -73,39 +73,39 @@ def _now_iso() -> str:
 def _friendly_proofread_error(err: str) -> str:
     """運用者向けに短く寄せる（詳細はログ用にそのまま残す）。"""
     e = (err or "").strip()
-    if "missing_env:GEMINI_API_KEY" in e or "GEMINI_API_KEY" in e:
+    if "missing_env:ANTHROPIC_API_KEY" in e or "ANTHROPIC_API_KEY" in e:
         return (
-            "Gemini API キーが未設定です。.env.local に GEMINI_API_KEY を書き Next を再起動するか、"
+            "Claude API キーが未設定です。.env.local に ANTHROPIC_API_KEY を書き Next を再起動するか、"
             "バッチを実行するターミナルで export してから同じシェルで python を実行してください。"
         )
     if "json_parse_failed" in e:
-        return "Geminiの返答をJSONとして解釈できませんでした。しばらく待って再実行してください。"
+        return "AIの返答をJSONとして解釈できませんでした。しばらく待って再実行してください。"
     if e.startswith("missing_keys:"):
-        return "Geminiの返答に必須フィールドが欠けています。再実行してください。"
+        return "AIの返答に必須フィールドが欠けています。再実行してください。"
     if "invalid_value:" in e:
-        return "Geminiの返答に空のフィールドがあります。再実行してください。"
+        return "AIの返答に空のフィールドがあります。再実行してください。"
     if "final_essay_too_short" in e:
         return "完成版英文が短すぎるため却下されました。プロンプト/入力を確認してください。"
     if "empty_read_aloud" in e:
         return "完成版英文が得られませんでした。入力や API の状態を確認し、再実行してください。"
     if "No API_KEY or ADC found" in e or "API_KEY or ADC" in e:
         return (
-            "Gemini の API キーが、この Python プロセスの環境変数にありません。"
+            "Claude の API キーが、この Python プロセスの環境変数にありません。"
             "【ターミナルで batch/run_day3_proofread.py を叩く場合】その同じシェルで先に "
-            "export GEMINI_API_KEY='…'（または GOOGLE_API_KEY）してから実行してください。"
+            "export ANTHROPIC_API_KEY='…' してから実行してください。"
             "【ブラウザの提出一覧から「添削」ボタン】キーは Next.js を起動したプロセスに渡る必要があります。"
             "別ターミナルで export しただけでは反映されません。next-writing-batch/.env.local に "
-            "GEMINI_API_KEY=… と書き、npm run dev（または next start）を一度止めて再起動してください。"
+            "ANTHROPIC_API_KEY=… と書き、npm run dev（または next start）を一度止めて再起動してください。"
         )
-    if "gemini_proofread_failed" in e:
-        tail = e.split("gemini_proofread_failed:", 1)[-1].strip()
-        base = "Gemini呼び出しが規定回数内に成功しませんでした。ネットワーク・API制限・GEMINI_MODEL を確認し、失敗分のみ再実行してください。"
+    if "ai_proofread_failed" in e:
+        tail = e.split("ai_proofread_failed:", 1)[-1].strip()
+        base = "Claude 呼び出しが規定回数内に成功しませんでした。ネットワーク・API制限・CLAUDE_MODEL を確認し、失敗分のみ再実行してください。"
         if tail and tail != e and len(tail) <= 280:
             return f"{base}（詳細: {tail}）"
         return base
     if e.startswith("empty_generation:"):
         return (
-            "Geminiから本文が返りませんでした（ブロック・空応答の可能性）。入力内容を短く分けて再試行するか、"
+            "Claudeから本文が返りませんでした（ブロック・空応答の可能性）。入力内容を短く分けて再試行するか、"
             "しばらく待ってから再実行してください。"
         )
     if "task_master_missing:" in e:

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { promisify } from "util";
 
-import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
+import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 
 const execFileAsync = promisify(execFile);
 
@@ -81,11 +81,10 @@ export async function runProofreadBatch(input: RunProofreadInput): Promise<RunPr
     args.push("--submission-ids", submissionIds.join(","));
   }
 
-  const key = resolveEffectiveGeminiApiKey();
+  const key = resolveEffectiveAnthropicApiKey();
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
   if (key) {
-    if (!(childEnv.GEMINI_API_KEY ?? "").trim()) childEnv.GEMINI_API_KEY = key;
-    if (!(childEnv.GOOGLE_API_KEY ?? "").trim()) childEnv.GOOGLE_API_KEY = key;
+    if (!(childEnv.ANTHROPIC_API_KEY ?? "").trim()) childEnv.ANTHROPIC_API_KEY = key;
   }
 
   const t0 = Date.now();

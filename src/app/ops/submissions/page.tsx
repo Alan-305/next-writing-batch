@@ -64,12 +64,12 @@ export default async function OpsSubmissionsPage() {
       </p>
 
       <div className="card">
-        <h2>添削を実行（Gemini）</h2>
+        <h2>添削を実行（Claude）</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           下のボタンから <code>batch/run_day3_proofread.py</code> を起動します（<code>data/submissions.json</code> を更新）。
           Next.js を動かしている<strong>同じ環境</strong>に <code>.venv</code> と API キーが必要です（
-          <Link href="/ops/gemini-key">運用でキーを保存</Link> または <code>.env.local</code> の{" "}
-          <code>GEMINI_API_KEY</code> / <code>GOOGLE_API_KEY</code>
+          <Link href="/ops/claude-key">運用でキーを保存</Link> または <code>.env.local</code> の{" "}
+          <code>ANTHROPIC_API_KEY</code>
           ）。サーバに Python が無いホスティングでは使えません。
         </p>
         <p className="muted" style={{ marginTop: 8, marginBottom: 0, lineHeight: 1.55 }}>
@@ -104,7 +104,7 @@ export default async function OpsSubmissionsPage() {
             <code>next-writing-batch</code> をカレントにし、仮想環境の Python で実行します。
           </p>
           <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
-            {`export GEMINI_API_KEY='…'   # または GOOGLE_API_KEY
+            {`export ANTHROPIC_API_KEY='…'
 
 ./.venv/bin/python3 batch/run_day3_proofread.py --task-id 課題ID --workers 2 --limit 1
 

@@ -1,20 +1,17 @@
 """
-添削バッチ用 Gemini モデル解決（親 monorepo の services.ai に依存しない）。
+添削バッチ用 Claude モデル解決。
 
-google.generativeai は非推奨だが、現行の google.genai 移行までは API キー＋generateContent で動作する。
+ファイル名は後方互換のため gemini_working_model.py のまま残す。
 """
 
 from __future__ import annotations
 
 import os
 import threading
-import warnings
+from dataclasses import dataclass
 from typing import Optional
 
-import google.generativeai as genai
-from google.generativeai.types import HarmBlockThreshold, HarmCategory
-
-warnings.filterwarnings("ignore", category=FutureWarning)
+from anthropic import Anthropic
 
 
 def get_env_or_secret(key: str, default: str = "") -> str:
@@ -26,69 +23,93 @@ def get_env_or_secret(key: str, default: str = "") -> str:
     return default
 
 
-gemini_key = get_env_or_secret("GEMINI_API_KEY") or get_env_or_secret("GOOGLE_API_KEY")
-if gemini_key:
-    genai.configure(api_key=gemini_key)
-
 _model_lock = threading.Lock()
 _cached_working_model = None
-_configured_api_key: Optional[str] = gemini_key or None
+_configured_api_key: Optional[str] = (get_env_or_secret("ANTHROPIC_API_KEY") or "").strip() or None
 
-DEFAULT_GEMINI_MODEL = "models/gemini-flash-latest"
-DEFAULT_GEMINI_FALLBACKS = (
-    "gemini-2.5-flash",
-    "models/gemini-2.5-flash",
-    "models/gemini-2.5-flash-lite",
+DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
+DEFAULT_CLAUDE_FALLBACKS = (
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-20241022",
+    "claude-3-5-haiku-latest",
 )
 
 
 def _candidate_models() -> list[str]:
-    preferred = (get_env_or_secret("GEMINI_MODEL", DEFAULT_GEMINI_MODEL) or "").strip() or DEFAULT_GEMINI_MODEL
-    fallback_raw = (get_env_or_secret("GEMINI_MODEL_FALLBACKS", "") or "").strip()
+    preferred = (get_env_or_secret("CLAUDE_MODEL", DEFAULT_CLAUDE_MODEL) or "").strip() or DEFAULT_CLAUDE_MODEL
+    fallback_raw = (get_env_or_secret("CLAUDE_MODEL_FALLBACKS", "") or "").strip()
     if fallback_raw:
-        fallbacks = [m.strip() for m in fallback_raw.split(",") if m.strip()]
+        env_fallbacks = [m.strip() for m in fallback_raw.split(",") if m.strip()]
     else:
-        fallbacks = list(DEFAULT_GEMINI_FALLBACKS)
-    ordered = [preferred, *fallbacks]
+        env_fallbacks = []
+    # 常に内蔵フォールバックを末尾に足す（env 指定時でも安全側）。
+    ordered = [preferred, *env_fallbacks, *DEFAULT_CLAUDE_FALLBACKS, DEFAULT_CLAUDE_MODEL]
     return list(dict.fromkeys(ordered))
 
 
-def _ensure_genai_configured() -> None:
+@dataclass
+class _SimpleResponse:
+    text: str
+
+
+class _ClaudeModel:
+    def __init__(self, model_names: list[str], api_key: str):
+        self._model_names = [m for m in model_names if m]
+        self.model_name = self._model_names[0] if self._model_names else DEFAULT_CLAUDE_MODEL
+        self._client = Anthropic(api_key=api_key)
+
+    def generate_content(self, prompt: str, generation_config=None):
+        generation_config = generation_config or {}
+        temperature = float(generation_config.get("temperature", 0.25))
+        max_tokens = int(generation_config.get("max_output_tokens", 1400))
+        last_err = None
+        for model_name in self._model_names:
+            try:
+                res = self._client.messages.create(
+                    model=model_name,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                self.model_name = model_name
+                parts = []
+                for blk in res.content:
+                    if getattr(blk, "type", None) == "text":
+                        parts.append(getattr(blk, "text", ""))
+                return _SimpleResponse(text="".join(parts).strip())
+            except Exception as e:
+                last_err = e
+                # モデル名が無効な場合は次候補へフォールバックする。
+                if "not_found_error" in str(e) or "model:" in str(e):
+                    continue
+                raise
+        if last_err is not None:
+            raise last_err
+        raise RuntimeError("no_claude_model_candidates")
+
+
+def _ensure_client_configured() -> str:
     global _configured_api_key
-    key = (get_env_or_secret("GEMINI_API_KEY") or get_env_or_secret("GOOGLE_API_KEY") or "").strip()
+    key = (get_env_or_secret("ANTHROPIC_API_KEY") or "").strip()
     if not key:
-        return
+        raise RuntimeError("missing_env:ANTHROPIC_API_KEY")
     if key != _configured_api_key:
-        genai.configure(api_key=key)
         _configured_api_key = key
         _reset_cached_model()
+    return key
 
 
 def get_working_model():
     global _cached_working_model
-    _ensure_genai_configured()
+    key = _ensure_client_configured()
     if _cached_working_model is not None:
         return _cached_working_model
-    safety = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
     with _model_lock:
         if _cached_working_model is not None:
             return _cached_working_model
-        last_err = None
-        for candidate in _candidate_models():
-            try:
-                _cached_working_model = genai.GenerativeModel(
-                    model_name=candidate, safety_settings=safety
-                )
-                break
-            except Exception as e:
-                last_err = e
-        if _cached_working_model is None:
-            raise RuntimeError(f"failed_to_initialize_gemini_model: {last_err}") from last_err
+        candidates = _candidate_models()
+        _cached_working_model = _ClaudeModel(model_names=candidates, api_key=key)
         return _cached_working_model
 
 
@@ -105,17 +126,13 @@ def generate_content_with_retry(
     request_options=None,
     max_attempts=2,
 ):
+    del request_options
     last_err = None
     attempts = max(1, int(max_attempts or 1))
     for i in range(attempts):
         try:
             model = get_working_model()
-            kwargs = {}
-            if generation_config is not None:
-                kwargs["generation_config"] = generation_config
-            if request_options is not None:
-                kwargs["request_options"] = request_options
-            return model.generate_content(payload, **kwargs)
+            return model.generate_content(payload, generation_config=generation_config)
         except Exception as e:
             last_err = e
             if i >= attempts - 1:
