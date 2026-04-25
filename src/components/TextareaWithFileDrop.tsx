@@ -48,7 +48,7 @@ export type TextareaWithFileDropProps = {
    */
   tesseractLang?: string;
   /**
-   * 提出の英文欄向け: 画像・PDF を先に Gemini で転記（手書き向き）。API キーがないか失敗時は Tesseract にフォールバック。
+   * 提出の英文欄向け: 画像・PDF を先に Claude で転記（手書き向き）。API キーがないか失敗時は Tesseract にフォールバック。
    */
   geminiHandwritingOcr?: boolean;
 };
@@ -222,30 +222,31 @@ export function TextareaWithFileDrop({
             );
             if (noApiKey) {
               setStatus("");
-              onNotify?.(
-                "Gemini API キーが未設定のため、ブラウザ内 OCR（Tesseract）で読み取ります。手書きは精度が落ちることがあります。",
-                "info",
-              );
+              onNotify?.("Claude API キーが未設定です。手書きOCRは Claude が必須です。", "error");
+              return;
             } else if (clientError) {
               setStatus("");
-              onNotify?.(`${clientError} Tesseract で再試行します。`, "info");
+              onNotify?.(`Claude OCR に失敗しました: ${clientError}`, "error");
+              return;
             } else if (geminiText.trim()) {
               let block = geminiText.trim();
               if (textJoin) {
                 block = `${textJoin}\n\n${block}`;
               }
-              onChange(mergeExtractedBlock(value ?? "", block, "画像・PDF（Gemini）"));
+              onChange(mergeExtractedBlock(value ?? "", block, "画像・PDF（Claude）"));
               setStatus("");
               onNotify?.("取り込みが完了しました。内容を確認してください。", "success");
               return;
             } else {
               setStatus("");
-              onNotify?.("Gemini が空の結果を返したため、Tesseract で再試行します。", "info");
+              onNotify?.("Claude OCR が空の結果を返しました。画像の鮮明さを確認して再実行してください。", "error");
+              return;
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             setStatus("");
-            onNotify?.(`${msg} Tesseract で再試行します。`, "info");
+            onNotify?.(`Claude OCR に失敗しました: ${msg}`, "error");
+            return;
           }
         }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { runEssayHandwritingIngestGemini } from "@/lib/essay-handwriting-gemini";
-import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
+import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
+import { runEssayHandwritingIngestClaude } from "@/lib/essay-handwriting-claude";
 
 export const runtime = "nodejs";
 
@@ -30,15 +30,15 @@ function isMediaFile(file: File): boolean {
 }
 
 /**
- * 提出フォームの英文欄向け: 手書き写真・HEIC・PDF を Gemini で転記（Tesseract より高精度）。
+ * 提出フォームの英文欄向け: 手書き写真・HEIC・PDF を Claude で転記（Tesseract より高精度）。
  */
 export async function POST(request: Request) {
-  const apiKey = resolveEffectiveGeminiApiKey();
+  const apiKey = resolveEffectiveAnthropicApiKey();
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "Gemini API キーがありません。環境変数 GEMINI_API_KEY（または GOOGLE_API_KEY）を設定するか、運用の「Gemini API キー」画面で data/gemini_api_key.txt に保存してください。",
+          "Claude API キーがありません。環境変数 ANTHROPIC_API_KEY を設定するか、運用の「Claude API キー」画面で data/anthropic_api_key.txt に保存してください。",
       },
       { status: 503 },
     );
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       })),
     );
 
-    const text = await runEssayHandwritingIngestGemini({
+    const text = await runEssayHandwritingIngestClaude({
       apiKey,
       parts,
     });
