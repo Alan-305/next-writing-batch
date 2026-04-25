@@ -14,7 +14,9 @@ from gemini_working_model import get_working_model
 from nl_essay_feedback import (  # noqa: E402
     build_nl_essay_prompt,
     finalize_final_version_for_display,
+    merge_proofread_explanation_for_storage,
     parse_free_writing_feedback,
+    polish_final_essay_paragraphs,
 )
 
 
@@ -97,7 +99,13 @@ def proofread_one(
 
     for attempt in range(max_retries):
         try:
-            generation_config = {"temperature": 0.25, "top_p": 0.9, "top_k": 20}
+            # 内容の指摘（①②③＋【ヒント】）と JSON が途中で切れないよう十分な出力長を確保（既定 1400 では不足しがち）
+            generation_config = {
+                "temperature": 0.25,
+                "top_p": 0.9,
+                "top_k": 20,
+                "max_output_tokens": 8192,
+            }
             response = working_model.generate_content(
                 prompt,
                 generation_config=generation_config,
@@ -126,19 +134,34 @@ def proofread_one(
             if not read_aloud:
                 read_aloud = (original_essay or "").strip()
 
+            read_aloud = polish_final_essay_paragraphs(read_aloud, multipart=multipart)
+            if not read_aloud:
+                read_aloud = (original_essay or "").strip()
+
             if not read_aloud:
                 raise ValueError("empty_read_aloud")
+
+            fv_for_store = finalize_final_version_for_display(read_aloud, append_word_count=True)
+            cd_i = max(0, int(content_deduction))
+            gd_i = max(0, int(grammar_deduction))
+            explanation_merged = merge_proofread_explanation_for_storage(
+                body_explanation=(explanation or "").strip(),
+                content_comment=(content_comment or "").strip(),
+                grammar_comment=(grammar_comment or "").strip(),
+                content_deduction=cd_i,
+                grammar_deduction=gd_i,
+            )
 
             generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
             return NLEssayProofreadOutput(
                 evaluation=(evaluation or "").strip(),
                 general_comment=(general_comment or "").strip(),
-                explanation=(explanation or "").strip(),
+                explanation=explanation_merged,
                 content_comment=(content_comment or "").strip(),
                 grammar_comment=(grammar_comment or "").strip(),
-                content_deduction=max(0, int(content_deduction)),
-                grammar_deduction=max(0, int(grammar_deduction)),
-                final_version=(final_version or "").strip(),
+                content_deduction=cd_i,
+                grammar_deduction=gd_i,
+                final_version=(fv_for_store or "").strip(),
                 final_essay=read_aloud,
                 model_name=_model_label(working_model),
                 generated_at=generated_at,

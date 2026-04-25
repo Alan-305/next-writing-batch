@@ -41,6 +41,7 @@ export default async function OpsSubmissionsPage() {
             String(d4.audio_path ?? "").trim() ||
             String(d4.qr_path ?? "").trim()),
       );
+      const sr = s.studentRelease;
       return {
         submissionId: s.submissionId,
         submittedAt: s.submittedAt,
@@ -49,6 +50,8 @@ export default async function OpsSubmissionsPage() {
         studentName: s.studentName,
         status: s.status,
         hasDay4Assets,
+        resultPublished: Boolean(sr?.operatorApprovedAt),
+        studentResultFirstViewedAt: s.studentResultFirstViewedAt,
       };
     });
 
@@ -65,18 +68,7 @@ export default async function OpsSubmissionsPage() {
 
       <div className="card">
         <h2>添削を実行（Claude）</h2>
-        <p className="muted" style={{ marginTop: 0 }}>
-          下のボタンから <code>batch/run_day3_proofread.py</code> を起動します（<code>data/submissions.json</code> を更新）。
-          Next.js を動かしている<strong>同じ環境</strong>に <code>.venv</code> と API キーが必要です（
-          <Link href="/ops/claude-key">運用でキーを保存</Link> または <code>.env.local</code> の{" "}
-          <code>ANTHROPIC_API_KEY</code>
-          ）。サーバに Python が無いホスティングでは使えません。
-        </p>
-        <p className="muted" style={{ marginTop: 8, marginBottom: 0, lineHeight: 1.55 }}>
-          <strong>添削が動かないとき</strong>は、まずターミナルでこのフォルダに移動し{" "}
-          <code>npm run check:setup</code> を実行してください。[要対応] が出た行を直すと、多くの場合は解決します。ブラウザのエラーだけでは分からないときは、表示された「詳細」をそのままコピーして相談してください。
-        </p>
-        <p style={{ marginBottom: 8 }}>
+        <p style={{ marginTop: 0, marginBottom: 8 }}>
           現在の <strong>pending</strong> 件数: {totalPending}
           {pendingTaskIds.length > 0 ? (
             <>

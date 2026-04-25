@@ -251,6 +251,7 @@ def main() -> None:
                 line2=fb2,
                 line3=fb3,
                 final_essay=read_aloud,
+                original_essay=str(s.get("essayText") or ""),
                 qr_path=qr,
             )
 

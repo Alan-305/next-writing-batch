@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import os
 import re
 from typing import Callable, List, Optional, Tuple
@@ -11,6 +12,13 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from day4_pdf_fonts import ensure_day4_sans_font
+
+from nl_essay_feedback import (
+    canonicalize_growth_hint_heading_explanation,
+    canonicalize_legacy_grammar_heading_explanation,
+    normalize_student_explanation_text,
+    strip_final_essay_artifacts,
+)
 
 # Layout constants (A4 return sheet)
 MARGIN_X_MM = 16
@@ -34,6 +42,10 @@ QR_SIZE_MM = 24
 _GRAMMAR_HEAD = "【文法・語法・表現】"
 _GRAMMAR_HEAD_LEGACY = "【文法】"
 _CONTENT_HEAD = "【内容】"
+_HINT_HEAD = "【ヒント】"
+_CIRCLED_HEAD_RE = re.compile(r"^[\u2460-\u2473]+")
+# 旧: 完成版の差分赤。現在は完成版を黒一色で統一（画面 /result と同趣旨）。
+_REVISION_RED = colors.HexColor("#b91c1c")
 
 
 def _grammar_header_marker_in(text: str) -> Optional[str]:
@@ -56,11 +68,6 @@ def _canonical_grammar_heading_line(line: str) -> str:
     if s == _GRAMMAR_HEAD_LEGACY:
         return _GRAMMAR_HEAD
     return line
-
-
-def _para_first_line_is_grammar_heading(p: str) -> bool:
-    first = p.split("\n", 1)[0].strip()
-    return first in (_GRAMMAR_HEAD, _GRAMMAR_HEAD_LEGACY)
 
 
 def _norm_text(s: str) -> str:
@@ -194,10 +201,11 @@ def _strip_trailing_word_count_marker(s: str) -> str:
 
 
 def _final_essay_with_word_count_line(text: str) -> str:
-    """完成版本文の直後に英語の語数のみ表記（別行）。"""
+    """完成版本文の直後に英語の語数のみ表記（別行）。改行は空白に寄せて段落表示。"""
     base = _strip_trailing_word_count_marker(_norm_text(text))
     if not base:
         return ""
+    base = re.sub(r"\s+", " ", base.replace("\n", " ")).strip()
     n = _count_english_words(base)
     return f"{base}\n（{n} words）"
 
@@ -228,54 +236,40 @@ def _insert_jp_wrap_spaces(s: str) -> str:
     return _norm_text(s)
 
 
-def _is_greeting_or_filler_line(s: str) -> bool:
-    """総評の先頭に付きがちな挨拶・導入だけの行（短い行に限定して誤検知を減らす）。"""
-    t = s.strip()
-    if not t or len(t) > 120:
-        return False
-    patterns = (
-        r"^こんにちは",
-        r"^こんばんは",
-        r"^お世話になって",
-        r"^はじめまして",
-        r"一緒に見ていきましょう",
-        r"一緒に見ていきます",
-        r"一緒に見てきましょう",
-        r"^それでは[,、]?\s*$",
-        r"^どうも[,、]?\s*$",
-        r"^はじめに[,、]",
-        r"読ませていただ",
-        r"拝見しました",
-        r"^本日は",
-        r"^今日は",
-    )
-    return any(re.search(p, t) for p in patterns)
-
-
-def _strip_leading_greeting_general_comment(s: str) -> str:
-    """点数直後の総評から、先頭の挨拶・決まり文句だけの行を除きコンパクトにする。"""
-    lines = _norm_text(s).split("\n")
-    i = 0
-    while i < len(lines):
-        st = lines[i].strip()
-        if not st:
-            i += 1
-            continue
-        if _is_greeting_or_filler_line(st):
-            i += 1
-            continue
-        break
-    return "\n".join(lines[i:]).strip()
-
-
 def _is_explanation_deduction_summary_line(s: str) -> bool:
     """減点合計行には ● を付けない。"""
     t = s.strip()
     return bool(re.match(r"^(文法|内容)減点\s*合計\s*[:：]", t))
 
 
+def _strip_content_line_markers(ln: str) -> str:
+    """【内容】ブロック用: 行頭の ● / ○ / Step 1 ラベルを除去（文法ブロックには使わない）。"""
+    m = re.match(r"^(\s*)(.*)$", ln)
+    indent, rest = (m.group(1), m.group(2)) if m else ("", ln)
+    t = rest
+    while True:
+        n = re.sub(r"^(?:●|○)\s*", "", t)
+        if n == t:
+            break
+        t = n
+    t = re.sub(r"(?i)^step\s*1\s*[：:．.]?\s*", "", t)
+    return indent + t
+
+
+def _content_line_skips_strip(st: str) -> bool:
+    """見出し・減点行などはマーカー除去の対象外にしない（そのまま）。"""
+    t = st.strip()
+    if not t:
+        return True
+    if t == _CONTENT_HEAD:
+        return True
+    if _is_explanation_deduction_summary_line(st):
+        return True
+    return False
+
+
 def _ensure_content_bullet_lines(text: str) -> str:
-    """【内容】見出し以降〜文法見出しの手前まで、箇条書き行の先頭に ● を付ける（見出し・内容減点合計行は除外）。"""
+    """【内容】ブロックでは ● を付けない。既存の ● / Step 1 ラベルは除去する。"""
     nt = (text or "").replace("\r\n", "\n").replace("\r", "\n")
     gkey = _grammar_header_marker_in(nt)
     if gkey:
@@ -302,13 +296,10 @@ def _ensure_content_bullet_lines(text: str) -> str:
         if not st:
             out.append(ln)
             continue
-        if st.startswith(("●", "○")):
+        if _content_line_skips_strip(ln):
             out.append(ln)
             continue
-        if _is_explanation_deduction_summary_line(st):
-            out.append(ln)
-            continue
-        out.append(f"● {st}")
+        out.append(_strip_content_line_markers(ln))
     merged_head = "\n".join(out)
     return merged_head + tail if tail else merged_head
 
@@ -398,6 +389,107 @@ def _format_explanation_bullets(raw: str) -> str:
 
 def _line_step_for_font(font_pt: float) -> float:
     return LINE_STEP_MM * mm * max(0.85, min(1.15, font_pt / START_BODY_FONT_PT))
+
+
+def _circled_bold_prefix_and_tail(stripped: str) -> Tuple[str, str]:
+    """①〜⑳ 始まりの行で、太字にする番号＋小見出しと残りを分ける。"""
+    m = re.match(r"^([\u2460-\u2473]+\s*)(.*)$", stripped)
+    if not m:
+        return "", stripped
+    circ, rest = m.group(1), m.group(2)
+    end = len(rest)
+    for ch in ("。", "、", "（", "：", "\n"):
+        i = rest.find(ch)
+        if i != -1:
+            end = min(end, i)
+    return circ + rest[:end], rest[end:]
+
+
+def _split_post_arrow_correct_suffix(post_arrow: str) -> Tuple[str, str]:
+    """→ 右側を「正しい英語」と日本語解説に分ける（全角コロン優先、student-release / HTML と同趣旨）。"""
+    p = post_arrow.strip()
+    if not p:
+        return "", ""
+    if "：" in p:
+        i = p.index("：")
+        return p[:i].strip(), p[i + 1 :].strip()
+    m = re.search(r"(?<=[^\s]):(?=\s)", p)
+    if m:
+        head = p[: m.start()].strip()
+        body = p[m.end() :].strip()
+        if head:
+            return head, body
+    return p, ""
+
+
+def _draw_fake_bold_string(
+    c: canvas.Canvas,
+    *,
+    x: float,
+    y: float,
+    text: str,
+    font: str,
+    font_size: float,
+) -> float:
+    """日本語フォントに Bold 面が無い場合の太字風（2重描画）。戻り値: 幅（1回分）。"""
+    if not text:
+        return 0.0
+    c.setFont(font, font_size)
+    c.setFillColor(colors.black)
+    c.drawString(x, y, text)
+    c.drawString(x + 0.28, y, text)
+    return c.stringWidth(text, font, font_size)
+
+
+def _normalize_essay_for_flow_display(s: str) -> str:
+    """final-essay-diff-html.ts normalizeEssayForFlowDisplay と同一。"""
+    t = (s or "").replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"[ \t\u00a0]+", " ", t)
+    t = re.sub(r"\s*\n+\s*", " ", t)
+    return t.strip()
+
+
+def _tokens_words_with_space(s: str) -> List[str]:
+    if not s:
+        return []
+    return [m.group(0) for m in re.finditer(r"\S+\s*|\s+", s)]
+
+
+def _essay_diff_segments_for_revised_display(original: str, revised_body: str) -> List[Tuple[bool, str]]:
+    """
+    diffWordsWithSpace に近いトークン列の差分で、完成版側に現れる断片を (is_added, text) にまとめる。
+    """
+    o = _normalize_essay_for_flow_display(original)
+    r = _normalize_essay_for_flow_display(revised_body)
+    if not r:
+        return [(False, "")]
+    ot = _tokens_words_with_space(o)
+    rt = _tokens_words_with_space(r)
+    sm = difflib.SequenceMatcher(a=ot, b=rt, autojunk=False)
+    merged: List[Tuple[bool, str]] = []
+    for tag, _i1, _i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            merged.append((False, "".join(rt[j1:j2])))
+        elif tag in ("insert", "replace"):
+            merged.append((True, "".join(rt[j1:j2])))
+    out: List[Tuple[bool, str]] = []
+    for is_red, chunk in merged:
+        if not chunk:
+            continue
+        if out and out[-1][0] == is_red:
+            out[-1] = (is_red, out[-1][1] + chunk)
+        else:
+            out.append((is_red, chunk))
+    return out if out else [(False, r)]
+
+
+def _split_final_body_and_wordcount_line(final_with_count: str) -> Tuple[str, str]:
+    """_final_essay_with_word_count_line の本文と語数行を分離。"""
+    t = _norm_text(final_with_count)
+    m = re.search(r"\n\s*（\s*\d+\s*words?\s*）\s*$", t, flags=re.IGNORECASE)
+    if not m:
+        return t, ""
+    return t[: m.start()].strip(), t[m.start() :].strip()
 
 
 class _PageCtx:
@@ -528,6 +620,84 @@ class _PageCtx:
                 self.ensure_space(line_h / mm)
                 c.drawString(x, self.y, ln)
                 self.y -= line_h
+        self.y -= BLOCK_GAP_MM * mm
+
+    def draw_final_essay_with_revision_highlights(
+        self,
+        title: str,
+        original_essay: str,
+        final_with_count: str,
+        *,
+        max_width_mm: float,
+        font_size: float = 10.5,
+    ) -> None:
+        """完成版: 黒一色の本文（語数行は従来どおり黒）。"""
+        body, wc_line = _split_final_body_and_wordcount_line(final_with_count)
+        segments = _essay_diff_segments_for_revised_display(original_essay, body)
+        flat: List[Tuple[bool, str]] = []
+        for _is_red, chunk in segments:
+            if not chunk:
+                continue
+            toks = re.findall(r"\S+\s*|\s+", chunk)
+            if not toks:
+                toks = [chunk]
+            for t in toks:
+                if t:
+                    flat.append((False, t))
+
+        c = self.c
+        x = MARGIN_X_MM * mm
+        max_w = max_width_mm * mm
+        font = self._font
+
+        self.ensure_space(TITLE_TO_BODY_MM + LINE_STEP_MM * 2)
+        c.setFont(self._font, TITLE_FONT_PT)
+        c.setFillColor(colors.black)
+        c.drawString(x, self.y, title)
+        self.y -= TITLE_TO_BODY_MM * mm
+
+        if not flat and not wc_line:
+            self.y -= BLOCK_GAP_MM * mm
+            return
+
+        lh = _line_step_for_font(font_size)
+        line_parts: List[Tuple[bool, str]] = []
+        line_width = 0.0
+
+        def emit_line() -> None:
+            nonlocal line_parts, line_width
+            if not line_parts:
+                return
+            self.ensure_space(lh / mm)
+            rx = x
+            for ir, piece in line_parts:
+                c.setFillColor(_REVISION_RED if ir else colors.black)
+                c.setFont(font, font_size)
+                c.drawString(rx, self.y, piece)
+                rx += c.stringWidth(piece, font, font_size)
+            self.y -= lh
+            line_parts = []
+            line_width = 0.0
+
+        c.setFont(font, font_size)
+        for is_red, tok in flat:
+            tw = c.stringWidth(tok, font, font_size)
+            if line_width + tw > max_w + 0.01 and line_parts:
+                emit_line()
+            line_parts.append((is_red, tok))
+            line_width += tw
+        emit_line()
+
+        if wc_line:
+            self.y -= BLOCK_GAP_MM * mm * 0.25
+            wc_fs = font_size * 0.92
+            wc_lh = _line_step_for_font(wc_fs)
+            c.setFillColor(colors.black)
+            c.setFont(font, wc_fs)
+            for ln in _wrap_words_to_width(c, wc_line, font=font, font_size=wc_fs, max_width=max_w):
+                self.ensure_space(wc_lh / mm)
+                c.drawString(x, self.y, ln)
+                self.y -= wc_lh
         self.y -= BLOCK_GAP_MM * mm
 
     def _draw_wrapped_paragraph_all_lines(
@@ -740,13 +910,7 @@ class _PageCtx:
                 wrong, post_arrow = inner.split("→", 1)
                 wrong = wrong.strip()
                 post_arrow = post_arrow.strip()
-                if "：" in post_arrow:
-                    correct, suf = post_arrow.split("：", 1)
-                    correct = correct.strip()
-                    suf = suf.strip()
-                else:
-                    correct = post_arrow
-                    suf = ""
+                correct, suf = _split_post_arrow_correct_suffix(post_arrow)
                 self._draw_wrong_arrow_correct_block(
                     x=x,
                     max_w=max_w,
@@ -774,18 +938,89 @@ class _PageCtx:
                 jp_wrap=True,
             )
 
-    def _draw_explanation_paragraph_plain(self, para: str, *, max_width_mm: float) -> None:
-        """解説段落をすべて黒・本文サイズで描画（【内容】ブロック用）。"""
+    def _draw_content_explanation_block(self, para: str, *, max_width_mm: float) -> None:
+        """【内容】ブロック: 【内容】・【ヒント】・①〜と小見出しを太字風、その他は黒で折り返し。"""
         p = _normalize_deduction_marks(_norm_text(para.strip()))
         if not p:
             return
-        self._draw_wrapped_paragraph_all_lines(
-            p,
-            max_width_mm=max_width_mm,
-            font_size=EXPLAIN_BODY_FONT_PT,
-            indent_mm=0,
-            jp_wrap=True,
-        )
+        fs = EXPLAIN_BODY_FONT_PT
+        line_h = _line_step_for_font(fs)
+        x = MARGIN_X_MM * mm
+        max_w = max_width_mm * mm
+        font = self._font
+        c = self.c
+        for raw_ln in p.split("\n"):
+            ln = raw_ln.rstrip()
+            if not ln.strip():
+                self.y -= line_h * 0.35
+                continue
+            t = ln.strip()
+            stripped = re.sub(r"^[●○]\s*", "", t)
+
+            if stripped.startswith(_CONTENT_HEAD):
+                self.ensure_space(line_h / mm)
+                rest = stripped[len(_CONTENT_HEAD) :].strip()
+                bw = _draw_fake_bold_string(c, x=x, y=self.y, text=_CONTENT_HEAD, font=font, font_size=fs)
+                if rest:
+                    cx = x + bw + c.stringWidth(" ", font, fs)
+                    if cx + c.stringWidth(rest, font, fs) <= max_w + 0.01:
+                        c.setFont(font, fs)
+                        c.setFillColor(colors.black)
+                        c.drawString(cx, self.y, rest)
+                self.y -= line_h
+                continue
+
+            if stripped in (_GRAMMAR_HEAD, _GRAMMAR_HEAD_LEGACY):
+                self.ensure_space(line_h / mm)
+                _draw_fake_bold_string(c, x=x, y=self.y, text=_GRAMMAR_HEAD, font=font, font_size=fs)
+                self.y -= line_h
+                continue
+
+            if stripped == _HINT_HEAD or stripped.startswith(_HINT_HEAD):
+                self.ensure_space(line_h / mm)
+                bw = _draw_fake_bold_string(c, x=x, y=self.y, text=_HINT_HEAD, font=font, font_size=fs)
+                tail = stripped[len(_HINT_HEAD) :].strip()
+                if tail:
+                    cx = x + bw + c.stringWidth(" ", font, fs)
+                    if cx + c.stringWidth(tail, font, fs) <= max_w + 0.01:
+                        c.setFont(font, fs)
+                        c.setFillColor(colors.black)
+                        c.drawString(cx, self.y, tail)
+                    else:
+                        self.y -= line_h
+                        self._draw_wrapped_paragraph_all_lines(
+                            tail,
+                            max_width_mm=max_width_mm,
+                            font_size=fs,
+                            indent_mm=0,
+                            jp_wrap=True,
+                        )
+                        continue
+                self.y -= line_h
+                continue
+
+            bold_part, tail_part = _circled_bold_prefix_and_tail(stripped)
+            if bold_part:
+                self.ensure_space(line_h / mm)
+                _draw_fake_bold_string(c, x=x, y=self.y, text=bold_part, font=font, font_size=fs)
+                self.y -= line_h
+                if tail_part.strip():
+                    self._draw_wrapped_paragraph_all_lines(
+                        tail_part.strip(),
+                        max_width_mm=max_width_mm,
+                        font_size=fs,
+                        indent_mm=0,
+                        jp_wrap=True,
+                    )
+                continue
+
+            self._draw_wrapped_paragraph_all_lines(
+                t,
+                max_width_mm=max_width_mm,
+                font_size=fs,
+                indent_mm=0,
+                jp_wrap=True,
+            )
 
     def draw_eval_and_explanation(
         self,
@@ -819,79 +1054,58 @@ class _PageCtx:
             self.y -= line_h
         self.y -= BLOCK_GAP_MM * mm * 0.5
 
-        # 全体コメント（挨拶・導入の定型文は先頭から除去）
-        second = _insert_jp_wrap_spaces(_norm_text(_strip_leading_greeting_general_comment(line2)))
-        lines = _wrap_words_to_width(
-            c, second, font=self._font, font_size=START_BODY_FONT_PT, max_width=max_w
-        )
-        c.setFont(self._font, START_BODY_FONT_PT)
-        line_h = _line_step_for_font(START_BODY_FONT_PT)
-        for ln in lines:
-            self.ensure_space(line_h / mm)
-            c.drawString(x, self.y, ln)
-            self.y -= line_h
-        self.y -= BLOCK_GAP_MM * mm * 0.5
+        # 全体コメントは画面から廃止したため PDF にも載せない（line2 は無視）
 
-        # 解説: line3 は公開 API / テキストDL（StudentCorrectionLookup の r.explanation）と同一文字列。
-        # 【内容】は黒のみ、【文法・語法・表現】は箇条書き ● ＋ 誤→正の赤。
-        raw3 = _normalize_deduction_marks(_norm_text(line3))
+        # 解説: /result と同じ正規化（student-release + 公開用整形）後、見出し位置で内容/文法に分割して描画。
+        line3_proc = normalize_student_explanation_text(
+            canonicalize_growth_hint_heading_explanation(
+                canonicalize_legacy_grammar_heading_explanation(_norm_text(line3))
+            )
+        )
+        raw3 = _normalize_deduction_marks(line3_proc)
         raw3 = _ensure_content_bullet_lines(raw3)
         gkey = _grammar_header_marker_in(raw3)
+        gap = BLOCK_GAP_MM * mm * 0.25
+
         if gkey:
             gi = raw3.index(gkey)
             content_seg = raw3[:gi].rstrip()
-            grammar_seg = raw3[gi:].lstrip()
-            grammar_seg = _ensure_grammar_bullet_lines(grammar_seg)
-            formatted_g = _format_explanation_bullets(grammar_seg)
-            if formatted_g:
-                grammar_out = _ensure_grammar_bullet_lines(formatted_g)
-            else:
-                grammar_out = grammar_seg
-            formatted = f"{content_seg}\n\n{grammar_out}".strip()
+            grammar_raw = raw3[gi:].rstrip()
         else:
-            grammar_seg = _ensure_grammar_bullet_lines(raw3)
-            formatted = _format_explanation_bullets(grammar_seg)
-            if formatted:
-                formatted = _ensure_grammar_bullet_lines(formatted)
-        if not formatted:
+            content_seg = raw3.rstrip()
+            grammar_raw = ""
+
+        if content_seg.strip():
+            self._draw_content_explanation_block(content_seg, max_width_mm=max_width_mm)
+            self.y -= gap
+
+        if grammar_raw.strip():
+            gw = _ensure_grammar_bullet_lines(grammar_raw)
+            gf = _format_explanation_bullets(gw)
+            if gf:
+                gw = _ensure_grammar_bullet_lines(gf)
+            glines = [x.strip() for x in gw.split("\n") if x.strip()]
+            if glines:
+                first = glines[0].strip()
+                if first in (_GRAMMAR_HEAD, _GRAMMAR_HEAD_LEGACY, "【文法】"):
+                    h0 = _canonical_grammar_heading_line(glines[0])
+                    self._draw_content_explanation_block(h0, max_width_mm=max_width_mm)
+                    self.y -= gap
+                    rest_g = glines[1:]
+                else:
+                    rest_g = glines
+                for j, gln in enumerate(rest_g):
+                    if j:
+                        self.y -= gap
+                    self._draw_explanation_paragraph_colored(gln, max_width_mm=max_width_mm)
+        elif not content_seg.strip() and raw3.strip():
             self._draw_wrapped_paragraph_all_lines(
-                _normalize_deduction_marks(_norm_text(line3)),
+                raw3,
                 max_width_mm=max_width_mm,
                 font_size=EXPLAIN_BODY_FONT_PT,
                 indent_mm=0,
                 jp_wrap=True,
             )
-        else:
-            section: Optional[str] = None
-            gap = BLOCK_GAP_MM * mm * 0.25
-            for para in re.split(r"\n\s*\n+", formatted.strip()):
-                p = para.strip()
-                if not p:
-                    continue
-                if p.startswith("【内容】"):
-                    section = "content"
-                    self._draw_explanation_paragraph_plain(p, max_width_mm=max_width_mm)
-                elif _para_first_line_is_grammar_heading(p):
-                    section = "grammar"
-                    glines = [x.strip() for x in p.split("\n") if x.strip()]
-                    if glines:
-                        h0 = _canonical_grammar_heading_line(glines[0])
-                        self._draw_explanation_paragraph_plain(h0, max_width_mm=max_width_mm)
-                        for j, gln in enumerate(glines[1:]):
-                            if j:
-                                self.y -= gap
-                            self._draw_explanation_paragraph_colored(gln, max_width_mm=max_width_mm)
-                elif section == "content":
-                    self._draw_explanation_paragraph_plain(p, max_width_mm=max_width_mm)
-                elif section == "grammar":
-                    g2 = [x.strip() for x in p.split("\n") if x.strip()]
-                    for j, gln in enumerate(g2):
-                        if j:
-                            self.y -= gap
-                        self._draw_explanation_paragraph_colored(gln, max_width_mm=max_width_mm)
-                else:
-                    self._draw_explanation_paragraph_colored(p, max_width_mm=max_width_mm)
-                self.y -= gap
 
         self.y -= BLOCK_GAP_MM * mm
 
@@ -905,6 +1119,7 @@ def render_return_pdf(
     line2: str,
     line3: str,
     final_essay: str,
+    original_essay: str = "",
     qr_path: Optional[str],
 ) -> str:
     os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
@@ -923,9 +1138,11 @@ def render_return_pdf(
         line3,
         max_width_mm=178,
     )
-    final_with_count = _final_essay_with_word_count_line(final_essay)
-    ctx.draw_block_long(
+    final_clean = strip_final_essay_artifacts((final_essay or "").strip())
+    final_with_count = _final_essay_with_word_count_line(final_clean)
+    ctx.draw_final_essay_with_revision_highlights(
         "完成版（1分間スピーチ練習用）",
+        original_essay,
         final_with_count,
         max_width_mm=178,
         font_size=10.5,

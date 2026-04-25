@@ -20,6 +20,23 @@ function segmentOk(seg: string): boolean {
   return true;
 }
 
+/** RFC 5987 の filename* で日本語などを渡し、古い UA 用に ASCII の filename も付ける */
+function contentDispositionPdfAttachment(displayName: string): string {
+  const trimmed = displayName.trim().slice(0, 200) || "result.pdf";
+  const ext = path.extname(trimmed) || ".pdf";
+  const stem = trimmed.endsWith(ext) ? trimmed.slice(0, -ext.length) : trimmed;
+  const asciiStem = stem
+    .replace(/[^A-Za-z0-9._-]/g, "")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 120);
+  const asciiName = `${asciiStem || "feedback"}${ext}`;
+  const star = encodeURIComponent(trimmed).replace(
+    /[!'()*]/g,
+    (ch) => "%" + ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0"),
+  );
+  return `attachment; filename="${asciiName}"; filename*=UTF-8''${star}`;
+}
+
 /**
  * GET /output/audio|qr|pdf/... 用。segments は URL の /output/ 以降。
  */
@@ -61,12 +78,18 @@ export async function getOutputFileResponse(segments: string[] | undefined): Pro
   try {
     const buf = await readFile(realFile);
     const name = segments[segments.length - 1] ?? "file";
+    const ct = contentType(name);
+    const headers: Record<string, string> = {
+      "Content-Type": ct,
+      "Cache-Control": "public, max-age=300",
+    };
+    // PDF はブラウザ内蔵ビューアに吸われがちなので、保存ダイアログを出しやすくする
+    if (ct === "application/pdf") {
+      headers["Content-Disposition"] = contentDispositionPdfAttachment(name);
+    }
     return new NextResponse(buf, {
       status: 200,
-      headers: {
-        "Content-Type": contentType(name),
-        "Cache-Control": "public, max-age=300",
-      },
+      headers,
     });
   } catch {
     return NextResponse.json({ message: "Not found" }, { status: 404 });

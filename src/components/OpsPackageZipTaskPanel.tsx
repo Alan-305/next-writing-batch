@@ -68,11 +68,6 @@ export function OpsPackageZipTaskPanel() {
   return (
     <div className="card">
       <h2>納品ZIPを作成（課題単位）</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        登録済みの<strong>課題ID</strong>を選び、        <code>output/audio|qr|pdf/（課題ID）/</code> 以下を <code>output/zips/（課題ID）.zip</code> にまとめます（
-        <code>package_task_outputs.py</code> と同等）。Day4
-        を済ませた課題のみ有効です。
-      </p>
       <p>
         <Link href="/ops/deliverables">納品ZIPのダウンロード一覧</Link>
       </p>

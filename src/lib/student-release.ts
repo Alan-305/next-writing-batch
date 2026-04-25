@@ -1,3 +1,4 @@
+import { sanitizeFinalEssayArtifactText } from "@/lib/student-final-essay-display";
 import {
   computeScoreTotal,
   formatRubricEvaluationSummary,
@@ -105,9 +106,43 @@ export function canonicalizeLegacyGrammarHeadingInExplanation(text: string): str
     .join("\n");
 }
 
+/** 行頭の「【成長ヒント】」「● 【成長ヒント】」、旧「ヒント」見出しを「【ヒント】」へ */
+export function canonicalizeGrowthHintHeadingInExplanation(text: string): string {
+  if (!text) return text;
+  return text
+    .split("\n")
+    .map((line) => {
+      let s = line
+        .replace(/^(\s*)(?:●|○)\s*【成長ヒント】\s*/, "$1【ヒント】")
+        .replace(/^(\s*)【成長ヒント】\s*/, "$1【ヒント】")
+        .replace(/^(\s*)(?:●|○)\s*ヒント\s*$/, "$1【ヒント】")
+        .replace(/^(\s*)(?:●|○)\s*ヒント([：:])/, "$1【ヒント】$2");
+      const tr = s.trim();
+      if (tr === "ヒント") {
+        return s.replace(/^(\s*)ヒント\s*$/, "$1【ヒント】");
+      }
+      if (/^(\s*)ヒント([：:])/.test(s)) {
+        return s.replace(/^(\s*)ヒント([：:])/, "$1【ヒント】$2");
+      }
+      return s;
+    })
+    .join("\n");
+}
+
+function preprocessExplanationBeforeNormalize(explanation: string): string {
+  return canonicalizeGrowthHintHeadingInExplanation(
+    canonicalizeLegacyGrammarHeadingInExplanation(explanation ?? ""),
+  );
+}
+
+/** ①〜⑳ の行頭（見出し・箇条書きの番号） */
+function leadsWithCircledDigit1To20(s: string): boolean {
+  return /^[\u2460-\u2473]/.test(s);
+}
+
 /**
- * 【内容】ブロック内で行頭に句読点（、。，．）が来ないよう前行へ寄せ、
- * 【内容】の箇条書き各行の先頭に ● を付ける（見出し・内容減点合計行は除外）、
+ * 【内容】ブロック内で行頭に句読点（、。，．）が来ないよう前行へ寄せる。
+ * 【内容】では ● を付けない（①②③・【ヒント】で区切る。行頭の ●・「Step 1」ラベルは除去）。
  * 【文法・語法・表現】ブロックの箇条書き各行の先頭に ● を付ける（減点合計行は除外）。
  */
 export function normalizeStudentExplanation(explanation: string): string {
@@ -126,6 +161,16 @@ export function normalizeStudentExplanation(explanation: string): string {
   const isGrammarDeductionLine = (s: string) => /^\s*文法減点\s*合計\s*[:：]/.test(s);
   const leadsJpClausePunct = (t: string) => /^[、。，．]/.test(t);
   const isContentDeductionLine = (s: string) => /^\s*内容減点\s*合計\s*[:：]/.test(s);
+
+  const stripContentLeadingMarkers = (core: string): string => {
+    let t = core;
+    for (;;) {
+      const n = t.replace(/^(?:●|○)\s*/, "");
+      if (n === t) break;
+      t = n;
+    }
+    return t.replace(/^\s*step\s*1\s*[：:.．]?\s*/i, "");
+  };
 
   for (const line of lines) {
     if (mode === "outer") {
@@ -168,11 +213,21 @@ export function normalizeStudentExplanation(explanation: string): string {
         out.push(line);
         continue;
       }
-      if (t.startsWith("●") || t.startsWith("○")) {
+      const strippedBullet = stripContentLeadingMarkers(t);
+      const indent = line.match(/^\s*/)?.[0] ?? "";
+      if (leadsWithCircledDigit1To20(strippedBullet)) {
+        out.push(indent + strippedBullet);
+        continue;
+      }
+      if (strippedBullet === "【ヒント】" || strippedBullet.startsWith("【ヒント】")) {
+        out.push(indent + strippedBullet);
+        continue;
+      }
+      if (t === "（記載なし）") {
         out.push(line);
         continue;
       }
-      out.push(`● ${t}`);
+      out.push(strippedBullet ? indent + strippedBullet : line);
       continue;
     }
     // grammar_body
@@ -194,6 +249,10 @@ export function normalizeStudentExplanation(explanation: string): string {
       out.push(line);
       continue;
     }
+    if (t === "（記載なし）") {
+      out.push(line);
+      continue;
+    }
     out.push(`● ${t}`);
   }
 
@@ -202,12 +261,89 @@ export function normalizeStudentExplanation(explanation: string): string {
 
 /** 公開表示・ダウンロード用（見出しの正規化＋句読点・箇条書きの整形）。 */
 export function formatExplanationForPublicView(explanation: string): string {
-  return normalizeStudentExplanation(canonicalizeLegacyGrammarHeadingInExplanation(explanation ?? ""));
+  return normalizeStudentExplanation(preprocessExplanationBeforeNormalize(explanation ?? ""));
+}
+
+/** 指摘文内の「➖N点」「-N点」等を合計（AI grammar_deduction との突合用）。 */
+export function sumDeductionMarksFromText(text: string): number {
+  const s = text ?? "";
+  let sum = 0;
+  const re = /(?:➖|−|-)\s*(\d+)\s*点/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) sum += n;
+  }
+  return sum;
+}
+
+/**
+ * 【内容】/【文法】見出しが無いとき用。
+ * ①〜⑳ と【ヒント】を内容、行頭の ●/○ を文法とみなす（`formatExplanationForPublicView` 済み想定）。
+ * どちらにも当てはまらない行は直前の区分へ連なる（内容・文法それぞれの続き）。
+ */
+function splitExplanationNoSectionHeads(rawLines: string[]): {
+  contentComment: string;
+  grammarComment: string;
+} {
+  const contentLines: string[] = [];
+  const grammarLines: string[] = [];
+  let last: "none" | "content" | "grammar" = "none";
+  const stripLeadBullet = (s: string) => s.replace(/^(?:●|○)\s*/, "");
+
+  for (const line of rawLines) {
+    const t = line.trim();
+    if (!t) continue;
+
+    if (/^内容減点\s*合計\s*[:：]/.test(t)) {
+      contentLines.push(line);
+      last = "content";
+      continue;
+    }
+    if (/^文法減点\s*合計\s*[:：]/.test(t)) {
+      grammarLines.push(line);
+      last = "grammar";
+      continue;
+    }
+
+    const t0 = line.trimStart();
+    const afterBullet = stripLeadBullet(t0);
+
+    if (afterBullet === "【ヒント】" || afterBullet.startsWith("【ヒント】")) {
+      contentLines.push(line);
+      last = "content";
+      continue;
+    }
+
+    if (leadsWithCircledDigit1To20(afterBullet)) {
+      contentLines.push(line);
+      last = "content";
+      continue;
+    }
+
+    if (/^●|^○/.test(t0)) {
+      grammarLines.push(line);
+      last = "grammar";
+      continue;
+    }
+
+    if (last === "grammar") {
+      grammarLines.push(line);
+    } else {
+      contentLines.push(line);
+      last = last === "none" ? "content" : last;
+    }
+  }
+
+  return {
+    contentComment: contentLines.join("\n"),
+    grammarComment: grammarLines.join("\n"),
+  };
 }
 
 /**
  * 修正入力の「内容の指摘」「文法の指摘」用。`formatExplanationForPublicView` 済みの解説を想定。
- * 見出しが無い旧形式は語句ベースで暫定分割する。
+ * 【内容】/【文法】見出しがある場合は見出し単位で分割。無い旧形式は ①②③・【ヒント】と ● 箇条書きで分割する。
  */
 export function splitExplanationIntoContentGrammarSections(explanation: string): {
   contentComment: string;
@@ -255,17 +391,7 @@ export function splitExplanationIntoContentGrammarSections(explanation: string):
     };
   }
 
-  for (const line of rawLines) {
-    if (/文法|語法|時制|冠詞|単複|前置詞|スペル|主語動詞一致|grammar/i.test(line)) {
-      grammarLines.push(line);
-    } else {
-      contentLines.push(line);
-    }
-  }
-  return {
-    contentComment: contentLines.join("\n"),
-    grammarComment: grammarLines.join("\n"),
-  };
+  return splitExplanationNoSectionHeads(rawLines);
 }
 
 /** 旧コンポーネント内関数名との互換（`splitExplanationIntoContentGrammarSections` と同一）。 */
@@ -282,16 +408,18 @@ function buildExplanationFromSections(args: {
   const lines: string[] = [];
   lines.push("【内容】");
   lines.push(args.contentComment || "（記載なし）");
-  if (args.contentDeduction != null && args.contentMax != null) {
-    const score = clampScore(args.contentMax - args.contentDeduction, args.contentMax);
-    lines.push(`内容減点 合計: -${args.contentDeduction}点（${score}/${args.contentMax}点）`);
+  const cd = args.contentDeduction ?? 0;
+  const gd = args.grammarDeduction ?? 0;
+  if (args.contentMax != null) {
+    const score = clampScore(args.contentMax - cd, args.contentMax);
+    lines.push(`内容減点 合計: -${cd}点（${score}/${args.contentMax}点）`);
   }
   lines.push("");
   lines.push(GRAMMAR_SECTION_HEAD);
   lines.push(args.grammarComment || "（記載なし）");
-  if (args.grammarDeduction != null && args.grammarMax != null) {
-    const score = clampScore(args.grammarMax - args.grammarDeduction, args.grammarMax);
-    lines.push(`文法減点 合計: -${args.grammarDeduction}点（${score}/${args.grammarMax}点）`);
+  if (args.grammarMax != null) {
+    const score = clampScore(args.grammarMax - gd, args.grammarMax);
+    lines.push(`文法減点 合計: -${gd}点（${score}/${args.grammarMax}点）`);
   }
   return lines.join("\n").trim();
 }
@@ -375,7 +503,7 @@ export function buildStudentReleaseFromPatch(
         grammarMax,
       })
     : explanationInput;
-  const explanation = normalizeStudentExplanation(canonicalizeLegacyGrammarHeadingInExplanation(rawExplanation));
+  const explanation = normalizeStudentExplanation(preprocessExplanationBeforeNormalize(rawExplanation));
   const finalText = asTrimmedString(body.finalText, MAX_TEXT);
 
   const now = new Date().toISOString();
@@ -429,6 +557,41 @@ export function emptyStudentRelease(): StudentRelease {
   };
 }
 
+/** 旧 Day3（evaluation 無し）の line1〜3 を全体コメント相当へまとめる */
+export function legacyProofreadGeneralComment(pr: {
+  line1_feedback?: string;
+  line2_improvement?: string;
+  line3_next_action?: string;
+}): string {
+  const parts = [pr.line1_feedback, pr.line2_improvement, pr.line3_next_action]
+    .map((x) => (typeof x === "string" ? x.trim() : ""))
+    .filter(Boolean);
+  return parts.join("\n\n");
+}
+
+/** 添削1行目「内容X点＋文法Y点」から減点（各25満点）を復元 */
+function nlDeductionsFromEvaluationLine(evaluation: string): { content: number; grammar: number } | null {
+  const m = evaluation
+    .trim()
+    .match(/内容\s*(\d+)\s*点\s*[＋+]\s*文法(?:・語法)?\s*(\d+)\s*点/);
+  if (!m) return null;
+  const ca = parseInt(m[1]!, 10);
+  const ga = parseInt(m[2]!, 10);
+  if (!Number.isFinite(ca) || !Number.isFinite(ga)) return null;
+  return {
+    content: Math.max(0, Math.min(25, 25 - ca)),
+    grammar: Math.max(0, Math.min(25, 25 - ga)),
+  };
+}
+
+/** 添削バッチが既に【内容】＋【文法・語法・表現】型で explanation を保存しているか */
+function proofreadExplanationLooksSectionMerged(explanation: string): boolean {
+  const t = (explanation ?? "").trim();
+  return t.includes("【内容】") && (t.includes("【文法・語法・表現】") || t.includes("【文法】"));
+}
+
+const NL_ESSAY_RUBRIC_MAX_PER_AXIS = 25;
+
 export function seedStudentReleaseFromProofread(pr: {
   evaluation?: string;
   general_comment?: string;
@@ -439,8 +602,11 @@ export function seedStudentReleaseFromProofread(pr: {
   grammar_deduction?: number;
   final_version?: string;
   final_essay?: string;
+  line1_feedback?: string;
+  line2_improvement?: string;
+  line3_next_action?: string;
 }): StudentRelease {
-  const finalRaw = (pr.final_essay || pr.final_version || "").trim();
+  const finalRaw = sanitizeFinalEssayArtifactText((pr.final_essay || pr.final_version || "").trim());
   const explRaw = (pr.explanation || "").trim();
   const formattedExpl = formatExplanationForPublicView(explRaw);
   const splitFromExpl = explRaw
@@ -448,16 +614,53 @@ export function seedStudentReleaseFromProofread(pr: {
     : { contentComment: "", grammarComment: "" };
   const contentCommentFromApi = (pr.content_comment || "").trim();
   const grammarCommentFromApi = (pr.grammar_comment || "").trim();
-  const contentComment = explRaw ? splitFromExpl.contentComment : contentCommentFromApi;
-  const grammarComment = explRaw ? splitFromExpl.grammarComment : grammarCommentFromApi;
+  /** JSON の content_comment / grammar_comment を優先（レガシー explanation の誤分割を防ぐ） */
+  const contentComment = contentCommentFromApi || splitFromExpl.contentComment;
+  const grammarComment = grammarCommentFromApi || splitFromExpl.grammarComment;
   const contentDed = Number(pr.content_deduction);
   const grammarDed = Number(pr.grammar_deduction);
+  const hasEval = Boolean((pr.evaluation || "").trim());
+  const generalComment =
+    (pr.general_comment || "").trim() || (!hasEval ? legacyProofreadGeneralComment(pr) : "");
+
+  const alreadyMerged = proofreadExplanationLooksSectionMerged(explRaw);
+  let explanationOut = formattedExpl;
+  if (
+    !alreadyMerged &&
+    (contentCommentFromApi ||
+      grammarCommentFromApi ||
+      Number.isFinite(contentDed) ||
+      Number.isFinite(grammarDed) ||
+      Boolean(contentComment) ||
+      Boolean(grammarComment))
+  ) {
+    let cd = Number.isFinite(contentDed) ? Math.max(0, Math.floor(contentDed)) : 0;
+    let gd = Number.isFinite(grammarDed) ? Math.max(0, Math.floor(grammarDed)) : 0;
+    const fromEval = nlDeductionsFromEvaluationLine(String(pr.evaluation ?? ""));
+    if (fromEval) {
+      cd = fromEval.content;
+      gd = fromEval.grammar;
+    }
+    explanationOut = normalizeStudentExplanation(
+      preprocessExplanationBeforeNormalize(
+        buildExplanationFromSections({
+          contentComment,
+          grammarComment,
+          contentDeduction: cd,
+          grammarDeduction: gd,
+          contentMax: NL_ESSAY_RUBRIC_MAX_PER_AXIS,
+          grammarMax: NL_ESSAY_RUBRIC_MAX_PER_AXIS,
+        }),
+      ),
+    );
+  }
+
   return {
     scores: {},
     scoreTotal: 0,
     evaluation: "",
-    generalComment: (pr.general_comment || "").trim(),
-    explanation: formattedExpl,
+    generalComment,
+    explanation: explanationOut,
     ...(contentComment ? { contentComment } : {}),
     ...(grammarComment ? { grammarComment } : {}),
     ...(Number.isFinite(contentDed) ? { contentDeduction: Math.max(0, contentDed) } : {}),

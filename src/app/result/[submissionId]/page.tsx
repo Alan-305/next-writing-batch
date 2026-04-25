@@ -1,19 +1,20 @@
 import Link from "next/link";
 
-import { finalEssayHtmlWithRevisionHighlights } from "@/lib/final-essay-diff-html";
+import { StudentResultAudioControls } from "@/components/StudentResultAudioControls";
+import { StudentResultViewBeacon } from "@/components/StudentResultViewBeacon";
+import { StudentResultPrintActions } from "@/components/StudentResultPrintActions";
+import { studentExplanationToDisplayHtml } from "@/lib/explanation-display-html";
+import { finalEssayHtmlPlainBlack } from "@/lib/final-essay-diff-html";
 import { formatDateTimeIso } from "@/lib/format-date";
-import { formatExplanationForPublicView } from "@/lib/student-release";
+import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-display";
+import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
+import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
 import { getSubmissionById } from "@/lib/submissions-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Props = { params: Promise<{ submissionId: string }> };
-
-function outputPublicHref(relativePath: string): string {
-  const p = relativePath.replace(/^\/+/, "");
-  return p.startsWith("output/") ? `/${p}` : `/${p}`;
-}
 
 function hrefForAudioUrl(url: string): string {
   const u = url.trim();
@@ -55,93 +56,90 @@ export default async function StudentResultPage({ params }: Props) {
     );
   }
 
-  const pdfPath = submission.day4?.pdf_path?.trim();
-  const pdfHref = pdfPath ? outputPublicHref(pdfPath) : "";
-
   const qrPath = submission.day4?.qr_path?.trim() ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
+  const audioSrc = audioUrl ? hrefForAudioUrl(audioUrl) : "";
 
-  const finalEssayHtml = finalEssayHtmlWithRevisionHighlights(submission.essayText ?? "", sr.finalText ?? "");
+  const explanationHtml = studentExplanationToDisplayHtml(sr.explanation ?? "");
+  const { revised: finalRevised } = resolveFinalEssayForStudentDisplay({
+    essayText: submission.essayText,
+    studentReleaseFinalText: sr.finalText,
+    proofread: submission.proofread,
+  });
+  const finalEssayHtml = finalEssayHtmlPlainBlack(finalRevised);
+
+  const taskMaster = await loadTaskProblemsMaster(submission.taskId);
+  const scoreInline = taskMaster
+    ? formatRubricEvaluationInline(taskMaster, sr.scores ?? {}, sr.scoreTotal)
+    : null;
 
   return (
-    <main>
+    <main className="student-result-page">
+      <StudentResultViewBeacon submissionId={submission.submissionId} />
       <h1>添削結果（確定版）</h1>
       <p className="muted" style={{ marginTop: 0 }}>
         {submission.studentName} さん / taskId: {submission.taskId} / 公開日時:{" "}
         {formatDateTimeIso(sr.operatorApprovedAt)}
       </p>
 
-      <div className="card">
-        <h2>得点・評価</h2>
-        <p style={{ margin: "0 0 10px", fontWeight: 600 }}>
-          合計: {sr.scoreTotal}点
-        </p>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{sr.evaluation}</pre>
+      <StudentResultPrintActions />
+
+      <div className="card student-result-card">
+        <h2 className="student-result-section-title">得点・評価</h2>
+        {scoreInline ? (
+          <p className="student-result-score-line">{scoreInline}</p>
+        ) : (
+          <>
+            <p className="student-result-score-line">合計: {sr.scoreTotal}点</p>
+            <pre className="student-result-pre">{sr.evaluation}</pre>
+          </>
+        )}
       </div>
 
-      <div className="card">
-        <h2>全体コメント</h2>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{sr.generalComment}</pre>
-      </div>
-
-      <div className="card">
-        <h2>解説</h2>
-        <pre
+      <div className="card student-result-card">
+        <h2 className="student-result-section-title">解説</h2>
+        <div
+          className="student-explanation-html-wrap"
           lang="ja"
-          style={{ whiteSpace: "pre-wrap", margin: 0, lineBreak: "strict" }}
-        >
-          {formatExplanationForPublicView(sr.explanation)}
-        </pre>
+          dangerouslySetInnerHTML={{ __html: explanationHtml }}
+        />
       </div>
 
-      <div className="card">
-        <h2>完成版（英文）</h2>
-        <p className="muted" style={{ marginTop: 0, marginBottom: 10 }}>
-          提出した原文と比べて<strong>変わった部分</strong>を赤く表示しています（語・空白の単位の目安です）。
-        </p>
+      <div className="card student-result-card student-result-card--essay">
+        <h2 className="student-result-section-title">完成版</h2>
         <div className="essay-final-diff" dangerouslySetInnerHTML={{ __html: finalEssayHtml }} />
+        {audioSrc ? <StudentResultAudioControls src={audioSrc} /> : null}
       </div>
 
       {qrSrc ? (
-        <div className="card">
-          <h2>音声（スマホ用 QR）</h2>
-          <p className="muted" style={{ marginTop: 0, lineHeight: 1.6 }}>
+        <div className="card student-result-card">
+          <h2 className="student-result-section-title">音声（スマホ用 QR）</h2>
+          <p className="muted student-result-qr-lead">
             音声には再生可能期限がありますのでダウンロードして保存してください。
           </p>
-          <div style={{ marginBottom: 12 }}>
+          <div className="student-result-qr-img-wrap">
             <img
               src={qrSrc}
               alt="音声への QR"
               width={220}
               height={220}
-              style={{ border: "1px solid #e2e8f0", borderRadius: 8 }}
+              className="student-result-qr-img"
             />
           </div>
           {audioUrl ? (
-            <p style={{ wordBreak: "break-all", marginBottom: 0 }}>
+            <p className="student-result-qr-audio-link">
               同じ音声を PC のブラウザで聞く場合:{" "}
               <a href={hrefForAudioUrl(audioUrl)}>音声を開く</a>
             </p>
           ) : null}
-          <p className="muted" style={{ marginTop: 10, marginBottom: 0 }}>
+          <p className="muted student-result-qr-foot">
             開いた先はページではなく <strong>mp3 ファイル</strong>です。再生ボタン（▶）を押すか、ダウンロードしてから聞いてください。
           </p>
         </div>
       ) : null}
 
-      {pdfHref ? (
-        <div className="card">
-          <h2>PDF</h2>
-          <p>
-            <a href={pdfHref} download className="student-download-btn">
-              PDFでダウンロード
-            </a>
-          </p>
-        </div>
-      ) : null}
-
-      <p>
+      <p className="no-print">
         <Link href="/submit">提出画面へ戻る</Link>
         {" · "}
         <Link href="/">開発用トップ</Link>

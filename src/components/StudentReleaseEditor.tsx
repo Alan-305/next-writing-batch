@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -11,6 +12,7 @@ import {
 } from "@/lib/student-release";
 import { buildRubricScoresForEditor } from "@/lib/build-rubric-scores-for-editor";
 import { computeScoreTotal, type TaskProblemsMaster } from "@/lib/task-problems-core";
+import { sanitizeFinalEssayArtifactText } from "@/lib/student-final-essay-display";
 
 type ProofreadSeed = {
   evaluation?: string;
@@ -22,12 +24,27 @@ type ProofreadSeed = {
   grammar_deduction?: number;
   final_version?: string;
   final_essay?: string;
+  line1_feedback?: string;
+  line2_improvement?: string;
+  line3_next_action?: string;
+  operator_message?: string;
+  error?: string;
 };
 
 function coalesceText(v: unknown): string {
   if (typeof v === "string") return v;
   if (v == null) return "";
   return String(v);
+}
+
+/** API が空文字で返す場合も次候補へ（`??` だけだと空文字で止まる） */
+function firstNonEmptyComment(...candidates: (string | undefined | null)[]): string {
+  for (const c of candidates) {
+    if (c == null) continue;
+    const raw = coalesceText(c);
+    if (raw.trim()) return raw;
+  }
+  return "";
 }
 
 function clampInt(n: number, min: number, max: number): number {
@@ -126,12 +143,19 @@ export function StudentReleaseEditor({
       return base;
     },
   );
-  const [generalComment, setGeneralComment] = useState(() => coalesceText(seeded?.generalComment));
   const [contentComment, setContentComment] = useState(() =>
-    coalesceText(seeded?.contentComment ?? aiSplitComments.contentComment ?? proofread?.content_comment),
+    firstNonEmptyComment(
+      seeded?.contentComment,
+      proofread?.content_comment,
+      aiSplitComments.contentComment,
+    ),
   );
   const [grammarComment, setGrammarComment] = useState(() =>
-    coalesceText(seeded?.grammarComment ?? aiSplitComments.grammarComment ?? proofread?.grammar_comment),
+    firstNonEmptyComment(
+      seeded?.grammarComment,
+      proofread?.grammar_comment,
+      aiSplitComments.grammarComment,
+    ),
   );
   const [contentDeduction, setContentDeduction] = useState(() => {
     const saved = Number(seeded?.contentDeduction);
@@ -153,35 +177,43 @@ export function StudentReleaseEditor({
     const score = Number(scores[grammarItem.id] ?? 0);
     return clampInt(grammarMax - (Number.isFinite(score) ? score : 0), 0, grammarMax);
   });
-  const [finalText, setFinalText] = useState(() => coalesceText(seeded?.finalText));
+  const [finalText, setFinalText] = useState(() =>
+    sanitizeFinalEssayArtifactText(coalesceText(seeded?.finalText)),
+  );
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const reimportFromProofread = () => {
-    const mergedContent = coalesceText(
-      proofread?.content_comment ?? aiSplitComments.contentComment ?? "",
+    if (!proofread) return;
+    const mergedContent = firstNonEmptyComment(
+      proofread.content_comment,
+      aiSplitComments.contentComment,
     );
-    const mergedGrammar = coalesceText(
-      proofread?.grammar_comment ?? aiSplitComments.grammarComment ?? "",
+    const mergedGrammar = firstNonEmptyComment(
+      proofread.grammar_comment,
+      aiSplitComments.grammarComment,
     );
-    const nextGeneral = coalesceText(proofread?.general_comment ?? "");
-    const nextFinalText = coalesceText(
-      proofread?.final_version ?? proofread?.final_essay ?? "",
+    const nextFinalText = sanitizeFinalEssayArtifactText(
+      coalesceText(proofread.final_essay ?? proofread.final_version ?? ""),
     );
 
-    const aiDedContent = Number(proofread?.content_deduction);
-    const aiDedGrammar = Number(proofread?.grammar_deduction);
+    const aiDedContent = Number(proofread.content_deduction);
+    const aiDedGrammar = Number(proofread.grammar_deduction);
+    const parsed = parseAiContentGrammarScores(String(proofread.evaluation ?? ""));
 
     setContentComment(mergedContent);
     setGrammarComment(mergedGrammar);
-    if (nextGeneral) setGeneralComment(nextGeneral);
-    if (nextFinalText) setFinalText(nextFinalText);
+    setFinalText(nextFinalText);
     if (Number.isFinite(aiDedContent)) {
       setContentDeduction(clampInt(aiDedContent, 0, contentMax));
+    } else if (parsed && contentItem) {
+      setContentDeduction(clampInt(contentMax - parsed.content, 0, contentMax));
     }
     if (Number.isFinite(aiDedGrammar)) {
       setGrammarDeduction(clampInt(aiDedGrammar, 0, grammarMax));
+    } else if (parsed && grammarItem) {
+      setGrammarDeduction(clampInt(grammarMax - parsed.grammar, 0, grammarMax));
     }
     setMessage("最新の添削結果を修正入力へ再取り込みしました。保存するまで確定はされません。");
     setError("");
@@ -216,7 +248,7 @@ export function StudentReleaseEditor({
     try {
       const body: Record<string, unknown> = {
         scores: effectiveScores,
-        generalComment,
+        generalComment: "",
         contentComment,
         grammarComment,
         deductions: {
@@ -274,10 +306,35 @@ export function StudentReleaseEditor({
     }
   };
 
+  if (status === "failed") {
+    const op = String(proofread?.operator_message ?? "").trim();
+    const err = String(proofread?.error ?? "").trim();
+    const detail = op || err || "unknown";
+    const likelyApiKey = /GEMINI|GOOGLE_API|API.?キー|API_KEY|ADC|環境変数|\.env\.local|export/i.test(
+      `${op} ${err}`,
+    );
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <p className="error" style={{ margin: 0 }}>
+          添削に失敗しました: {detail || "unknown"}
+        </p>
+        {likelyApiKey ? (
+          <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
+            <strong>提出一覧の「添削」</strong>は Next 起動時の環境のキーを使います。{" "}
+            <code>next-writing-batch/.env.local</code> にキーを書き{" "}
+            <code>npm run dev</code> を再起動するか、{" "}
+            <Link href="/ops/gemini-key">Gemini API キー（運用）</Link>
+            から保存してください。
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   if (status !== "done") {
     return (
       <p className="muted" style={{ marginTop: 0 }}>
-        Day3 添削が完了すると、ここでルーブリック得点・確定文面を編集できます。
+        まだ添削処理が完了していません。完了後にここでルーブリック得点・確定文面を編集できます。
       </p>
     );
   }
@@ -306,16 +363,6 @@ export function StudentReleaseEditor({
       <p style={{ margin: 0, fontWeight: 600 }}>
         合計: {scoreTotal}点
       </p>
-
-      <label className="field">
-        <span>全体コメント</span>
-        <textarea
-          rows={4}
-          value={generalComment ?? ""}
-          disabled={busy}
-          onChange={(e) => setGeneralComment(e.target.value)}
-        />
-      </label>
 
       {contentItem && grammarItem ? (
         <>
@@ -415,7 +462,7 @@ export function StudentReleaseEditor({
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !proofread}
           onClick={reimportFromProofread}
           style={{
             padding: "10px 14px",
@@ -423,7 +470,7 @@ export function StudentReleaseEditor({
             background: busy ? "#94a3b8" : "#475569",
             color: "#fff",
           }}
-          title="添削結果の内容解説を内容の指摘へ、文法解説を文法の指摘へ再取り込みします"
+          title="保存済みの添削データ（Day3）を修正入力欄へまとめて再読み込みします"
         >
           添削結果を再取り込み
         </button>

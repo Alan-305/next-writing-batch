@@ -98,3 +98,28 @@ export function formatRubricEvaluationSummary(
   lines.push(`合計: ${total}点`);
   return lines.join("\n");
 }
+
+/** 生徒向け1行得点（例: 内容：10/25点+文法・語法：5/25点=合計:15/50点） */
+export function formatRubricEvaluationInline(
+  master: TaskProblemsMaster,
+  scores: Record<string, number>,
+  scoreTotal?: number,
+): string {
+  const total = scoreTotal ?? computeScoreTotal(master, scores);
+  const maxTotal =
+    master.rubric.maxTotal > 0
+      ? master.rubric.maxTotal
+      : master.rubric.items.reduce((s, it) => s + it.max, 0);
+  const parts: string[] = [];
+  for (const it of master.rubric.items) {
+    let v = scores[it.id];
+    if (typeof v !== "number" || Number.isNaN(v)) v = 0;
+    if (v < 0) v = 0;
+    if (v > it.max) v = it.max;
+    parts.push(`${it.label}：${v}/${it.max}点`);
+  }
+  if (parts.length === 0) {
+    return `合計:${total}/${maxTotal || total}点`;
+  }
+  return `${parts.join("+")}=合計:${total}/${maxTotal}点`;
+}

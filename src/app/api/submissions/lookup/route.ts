@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findLatestSubmissionByStudentLookup } from "@/lib/submissions-store";
+import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-display";
 import { formatExplanationForPublicView } from "@/lib/student-release";
 
 function outputPublicHref(relativePath: string): string {
@@ -58,6 +59,12 @@ export async function POST(request: Request) {
   const pdfPath = submission.day4?.pdf_path?.trim();
   const pdfHref = pdfPath ? outputPublicHref(pdfPath) : "";
 
+  const { revised: finalTextForSummary } = resolveFinalEssayForStudentDisplay({
+    essayText: submission.essayText,
+    studentReleaseFinalText: sr!.finalText,
+    proofread: submission.proofread,
+  });
+
   return NextResponse.json({
     ok: true,
     found: true,
@@ -68,9 +75,8 @@ export async function POST(request: Request) {
     resultSummary: {
       scoreTotal: sr!.scoreTotal,
       evaluation: sr!.evaluation,
-      generalComment: sr!.generalComment,
       explanation: formatExplanationForPublicView(sr!.explanation ?? ""),
-      finalText: sr!.finalText,
+      finalText: finalTextForSummary,
     },
     pdfHref: pdfHref || undefined,
   });

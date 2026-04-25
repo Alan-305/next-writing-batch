@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { NexusSupportForm } from "@/components/NexusSupportForm";
 import { RegisteredTaskIdField } from "@/components/RegisteredTaskIdField";
 import { StudentCorrectionLookup } from "@/components/StudentCorrectionLookup";
+import { SubmitGradingConfirmDialog } from "@/components/SubmitGradingConfirmDialog";
 import { TextareaWithFileDrop } from "@/components/TextareaWithFileDrop";
 
 type FieldErrors = Partial<
@@ -31,6 +32,7 @@ export default function SubmitPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [importHint, setImportHint] = useState<ImportHint | null>(null);
 
   const charCount = useMemo(() => {
@@ -40,8 +42,13 @@ export default function SubmitPage() {
     return form.essayText.length;
   }, [answerMode, essayParts, form.essayText.length]);
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const onFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
+    setSubmitConfirmOpen(true);
+  };
+
+  const runSubmit = async () => {
     setSubmitting(true);
     setMessage("");
     setErrors({});
@@ -97,6 +104,11 @@ export default function SubmitPage() {
     }
   };
 
+  const onConfirmSubmit = () => {
+    setSubmitConfirmOpen(false);
+    void runSubmit();
+  };
+
   const hintClass = (v: ImportHint["variant"]) =>
     v === "success" ? "success" : v === "info" ? "muted" : "error";
 
@@ -111,7 +123,7 @@ export default function SubmitPage() {
         <b>解答欄</b>では写真・PDF・テキストをドロップして取り込めます。誤読やレイアウト崩れがある場合は、必ず手で直してから送信してください。
       </p>
 
-      <form className="card" onSubmit={onSubmit}>
+      <form className="card" onSubmit={onFormSubmit}>
         <RegisteredTaskIdField
           value={form.taskId}
           onTaskIdChange={(tid, defaultProblemId) => {
@@ -268,6 +280,22 @@ export default function SubmitPage() {
           {submitting ? "送信中..." : "内容を確認して送信"}
         </button>
       </form>
+
+      <SubmitGradingConfirmDialog
+        open={submitConfirmOpen}
+        onDismiss={() => !submitting && setSubmitConfirmOpen(false)}
+        onConfirm={onConfirmSubmit}
+        busy={submitting}
+        title="採点に使われる文面の確認"
+      >
+        <p style={{ margin: 0 }}>
+          この画面で入力・修正した<strong>英文</strong>は、そのまま<strong>採点に使われます</strong>
+          （写真やファイルから取り込んだ場合も、ここに表示されているテキストが対象です）。
+        </p>
+        <p style={{ margin: "12px 0 0" }}>
+          誤字・取り込みミス・設問文やメモなど<strong>不要な文字の混入</strong>がないか、最終確認のうえ「送信を確定」を押してください。
+        </p>
+      </SubmitGradingConfirmDialog>
 
       {importHint ? <p className={hintClass(importHint.variant)}>{importHint.text}</p> : null}
 

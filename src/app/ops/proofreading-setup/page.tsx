@@ -274,20 +274,12 @@ export default function ProofreadingSetupPage() {
   return (
     <main>
       <h1>課題・添削設定</h1>
-      <p className="muted">
-        課題文や配点などを入力し、<strong>JSON をダウンロードして保存</strong>したり、保存したファイルを<strong>読み込んで再編集</strong>できます。
-      </p>
       <p>
         <Link href="/ops">運用トップ</Link> · <Link href="/submit">提出（生徒）</Link>
       </p>
 
       <div className="card">
         <h2>設定・問題</h2>
-        <p className="muted" style={{ marginTop: -6, marginBottom: 14, fontSize: "0.88rem", lineHeight: 1.55 }}>
-          「サーバーに保存」すると、プロジェクト直下の{" "}
-          <code>data/teacher-proofreading-setup/〈課題ID〉.json</code> と{" "}
-          <code>data/task-problems/〈課題ID〉.json</code> に書き込まれます（Finder / VS Code で開けます）。保存直後のメッセージにも実際のパスが出ます。
-        </p>
 
         <label className="field">
           <span>先生のお名前（本名）</span>
@@ -381,11 +373,6 @@ export default function ProofreadingSetupPage() {
             合計: {totalPoints} 点
           </span>
         </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          「サーバーに保存」を押すと、<strong>課題ID</strong>ごとに教員設定が保存されると同時に、
-          <code>data/task-problems/</code> 下の当該課題の JSON が<strong>上書き</strong>されます（生徒の提出プルダウン・添削の問題文の単一ソース）。手編集したマスタがある場合はバックアップを推奨します。運用の<strong>提出詳細 → 修正入力</strong>のルーブリック初期値（
-          <code>content</code> / <code>grammar</code>）にも、ここで設定した<strong>内容点・文法点</strong>が反映されます（課題マスタの各項目の満点を超えないよう丸めます）。
-        </p>
 
         <TextareaWithFileDrop
           label="問題文（課題）— JSON 保存に必須"

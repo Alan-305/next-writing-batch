@@ -19,7 +19,6 @@ type LookupResult =
       resultSummary?: {
         scoreTotal: number;
         evaluation: string;
-        generalComment: string;
         explanation: string;
         finalText: string;
       };
@@ -54,9 +53,6 @@ function buildDownloadBody(
     "",
     "【得点・評価】",
     r.evaluation,
-    "",
-    "【全体コメント】",
-    r.generalComment,
     "",
     "【解説】",
     formatExplanationForPublicView(r.explanation),
@@ -224,11 +220,6 @@ export function StudentCorrectionLookup() {
                 >
                   テキストでダウンロード
                 </button>
-              ) : null}
-              {result.pdfHref ? (
-                <a href={result.pdfHref} download style={blueButtonLinkStyle}>
-                  PDFでダウンロード
-                </a>
               ) : null}
             </div>
           ) : null}

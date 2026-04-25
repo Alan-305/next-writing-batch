@@ -11,9 +11,13 @@ export type Submission = SubmissionInput & {
   submissionId: string;
   submittedAt: string;
   status: "pending" | "processing" | "done" | "failed";
+  /** 生徒が公開済み添削結果ページを初めて開いた日時（運用一覧の Viewed 表示用） */
+  studentResultFirstViewedAt?: string;
   /** 運用が編集・公開した生徒向け確定データ（やり方A: ルーブリック得点＋合計＋テキスト） */
   studentRelease?: StudentRelease;
   proofread?: {
+    /** この添削結果を生成したときの提出の taskId（課題ID変更後の不一致検出用） */
+    sourceTaskId?: string;
     startedAt?: string;
     finishedAt?: string;
     /** Nexus Learning（ESSAY_PROMPT）形式 */

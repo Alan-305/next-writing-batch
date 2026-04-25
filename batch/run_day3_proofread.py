@@ -220,6 +220,8 @@ def main() -> None:
             submission_id = str(s.get("submissionId") or "")
 
             s["status"] = "processing"
+            # 再添削後は Viewed 記録をリセット（新しい結果を見るまで緑にしない）
+            s.pop("studentResultFirstViewedAt", None)
             s["proofread"] = s.get("proofread") or {}
             s["proofread"]["startedAt"] = _now_iso()
             s["proofread"].pop("error", None)
@@ -242,6 +244,7 @@ def main() -> None:
                 s = data[idx]
                 s["status"] = "done"
                 s["proofread"] = {
+                    "sourceTaskId": task_id,
                     "evaluation": out.evaluation,
                     "general_comment": out.general_comment,
                     "explanation": out.explanation,

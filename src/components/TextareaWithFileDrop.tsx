@@ -11,6 +11,7 @@ import {
   mergeExtractedBlock,
   readFileAsText,
 } from "@/lib/file-ingest";
+import { ProcessingEyesIcon } from "@/components/ProcessingEyesIcon";
 import {
   extractQuestionFromTeacherJson,
   isProofreadingSetupJson,
@@ -214,7 +215,7 @@ export function TextareaWithFileDrop({
 
         if (tryEssayGemini) {
           try {
-            setStatus("Gemini で手書き・画像を読み取り中…");
+            setStatus("手書き・画像を読み取り中…");
             const normalizedMedia = await normalizeGeminiMediaFiles(geminiMedia);
             const { text: geminiText, noApiKey, clientError } = await fetchGeminiEssayImageIngest(
               normalizedMedia,
@@ -250,7 +251,7 @@ export function TextareaWithFileDrop({
 
         if (useGeminiPath) {
           try {
-            setStatus("Gemini で問題文を読み取り中…");
+            setStatus("問題文を読み取り中…");
             const structured = structuredProblemReading.checked;
             const { text: geminiText, usedFirstOnly } = await fetchGeminiProblemIngest(geminiMedia, structured);
             if (!geminiText.trim()) {
@@ -278,10 +279,10 @@ export function TextareaWithFileDrop({
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             if (msg.includes("GEMINI_API_KEY")) {
-              setStatus("Gemini を使えないため、ブラウザ内の取り込みに切り替えます…");
+              setStatus("ブラウザ内の取り込みに切り替えます…");
               onNotify?.("Gemini API が使えないため、ローカル（Tesseract / PDF）で読み取ります。", "info");
             } else {
-              setStatus("Gemini が失敗したため、ブラウザ内の取り込みに切り替えます…");
+              setStatus("ブラウザ内の取り込みに切り替えます…");
               onNotify?.(`${msg} ローカル取り込みを試みます。`, "info");
             }
           }
@@ -439,13 +440,36 @@ export function TextareaWithFileDrop({
           ) : null}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-          <button type="button" onClick={onPick} disabled={disabled || busy}>
-            {busy ? "処理中…" : "ファイルを選ぶ"}
+          <button
+            type="button"
+            onClick={onPick}
+            disabled={disabled || busy}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+          >
+            {busy ? (
+              <>
+                <ProcessingEyesIcon />
+                処理中…
+              </>
+            ) : (
+              "ファイルを選ぶ"
+            )}
           </button>
         </div>
         {status ? (
-          <p className="muted" style={{ margin: "0 0 8px" }}>
-            {status}
+          <p
+            className="muted"
+            style={{
+              margin: "0 0 8px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+              lineHeight: 1.5,
+            }}
+          >
+            <ProcessingEyesIcon />
+            <span>{status}</span>
           </p>
         ) : null}
         <p className="muted" style={{ margin: "0 0 0", fontSize: "0.85rem" }}>

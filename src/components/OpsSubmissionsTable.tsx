@@ -20,6 +20,10 @@ export type SubmissionListRow = {
   status: string;
   /** Day4 成果物（ZIP 対象）が1つ以上ある */
   hasDay4Assets?: boolean;
+  /** 運用が生徒向け結果を公開済み（studentRelease.operatorApprovedAt あり） */
+  resultPublished?: boolean;
+  /** 公開結果ページの初回閲覧日時（ISO） */
+  studentResultFirstViewedAt?: string;
 };
 
 type SortKey =
@@ -30,15 +34,34 @@ type SortKey =
   | "status_alpha"
   | "status_pending_first";
 
-const STATUS_ORDER: Record<string, number> = {
-  pending: 0,
-  processing: 1,
-  failed: 2,
-  done: 3,
-};
+function hasStudentViewedPublishedResult(item: SubmissionListRow): boolean {
+  return (
+    item.status === "done" &&
+    Boolean(item.resultPublished) &&
+    Boolean(String(item.studentResultFirstViewedAt ?? "").trim())
+  );
+}
 
-function statusRank(s: string): number {
-  return STATUS_ORDER[s] ?? 99;
+/** 未処理を上に並べる用（Viewed は done より後ろ） */
+function submissionListRank(item: SubmissionListRow): number {
+  const st = item.status;
+  if (st === "pending") return 0;
+  if (st === "processing") return 1;
+  if (st === "failed") return 2;
+  if (st === "done") {
+    if (hasStudentViewedPublishedResult(item)) return 4;
+    return 3;
+  }
+  return 99;
+}
+
+function submissionStatusSortLabel(item: SubmissionListRow): string {
+  if (item.status === "pending") return "pending";
+  if (item.status === "processing") return "processing";
+  if (item.status === "failed") return "failed";
+  if (hasStudentViewedPublishedResult(item)) return "viewed";
+  if (item.status === "done") return "done";
+  return item.status;
 }
 
 function compareRows(a: SubmissionListRow, b: SubmissionListRow, sort: SortKey): number {
@@ -58,10 +81,13 @@ function compareRows(a: SubmissionListRow, b: SubmissionListRow, sort: SortKey):
       return b.submittedAt.localeCompare(a.submittedAt);
     }
     case "status_alpha":
-      return a.status.localeCompare(b.status) || b.submittedAt.localeCompare(a.submittedAt);
+      return (
+        submissionStatusSortLabel(a).localeCompare(submissionStatusSortLabel(b)) ||
+        b.submittedAt.localeCompare(a.submittedAt)
+      );
     case "status_pending_first": {
-      const ra = statusRank(a.status);
-      const rb = statusRank(b.status);
+      const ra = submissionListRank(a);
+      const rb = submissionListRank(b);
       if (ra !== rb) return ra - rb;
       return b.submittedAt.localeCompare(a.submittedAt);
     }
@@ -156,7 +182,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
     const runningPending = item.status === "pending" && tid !== "" && item.taskId === tid;
     if (runningPending) {
       return (
-        <span className="status-running">
+        <span className="status-running status-running--pending" title="一括添削実行中（pending）">
           <span className="status-spinner" aria-hidden="true" />
           添削中
         </span>
@@ -173,6 +199,23 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
           <span className="status-processing-stale-hint">（再実行可）</span>
         </span>
       );
+    }
+    if (item.status === "pending") {
+      return <span className="ops-status-pending">pending</span>;
+    }
+    if (item.status === "failed") {
+      return <span className="ops-status-failed">failed</span>;
+    }
+    if (item.status === "done") {
+      if (hasStudentViewedPublishedResult(item)) {
+        const at = String(item.studentResultFirstViewedAt ?? "").trim();
+        return (
+          <span className="ops-status-viewed" title={at ? `初回閲覧: ${at}` : undefined}>
+            Viewed
+          </span>
+        );
+      }
+      return <span className="ops-status-done">done</span>;
     }
     return item.status;
   };
@@ -253,32 +296,20 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
 
   return (
     <div>
-      <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-        データに<strong>表示件数の上限はありません</strong>（<code>submissions.json</code> の全件を読み込みます）。
-        件数が多いときは下の絞り込み・ページサイズで整理してください。
-      </p>
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
           gap: "10px 14px",
           alignItems: "center",
-          marginTop: -4,
+          marginTop: 0,
           marginBottom: 14,
         }}
       >
         <button type="button" disabled={listRefreshing} onClick={() => onRefreshList()}>
           {listRefreshing ? "再読み込み中…" : "一覧を最新化（JSONの手編集を反映）"}
         </button>
-        <span className="muted" style={{ fontSize: "0.88rem", lineHeight: 1.5 }}>
-          手で <code>data/submissions.json</code> を変えたあと、表示や「添削」が古いときは押してください（Next の表示キャッシュを避けます）。
-        </span>
       </div>
-      {enableZipSelection ? (
-        <p className="muted" style={{ marginTop: -6, marginBottom: 12 }}>
-          <strong>納品ZIP（個別選択）</strong>: Day4 済みの行だけチェックできます。フィルタ後に「Day4済みをすべて選択」で一括指定も可能です。
-        </p>
-      ) : null}
 
       <div
         className="field"

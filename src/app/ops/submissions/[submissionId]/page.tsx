@@ -1,9 +1,10 @@
 import Link from "next/link";
 
+import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEditor";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
 import { formatDateTimeIso } from "@/lib/format-date";
+import { submissionProofreadTaskMismatch } from "@/lib/submission-proofread-task-mismatch";
 import { getSubmissionById } from "@/lib/submissions-store";
-import { formatExplanationForPublicView } from "@/lib/student-release";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { defaultScoresFromTeacherSetup } from "@/lib/build-rubric-scores-for-editor";
 import { loadTaskRubricDefaultScores } from "@/lib/task-rubric-default-scores";
@@ -44,7 +45,6 @@ export default async function SubmissionDetailPage({ params }: Props) {
     );
   }
 
-  const pr = submission.proofread;
   const [master, taskRubricDefaults, teacherSetupJson] = await Promise.all([
     loadTaskProblemsMaster(submission.taskId),
     loadTaskRubricDefaultScores(submission.taskId),
@@ -60,6 +60,9 @@ export default async function SubmissionDetailPage({ params }: Props) {
   const qrPath = submission.day4?.qr_path ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
 
+  const published = Boolean(submission.studentRelease?.operatorApprovedAt);
+  const taskMismatch = submissionProofreadTaskMismatch(submission);
+
   return (
     <main>
       <h1>提出詳細</h1>
@@ -68,9 +71,34 @@ export default async function SubmissionDetailPage({ params }: Props) {
       </p>
 
       <div className="card">
-        <p>
-          <b>taskId</b>: {submission.taskId}
-        </p>
+        {taskMismatch.mismatched ? (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              background: "#fef3c7",
+              border: "1px solid #f59e0b",
+              borderRadius: 8,
+              color: "#78350f",
+            }}
+          >
+            <strong>課題IDと添削結果の不一致</strong>
+            <p style={{ margin: "8px 0 0", fontSize: "0.95rem" }}>
+              現在の課題IDは <code>{submission.taskId}</code> ですが、この添削結果は{" "}
+              <code>{taskMismatch.sourceTaskId}</code> のときに生成されています。正しい課題で再度 AI
+              添削する場合は、下で課題IDを保存したうえで、提出一覧へ戻り「添削やり直し」を実行してください。再添削が完了すると、以前の AI
+              添削結果は新しい結果で置き換わります。
+            </p>
+          </div>
+        ) : null}
+        <OpsSubmissionTaskIdEditor
+          key={submission.taskId}
+          submissionId={submission.submissionId}
+          initialTaskId={submission.taskId}
+          disabled={published}
+          disabledReason={published ? "生徒向け公開済みのため課題IDは変更できません。" : undefined}
+        />
         <p>
           <b>studentId</b>: {submission.studentId}
         </p>
@@ -102,7 +130,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
         ) : null}
       </div>
 
-      <div className="card">
+      <div className="card ops-submission-original-essay">
         <h2>原文</h2>
         {submission.essayMultipart && submission.essayParts && submission.essayParts.length > 0 ? (
           <>
@@ -112,16 +140,16 @@ export default async function SubmissionDetailPage({ params }: Props) {
             {submission.essayParts.map((part, i) => (
               <div key={i} style={{ marginBottom: 16 }}>
                 <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Question {i + 1}</p>
-                <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{part}</pre>
+                <pre>{part}</pre>
               </div>
             ))}
             <p className="muted" style={{ marginBottom: 6 }}>
               添削プロンプトへ渡した結合テキスト（<code>essayText</code>）：
             </p>
-            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{submission.essayText}</pre>
+            <pre>{submission.essayText}</pre>
           </>
         ) : (
-          <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{submission.essayText}</pre>
+          <pre>{submission.essayText}</pre>
         )}
       </div>
 
@@ -130,9 +158,9 @@ export default async function SubmissionDetailPage({ params }: Props) {
         <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
           修正の必要がある場合のみ、内容を変更してください。
         </p>
-        {submission.studentRelease?.operatorApprovedAt ? (
+        {published && submission.studentRelease ? (
           <p className="success" style={{ marginTop: 0, marginBottom: 12 }}>
-            生徒向け公開済み（{formatDateTimeIso(submission.studentRelease.operatorApprovedAt)}）— 合計{" "}
+            生徒向け公開済み（{formatDateTimeIso(submission.studentRelease.operatorApprovedAt ?? "")}）— 合計{" "}
             {submission.studentRelease.scoreTotal}点 —{" "}
             <Link href={`/result/${encodeURIComponent(submission.submissionId)}`}>生徒向けページ</Link>
           </p>
@@ -146,7 +174,7 @@ export default async function SubmissionDetailPage({ params }: Props) {
         ) : null}
         {master ? (
           <StudentReleaseEditor
-            key={submission.submissionId}
+            key={`${submission.submissionId}-${submission.status}-${submission.proofread?.finishedAt ?? submission.proofread?.generated_at ?? ""}`}
             submissionId={submission.submissionId}
             taskId={submission.taskId}
             master={master}
@@ -163,84 +191,6 @@ export default async function SubmissionDetailPage({ params }: Props) {
             課題マスタがありません（<code>data/task-problems/{submission.taskId}.json</code>
             ）。配置後にルーブリック編集が使えます。
           </p>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>添削結果</h2>
-        {submission.status === "done" ? (
-          <>
-            {pr?.evaluation ? (
-              <>
-                <p>
-                  <b>得点・評価</b>
-                </p>
-                <pre style={{ whiteSpace: "pre-wrap", margin: "0 0 12px" }}>{pr.evaluation}</pre>
-                <p>
-                  <b>全体コメント</b>
-                </p>
-                <pre style={{ whiteSpace: "pre-wrap", margin: "0 0 12px" }}>{pr.general_comment}</pre>
-                <p>
-                  <b>解説</b>
-                </p>
-                <pre style={{ whiteSpace: "pre-wrap", margin: "0 0 12px" }}>
-                  {formatExplanationForPublicView(String(pr.explanation ?? ""))}
-                </pre>
-                {pr.final_version ? (
-                  <>
-                    <h3>完成版</h3>
-                    <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{pr.final_version}</pre>
-                  </>
-                ) : null}
-                <h3>音読用英文</h3>
-                <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{pr?.final_essay}</pre>
-              </>
-            ) : (
-              <>
-                <p>
-                  <b>line1</b>: {pr?.line1_feedback}
-                </p>
-                <p>
-                  <b>line2</b>: {pr?.line2_improvement}
-                </p>
-                <p>
-                  <b>line3</b>: {pr?.line3_next_action}
-                </p>
-                <h3>完成版英文</h3>
-                <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{pr?.final_essay}</pre>
-              </>
-            )}
-            <p style={{ marginTop: 12 }}>
-              <b>model</b>: {pr?.model_name} / <b>generated_at</b>: {pr?.generated_at}
-            </p>
-          </>
-        ) : submission.status === "failed" ? (
-          <>
-            <p className="error">
-              添削に失敗しました: {pr?.operator_message ?? pr?.error ?? "unknown"}
-            </p>
-            {(() => {
-              const msg = `${pr?.operator_message ?? ""} ${pr?.error ?? ""}`;
-              const likelyApiKey =
-                /GEMINI|GOOGLE_API|API.?キー|API_KEY|ADC|環境変数|\.env\.local|export/i.test(msg);
-              if (!likelyApiKey) return null;
-              return (
-                <p className="muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
-                  <strong>提出一覧の「添削」ボタン</strong>から実行した場合、キーは{" "}
-                  <strong>Next.js を起動したときの環境</strong>だけが使われます。別のターミナルで{" "}
-                  <code>export</code> しただけでは届きません。プロジェクト{" "}
-                  <code>next-writing-batch/.env.local</code> に{" "}
-                  <code>GEMINI_API_KEY=あなたのキー</code>（または <code>GOOGLE_API_KEY</code>
-                  ）を1行で書き、<code>npm run dev</code> を<strong>一度停止して再起動</strong>
-                  してから、もう一度「添削」を試してください。または{" "}
-                  <Link href="/ops/gemini-key">運用の「Gemini API キー」画面</Link>
-                  から保存すると <code>data/gemini_api_key.txt</code> に格納され、再起動なしで使えることがあります。
-                </p>
-              );
-            })()}
-          </>
-        ) : (
-          <p>まだ添削処理が完了していません。</p>
         )}
       </div>
 
