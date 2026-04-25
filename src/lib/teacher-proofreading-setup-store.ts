@@ -1,6 +1,5 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { unstable_noStore as noStore } from "next/cache";
 
 import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
 import {
@@ -18,7 +17,6 @@ export function teacherProofreadingSetupFilePath(taskId: string): string {
 }
 
 export async function loadTeacherProofreadingSetup(taskId: string): Promise<ProofreadingSetupJson | null> {
-  noStore();
   const tid = taskId.trim();
   if (!tid) return null;
   try {

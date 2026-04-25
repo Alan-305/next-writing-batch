@@ -54,48 +54,43 @@ export function RegisteredTaskIdField({
   }, []);
 
   const selected = useMemo(() => tasks?.find((t) => t.taskId === value), [tasks, value]);
-
-  if (tasks === null && !fetchErr) {
-    return <p className="muted">課題一覧を読み込み中…</p>;
-  }
-
-  if (fetchErr) {
-    return <p className="error">{fetchErr}</p>;
-  }
-
-  if (!tasks || tasks.length === 0) {
-    return (
-      <p className="error">
-        登録済みの課題がありません。運用の「課題・添削設定」で<strong>サーバーに保存（課題ID）</strong>すると、ここに課題が表示されます。
-      </p>
-    );
-  }
+  const hasTasks = Array.isArray(tasks) && tasks.length > 0;
 
   return (
     <>
-      <label className="field">
-        <span>課題</span>
-        <select
-          value={value}
-          onChange={(e) => {
-            const tid = e.target.value;
-            const row = tasks.find((t) => t.taskId === tid);
-            const def = row?.problems[0]?.problemId ?? "";
-            onTaskIdChange(tid, def);
-          }}
-          disabled={disabled}
-        >
-          <option value="">選択してください</option>
-          {tasks.map((t) => (
-            <option key={t.taskId} value={t.taskId}>
-              {t.taskId} — {t.displayLabel}
-            </option>
-          ))}
-        </select>
-        {errorText ? <span className="error">{errorText}</span> : null}
-      </label>
+      {tasks === null && !fetchErr ? <p className="muted">課題一覧を読み込み中…</p> : null}
+      {fetchErr ? <p className="error">{fetchErr}</p> : null}
+      {!hasTasks && tasks !== null && !fetchErr ? (
+        <p className="error">
+          登録済みの課題がありません。運用の「課題・添削設定」で<strong>サーバーに保存（課題ID）</strong>すると、ここに課題が表示されます。
+        </p>
+      ) : null}
 
-      {selected && selected.problems.length > 1 && onProblemIdChange ? (
+      {hasTasks ? (
+        <label className="field">
+          <span>課題（登録一覧から選択）</span>
+          <select
+            value={value}
+            onChange={(e) => {
+              const tid = e.target.value;
+              const row = tasks.find((t) => t.taskId === tid);
+              const def = row?.problems[0]?.problemId ?? "";
+              onTaskIdChange(tid, def);
+            }}
+            disabled={disabled}
+          >
+            <option value="">選択してください</option>
+            {tasks.map((t) => (
+              <option key={t.taskId} value={t.taskId}>
+                {t.taskId} — {t.displayLabel}
+              </option>
+            ))}
+          </select>
+          {errorText ? <span className="error">{errorText}</span> : null}
+        </label>
+      ) : null}
+
+      {hasTasks && selected && selected.problems.length > 1 && onProblemIdChange ? (
         <label className="field">
           <span>設問</span>
           <select
