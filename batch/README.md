@@ -41,6 +41,7 @@ QRに埋め込むURL:
   - **運用画面の「確定（Day4 生成）」から**叩くときは、`NODE_ENV` が本番以外かつ `GCS_BUCKET_NAME` が無ければ Next が **自動で `--allow-local-qr` を付けます**（`.env.example` 参照）。
   - `AUDIO_BASE_URL` があれば `.../output/audio/{taskId}/{studentId}.mp3`（例: `http://192.168.0.10:3001` — スマホからQRで試すときは PC の LAN IP + dev ポート）
   - 無ければ `/output/audio/...`（`npm run dev` 中は Next の `app/output/...` ルートで成果物を配信）
+- QR を使わない運用にしたいときは `--disable-qr`（または `DAY4_DISABLE_QR=true`）で生成を停止できます。復帰時はフラグを外すだけです。
 
 実行例:
 ```bash
@@ -48,6 +49,8 @@ cd next-writing-batch
 ./.venv/bin/python3 -m pip install -r requirements.txt
 # GCS 未設定のローカル開発:
 ./.venv/bin/python3 batch/run_day4_tts_qr_pdf.py --task-id 2026_spring_week1 --allow-local-qr
+# QR を生成しない場合:
+./.venv/bin/python3 batch/run_day4_tts_qr_pdf.py --task-id 2026_spring_week1 --allow-local-qr --disable-qr
 # GCS 設定済み:
 ./.venv/bin/python3 batch/run_day4_tts_qr_pdf.py --task-id 2026_spring_week1
 ```

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { sendTensakuKakumeiContactEmail } from "@/lib/nexus-support";
+import { postTeacherInquiryToAppsScript, sendTensakuKakumeiContactEmail } from "@/lib/nexus-support";
 
 export const runtime = "nodejs";
 
@@ -64,7 +64,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const mailOk = await sendTensakuKakumeiContactEmail({ name, email, message });
+  const [mailOk, gasOk] = await Promise.all([
+    sendTensakuKakumeiContactEmail({ name, email, message }),
+    postTeacherInquiryToAppsScript({ name, email, message, channel: "tensaku_top" }),
+  ]);
+
+  if (mailOk && gasOk) {
+    return NextResponse.json({ ok: true, mailOk: true, gasOk: true, message: "送信しました。担当より折り返しご連絡いたします。" });
+  }
+  if (mailOk && !gasOk) {
+    return NextResponse.json({
+      ok: true,
+      partial: true,
+      mailOk: true,
+      gasOk: false,
+      message: "お問い合わせを受け付けました（スプレッドシート記録のみ失敗）。必要に応じて再送してください。",
+    });
+  }
+  if (!mailOk && gasOk) {
+    return NextResponse.json({
+      ok: true,
+      partial: true,
+      mailOk: false,
+      gasOk: true,
+      message:
+        "お問い合わせは記録しました（メール通知のみ失敗）。しばらくしてから再度お試しください。",
+    });
+  }
   if (!mailOk) {
     return NextResponse.json(
       {
@@ -76,5 +102,11 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, message: "送信しました。担当より折り返しご連絡いたします。" });
+  return NextResponse.json(
+    {
+      ok: false,
+      message: "送信に失敗しました。しばらくしてから再度お試しください。",
+    },
+    { status: 502 },
+  );
 }

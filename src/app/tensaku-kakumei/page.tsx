@@ -1,8 +1,21 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { TensakuKakumeiSupportForm } from "./TensakuKakumeiSupportForm";
 
-export default function TensakuKakumeiPage() {
+export default async function TensakuKakumeiPage() {
+  const h = await headers();
+  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").toLowerCase();
+
+  if (host.startsWith("tensaku-kakumei-for-students.")) {
+    redirect("/submit");
+  }
+
+  if (host.startsWith("tensaku-kakumei-for-teachers.")) {
+    redirect("/ops");
+  }
+
   return (
     <div className="tensaku-kakumei-site">
       <div className="tensaku-trial-banner" role="status">
@@ -141,14 +154,6 @@ export default function TensakuKakumeiPage() {
 
         <section className="tensaku-section card" id="support">
           <h2>サポート・ご相談</h2>
-          <p className="muted">
-            以下のフォームから送信いただくと、運営の受信箱（Nexus Learning /{" "}
-            <span className="tensaku-en">nexus-learning.com</span>）へメールが届きます。返信はご入力のメールアドレス宛に行います（Resend）。
-          </p>
-          <p className="muted" style={{ fontSize: "0.88rem" }}>
-            デプロイ時は <code>RESEND_API_KEY</code>、<code>RESEND_FROM_EMAIL</code>、<code>SUPPORT_NOTIFY_EMAIL</code> を Cloud Run
-            に設定してください（<code>nexus_project/docs/support-email-setup.md</code> と同じ）。
-          </p>
           <TensakuKakumeiSupportForm />
         </section>
 

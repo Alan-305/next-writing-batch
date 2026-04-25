@@ -34,6 +34,11 @@ function shouldAllowLocalQrForDay4(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+function shouldDisableQrForDay4(): boolean {
+  const expl = (process.env.DAY4_DISABLE_QR ?? "").trim().toLowerCase();
+  return expl === "true" || expl === "1";
+}
+
 export function resolveDay4Python(): string | null {
   const env = (process.env.PROOFREAD_PYTHON ?? "").trim();
   if (env && fs.existsSync(env)) return env;
@@ -84,6 +89,9 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
   }
   if (shouldAllowLocalQrForDay4()) {
     args.push("--allow-local-qr");
+  }
+  if (shouldDisableQrForDay4()) {
+    args.push("--disable-qr");
   }
 
   const t0 = Date.now();

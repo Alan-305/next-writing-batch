@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 
 import { buildStudentReleaseFromPatch, type StudentReleasePatchBody } from "@/lib/student-release";
+import { splitExplanationIntoContentGrammarSections } from "@/lib/student-release";
 import { getSubmissionById, updateSubmissionById } from "@/lib/submissions-store";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
+import { postAnalysisPhase1ToAppsScript } from "@/lib/nexus-support";
 import { persistTaskRubricDefaultScores } from "@/lib/task-rubric-default-scores";
 
 type RouteContext = { params: Promise<{ submissionId: string }> };
+
+function countEnglishWords(text: string): number {
+  const t = (text || "").trim();
+  if (!t) return 0;
+  const words = t.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g);
+  return words ? words.length : 0;
+}
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { submissionId } = await context.params;
@@ -88,6 +97,29 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (updated) {
     await persistTaskRubricDefaultScores(submission.taskId, master, release.scores);
+
+    const prevFinalizedAt = String(submission.studentRelease?.operatorFinalizedAt ?? "").trim();
+    const nextFinalizedAt = String(release.operatorFinalizedAt ?? "").trim();
+    const finalizedNow = Boolean(nextFinalizedAt) && nextFinalizedAt !== prevFinalizedAt;
+    if (finalizedNow) {
+      const sections = splitExplanationIntoContentGrammarSections(release.explanation || "");
+      const analysisOk = await postAnalysisPhase1ToAppsScript({
+        taskId: submission.taskId,
+        submissionId: sid,
+        problemMemo: (submission.problemMemo ?? "").trim(),
+        evaluation: release.evaluation,
+        explanationContent: sections.contentComment,
+        explanationGrammar: sections.grammarComment,
+        contentDeduction: release.contentDeduction,
+        grammarDeduction: release.grammarDeduction,
+        scoreTotal: release.scoreTotal,
+        wordCount: countEnglishWords(release.finalText || ""),
+        source: "ops",
+      });
+      if (!analysisOk) {
+        console.warn("[student-release] analysis_phase1 post failed:", sid);
+      }
+    }
   }
 
   return NextResponse.json({ ok: true, studentRelease: updated?.studentRelease ?? release });

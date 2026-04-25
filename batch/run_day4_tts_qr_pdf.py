@@ -145,6 +145,11 @@ def main() -> None:
         default="",
         help="カンマ区切り submissionId に絞る",
     )
+    parser.add_argument(
+        "--disable-qr",
+        action="store_true",
+        help="QR画像を生成しない（将来の復帰用に機能は保持したまま無効化）",
+    )
     args = parser.parse_args()
 
     if not os.environ.get("GCS_BUCKET_NAME", "").strip() and not args.allow_local_qr:
@@ -233,10 +238,15 @@ def main() -> None:
 
             audio_url = _signed_url_or_local(local_audio_url=audio_url)
 
-            qr_path = os.path.join(paths.qr_dir, task_id, f"{student_id}.png")
-            qr = make_qr_png(url=audio_url, out_path=qr_path)
-            if not qr:
-                raise RuntimeError("qr_failed")
+            qr_rel: Optional[str] = None
+            qr_arg: Optional[str] = None
+            if not args.disable_qr:
+                qr_path = os.path.join(paths.qr_dir, task_id, f"{student_id}.png")
+                qr = make_qr_png(url=audio_url, out_path=qr_path)
+                if not qr:
+                    raise RuntimeError("qr_failed")
+                qr_rel = os.path.relpath(qr_path, paths.project_root)
+                qr_arg = qr
 
             pdf_path = os.path.join(
                 paths.pdf_dir, task_id, f"{student_id}_{student_name}.pdf".replace(" ", "_")
@@ -252,7 +262,7 @@ def main() -> None:
                 line3=fb3,
                 final_essay=read_aloud,
                 original_essay=str(s.get("essayText") or ""),
-                qr_path=qr,
+                qr_path=qr_arg,
             )
 
             with store_lock:
@@ -261,10 +271,13 @@ def main() -> None:
                 s["day4"] = {
                     "audio_path": os.path.relpath(mp3_path, paths.project_root),
                     "audio_url": audio_url,
-                    "qr_path": os.path.relpath(qr_path, paths.project_root),
                     "pdf_path": os.path.relpath(pdf_path, paths.project_root),
                     "generatedAt": _now_iso(),
                 }
+                if qr_rel:
+                    s["day4"]["qr_path"] = qr_rel
+                else:
+                    s["day4"].pop("qr_path", None)
                 s["day4"].pop("error", None)
                 s["day4"].pop("operator_message", None)
                 data[idx] = s

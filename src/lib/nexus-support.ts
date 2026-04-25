@@ -41,23 +41,15 @@ function supportTimeoutMs(): number {
   return Math.max(5000, n * 1000);
 }
 
-/** Python の _post と同等: JSON POST、token 付与、200 + JSON status error チェック */
-export async function postSupportToAppsScript(args: {
-  studentName: string;
-  email: string;
-  content: string;
+async function postAppsScriptJson(args: {
+  endpointName: "support" | "inquiry" | "analysis";
+  body: Record<string, unknown>;
 }): Promise<boolean> {
   const url = env("APPS_SCRIPT_SUPPORT_URL");
   if (!url) return false;
-
   const token = env("APPS_SCRIPT_TOKEN");
-  const body: Record<string, unknown> = {
-    kind: "support",
-    student_name: args.studentName,
-    email: args.email,
-    content: args.content,
-  };
-  if (token) body.token = token;
+  const payload: Record<string, unknown> = { ...args.body };
+  if (token) payload.token = token;
 
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), supportTimeoutMs());
@@ -65,30 +57,103 @@ export async function postSupportToAppsScript(args: {
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     if (r.status !== 200) {
-      console.warn("[postSupportToAppsScript] HTTP", r.status, (await r.text()).slice(0, 500));
+      console.warn(
+        `[postAppsScriptJson:${args.endpointName}] HTTP`,
+        r.status,
+        (await r.text()).slice(0, 500),
+      );
       return false;
     }
     const text = await r.text();
     try {
       const data = JSON.parse(text) as { status?: string };
       if (data && typeof data === "object" && data.status === "error") {
-        console.warn("[postSupportToAppsScript] GAS error JSON:", text.slice(0, 500));
+        console.warn(`[postAppsScriptJson:${args.endpointName}] GAS error JSON:`, text.slice(0, 500));
         return false;
       }
     } catch {
-      /* 非 JSON 応答は成功扱い（GAS によってはテキストのみの場合） */
+      /* 非 JSON 応答は成功扱い */
     }
     return true;
   } catch (e) {
-    console.warn("[postSupportToAppsScript] request failed:", e);
+    console.warn(`[postAppsScriptJson:${args.endpointName}] request failed:`, e);
     return false;
   } finally {
     clearTimeout(t);
   }
+}
+
+/** Python の _post と同等: JSON POST、token 付与、200 + JSON status error チェック */
+export async function postSupportToAppsScript(args: {
+  studentName: string;
+  email: string;
+  content: string;
+}): Promise<boolean> {
+  return postAppsScriptJson({
+    endpointName: "support",
+    body: {
+      kind: "support_student",
+      // 互換: 旧 GAS 実装が読む可能性のあるキーも残す
+      studentName: args.studentName,
+      student_name: args.studentName,
+      email: args.email,
+      content: args.content,
+    },
+  });
+}
+
+export async function postTeacherInquiryToAppsScript(args: {
+  name: string;
+  email: string;
+  message: string;
+  channel?: string;
+}): Promise<boolean> {
+  return postAppsScriptJson({
+    endpointName: "inquiry",
+    body: {
+      kind: "inquiry_teacher",
+      name: args.name,
+      email: args.email,
+      channel: (args.channel ?? "").trim() || "tensaku_top",
+      content: args.message,
+    },
+  });
+}
+
+export async function postAnalysisPhase1ToAppsScript(args: {
+  taskId: string;
+  submissionId: string;
+  problemMemo?: string;
+  evaluation: string;
+  explanationContent?: string;
+  explanationGrammar?: string;
+  contentDeduction?: number;
+  grammarDeduction?: number;
+  scoreTotal?: number;
+  wordCount?: number;
+  source?: string;
+}): Promise<boolean> {
+  return postAppsScriptJson({
+    endpointName: "analysis",
+    body: {
+      kind: "analysis_phase1",
+      taskId: args.taskId,
+      submissionId: args.submissionId,
+      problemMemo: args.problemMemo ?? "",
+      evaluation: args.evaluation,
+      explanationContent: args.explanationContent ?? "",
+      explanationGrammar: args.explanationGrammar ?? "",
+      contentDeduction: args.contentDeduction,
+      grammarDeduction: args.grammarDeduction,
+      scoreTotal: args.scoreTotal,
+      wordCount: args.wordCount,
+      source: args.source ?? "ops",
+    },
+  });
 }
 
 async function sendViaResend(args: {
