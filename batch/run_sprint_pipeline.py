@@ -44,9 +44,9 @@ def main() -> None:
         help="run_day4_tts_qr_pdf に --allow-local-qr を渡す（GCS 無しの開発用）",
     )
     parser.add_argument(
-        "--day4-disable-qr",
+        "--day4-qr",
         action="store_true",
-        help="run_day4_tts_qr_pdf に --disable-qr を渡す（QR 生成を無効化）",
+        help="run_day4_tts_qr_pdf に --qr を渡す（QR 生成。要 GCS または --day4-allow-local-qr）",
     )
     parser.add_argument("--zip", action="store_true", help="Run package_task_outputs.py after Day4")
     args = parser.parse_args()
@@ -85,8 +85,8 @@ def main() -> None:
             cmd4 += ["--task-id", args.task_id]
         if args.day4_allow_local_qr:
             cmd4.append("--allow-local-qr")
-        if args.day4_disable_qr:
-            cmd4.append("--disable-qr")
+        if args.day4_qr:
+            cmd4.append("--qr")
         rc = _run(cmd4)
         if rc != 0:
             print(f"[pipeline] day4 exit={rc}")

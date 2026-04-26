@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { buildStudentReleaseFromPatch, type StudentReleasePatchBody } from "@/lib/student-release";
 import { splitExplanationIntoContentGrammarSections } from "@/lib/student-release";
+import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
 import { getSubmissionById, updateSubmissionById } from "@/lib/submissions-store";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { postAnalysisPhase1ToAppsScript } from "@/lib/nexus-support";
@@ -25,7 +26,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const submission = await getSubmissionById(sid);
   if (!submission) {
-    return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
+    return NextResponse.json(submissionNotFoundBody(), { status: 404 });
   }
 
   const master = await loadTaskProblemsMaster(submission.taskId);

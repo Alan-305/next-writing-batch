@@ -40,7 +40,10 @@ function contentDispositionPdfAttachment(displayName: string): string {
 /**
  * GET /output/audio|qr|pdf/... 用。segments は URL の /output/ 以降。
  */
-export async function getOutputFileResponse(segments: string[] | undefined): Promise<NextResponse> {
+export async function getOutputFileResponse(
+  segments: string[] | undefined,
+  options?: { forceDownload?: boolean },
+): Promise<NextResponse> {
   if (!segments?.length) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
@@ -83,9 +86,13 @@ export async function getOutputFileResponse(segments: string[] | undefined): Pro
       "Content-Type": ct,
       "Cache-Control": "public, max-age=300",
     };
-    // PDF はブラウザ内蔵ビューアに吸われがちなので、保存ダイアログを出しやすくする
+    // 既定は inline（印刷プレビューの安定性を優先）。必要時のみ attachment。
     if (ct === "application/pdf") {
-      headers["Content-Disposition"] = contentDispositionPdfAttachment(name);
+      if (options?.forceDownload) {
+        headers["Content-Disposition"] = contentDispositionPdfAttachment(name);
+      } else {
+        headers["Content-Disposition"] = "inline";
+      }
     }
     return new NextResponse(buf, {
       status: 200,

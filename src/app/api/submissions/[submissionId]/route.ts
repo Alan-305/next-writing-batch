@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
 import { deleteSubmissionById, getSubmissionById } from "@/lib/submissions-store";
 
 type RouteContext = { params: Promise<{ submissionId: string }> };
@@ -13,7 +14,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   const existing = await getSubmissionById(submissionId);
   if (!existing) {
-    return NextResponse.json({ ok: false, message: "提出が見つかりません。" }, { status: 404 });
+    return NextResponse.json(submissionNotFoundBody(), { status: 404 });
   }
 
   const ok = await deleteSubmissionById(submissionId);

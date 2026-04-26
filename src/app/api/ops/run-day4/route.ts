@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { runDay4Batch } from "@/lib/run-day4-batch";
 
-/** Day4 は TTS / PDF 生成で時間がかかることがある */
-export const maxDuration = 300;
+/** Day4 は TTS / PDF 生成で時間がかかることがある（batch 側タイムアウトに合わせ長め） */
+export const maxDuration = 900;
 export const dynamic = "force-dynamic";
 
 type Body = {

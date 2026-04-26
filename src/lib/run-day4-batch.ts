@@ -21,9 +21,12 @@ const MAX_BUFFER = 24 * 1024 * 1024;
 const TIMEOUT_MS = 16 * 60 * 1000;
 
 /**
- * GCS 未設定のローカル開発では Day4 に --allow-local-qr を付ける（相対 URL の QR）。
- * 本番（NODE_ENV=production）で GCS が無い場合は付けず、設定ミスとして失敗させる。
- * 明示: DAY4_ALLOW_LOCAL_QR=true / false
+ * Day4 に --allow-local-qr を付ける条件（GCS なしで音声 URL を HTTPS 相対 or AUDIO_BASE_URL 絶対にする）。
+ * - DAY4_ALLOW_LOCAL_QR=false … 明示オフ
+ * - DAY4_ALLOW_LOCAL_QR=true … 明示オン
+ * - GCS_BUCKET_NAME あり … GCS 利用のため付けない
+ * - AUDIO_BASE_URL あり（GCS なし）… 本番でも「公開ベース URL 運用」とみなしてオン（Cloud Run 試験運用向け）
+ * - それ以外 … 非 production のみ従来どおりオン
  */
 function shouldAllowLocalQrForDay4(): boolean {
   const expl = (process.env.DAY4_ALLOW_LOCAL_QR ?? "").trim().toLowerCase();
@@ -31,11 +34,14 @@ function shouldAllowLocalQrForDay4(): boolean {
   if (expl === "true" || expl === "1") return true;
   const gcs = (process.env.GCS_BUCKET_NAME ?? "").trim();
   if (gcs) return false;
+  const audioBase = (process.env.AUDIO_BASE_URL ?? "").trim();
+  if (audioBase) return true;
   return process.env.NODE_ENV !== "production";
 }
 
-function shouldDisableQrForDay4(): boolean {
-  const expl = (process.env.DAY4_DISABLE_QR ?? "").trim().toLowerCase();
+/** QR 生成は明示オプションのみ（既定オフ）。将来つけるときは DAY4_ENABLE_QR=true */
+function shouldEnableQrForDay4(): boolean {
+  const expl = (process.env.DAY4_ENABLE_QR ?? "").trim().toLowerCase();
   return expl === "true" || expl === "1";
 }
 
@@ -90,8 +96,8 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
   if (shouldAllowLocalQrForDay4()) {
     args.push("--allow-local-qr");
   }
-  if (shouldDisableQrForDay4()) {
-    args.push("--disable-qr");
+  if (shouldEnableQrForDay4()) {
+    args.push("--qr");
   }
 
   const t0 = Date.now();

@@ -60,8 +60,8 @@ def _friendly_day4_error(err: str) -> str:
     e = (err or "").strip()
     if e.startswith("missing_env:"):
         return (
-            "必要な環境変数が不足しています（GCS_BUCKET_NAME と GOOGLE_APPLICATION_CREDENTIALS など）。"
-            "ローカル開発のみ --allow-local-qr で相対URLのQRを許可できます。"
+            "GCS 未設定のまま --qr（QR生成）を有効にしています。QR を付けるには GCS または --allow-local-qr が必要です。"
+            "既定では QR は生成しません（音声のみ /output/audio/...）。"
         )
     if "tts_failed" in e:
         return "音声合成（TTS）に失敗しました。ネットワークと gTTS、入力テキストを確認してください。"
@@ -111,13 +111,13 @@ def _pick_day4_indices(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Day4: TTS + GCS + QR + PDF")
+    parser = argparse.ArgumentParser(description="Day4: TTS + PDF（QR は --qr 指定時のみ。既定は QR なし・GCS 不要）")
     parser.add_argument("--task-id", default="", help="Only process this taskId (optional)")
     parser.add_argument("--limit", type=int, default=0, help="Process at most N records (0 = no limit)")
     parser.add_argument(
         "--audio-base-url",
         default=os.environ.get("AUDIO_BASE_URL", ""),
-        help="--allow-local-qr 時のみ: QRに埋め込むベースURL（env AUDIO_BASE_URL）",
+        help="--allow-local-qr または QR なし時: 音声URLのベース（env AUDIO_BASE_URL）。末尾スラッシュなし",
     )
     parser.add_argument(
         "--allow-local-qr",
@@ -146,22 +146,26 @@ def main() -> None:
         help="カンマ区切り submissionId に絞る",
     )
     parser.add_argument(
-        "--disable-qr",
+        "--qr",
         action="store_true",
-        help="QR画像を生成しない（将来の復帰用に機能は保持したまま無効化）",
+        help="QR画像を生成する（要 GCS、または --allow-local-qr）。未指定時は QR を出さない（既定）",
     )
     args = parser.parse_args()
 
-    if not os.environ.get("GCS_BUCKET_NAME", "").strip() and not args.allow_local_qr:
-        print(
-            "[day4] GCS_BUCKET_NAME が未設定です。署名付きURLのQRには GCS を設定するか、"
-            "開発時のみ --allow-local-qr を付けてください。"
-        )
-    elif not os.environ.get("GCS_BUCKET_NAME", "").strip() and args.allow_local_qr:
-        has_base = bool((args.audio_base_url or "").strip() or os.environ.get("AUDIO_BASE_URL", "").strip())
-        if not has_base:
+    if not os.environ.get("GCS_BUCKET_NAME", "").strip():
+        if args.qr and not args.allow_local_qr:
             print(
-                "[day4] warning: --allow-local-qr かつ AUDIO_BASE_URL も無いため、QR は相対パスです。"
+                "[day4] --qr 指定: QR 用の公開音声URLに GCS か --allow-local-qr が必要です。"
+            )
+        elif args.allow_local_qr:
+            has_base = bool((args.audio_base_url or "").strip() or os.environ.get("AUDIO_BASE_URL", "").strip())
+            if not has_base:
+                print(
+                    "[day4] warning: --allow-local-qr かつ AUDIO_BASE_URL も無いため、QR 埋め込みURLは相対パスです。"
+                )
+        else:
+            print(
+                "[day4] GCS 未設定・QR は生成しません（既定）。音声URLは /output/audio/...（または AUDIO_BASE_URL）。"
             )
 
     id_filter: Optional[Set[str]] = None
@@ -227,7 +231,8 @@ def main() -> None:
                     object_name=object_name,
                     expires_days=expires_days,
                 )
-            elif args.allow_local_qr:
+            elif args.allow_local_qr or not args.qr:
+                # QR オフ（既定）またはローカルQR: GCS なしで音声 URL を /output/ または AUDIO_BASE_URL 下に
                 base = (args.audio_base_url or "").rstrip("/")
                 if not base:
                     audio_url = f"/output/audio/{task_id}/{mp3_filename}"
@@ -240,7 +245,7 @@ def main() -> None:
 
             qr_rel: Optional[str] = None
             qr_arg: Optional[str] = None
-            if not args.disable_qr:
+            if args.qr:
                 qr_path = os.path.join(paths.qr_dir, task_id, f"{student_id}.png")
                 qr = make_qr_png(url=audio_url, out_path=qr_path)
                 if not qr:

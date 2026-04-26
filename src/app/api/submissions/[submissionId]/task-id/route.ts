@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { hydrateSubmissionForRegisteredTask } from "@/lib/submission-task-hydration";
+import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
 import { getSubmissionById, updateSubmissionById } from "@/lib/submissions-store";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 import type { SubmissionInput } from "@/lib/validation";
@@ -16,7 +17,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const submission = await getSubmissionById(sid);
   if (!submission) {
-    return NextResponse.json({ ok: false, message: "提出が見つかりません。" }, { status: 404 });
+    return NextResponse.json(submissionNotFoundBody(), { status: 404 });
   }
 
   if (submission.studentRelease?.operatorApprovedAt) {
