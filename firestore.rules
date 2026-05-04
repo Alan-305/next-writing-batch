@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// デプロイ例: npx firebase-tools deploy --only firestore:rules
+// プロジェクトは .firebaserc の default か --project で指定
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 自分のユーザードキュメントのみ読める。更新はサーバー（Functions / Admin SDK）想定でクライアントからは不可。
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if false;
+
+      match /entitlements/{productId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, update, delete: if false;
+      }
+    }
+
+    // organizations やその他コレクションは未整備の間はクライアントから一切不可（後でルールを分割追加）
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

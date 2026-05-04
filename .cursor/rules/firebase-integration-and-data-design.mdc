@@ -1,0 +1,78 @@
+---
+description: Firebase 統合、インフラ、データモデル、認証、課金、セキュリティ、デプロイの原則（nexusproject / next-writing-batch）
+alwaysApply: true
+---
+
+# Firebase 統合とデータ設計の原則
+
+## インフラおよび外部サービス構成
+
+- **Firebase プラン**: Blaze（従量課金）。Cloud Functions の実行および外部通信を許可する前提。
+- **バックエンド**: Cloud Functions でサーバーサイド処理を行う。
+- **秘密情報**: API キー等は **Secret Manager** で管理する。コードに機密を直書きしない。
+- **メール**: **Resend**。ユーザー登録時（`Auth.onCreate`）にウェルカムメールを送るロジックを Functions に実装する。
+- **添削エンジン**: **Claude 3.5 Sonnet**。論理的で精度の高いフィードバックを生成する。
+
+## プロダクト表記と Firebase プロジェクト
+
+- **表記（固定）**: `nexusproject` / `next-writing-batch` — 表記ゆれを禁止し、独立したアプリとして扱う。
+- **本番 Firebase プロジェクト**: `nexus0301`（独立した 2 アプリを 1 プロジェクトで統合管理）。
+- **開発・検証**: `nexus0101`（両アプリの共通テスト環境）。
+- **ローカル開発**: 原則 **Firebase Emulator** を使用する。
+
+## フロントエンドと接続
+
+- **Next.js 各リポ**: Firebase 設定は **`.env.local`** で注入する。GitHub 等に **絶対にコミットしない**。
+- **本番（Cloud Run）**: 本番用 env と、ローカルは開発用または Emulator を自動で切り替える。
+
+## Authentication
+
+- **主**: Google ログインのみ。
+- **ゲート**: ホームは一般公開。解答・入力作業（`/input` 等）へ進む時点で Google 認証を要求する。
+- **Admin SDK**: **サーバー（Functions 等）のみ**で使用する。
+
+## データモデル（Firestore）
+
+- **ユーザー主キー**: Auth の `uid`。
+- **保存**: 添削設定（JSON）、生徒の回答、AI の添削結果はすべて `uid` に紐付けて永続保存する。
+- **アナリティクス**: 課題 ID ごとの点数分布、間違いが多い箇所、生徒の具体例・理由の種類をデータ化する。サポート内容もデータ化し、改善資料とする。
+- **プロダクト ID（固定）**: `next-writing-batch` / `nexusproject`。
+- **権利（Entitlements）**: `users/{uid}/entitlements/{productId}` サブコレクションでアプリごとの利用可否を管理。
+  - 初期 `status`: `none` / `active`（後から拡張可）。
+  - 将来用（null 可）: `source`, `expiresAt`, `organizationId` など。
+- **組織**: `organizations/{orgId}`。ユーザーは 1 組織に紐付け（`organizationId`）。
+
+## プロジェクト横断
+
+- **同一 uid**: アプリが別でも同じ `uid`。アクセスは `entitlements` で制御する。
+- **ドキュメント ID**: 課題・提出は **自動 ID（`addDoc`）**。マスタ ID（例: `2026`）と混同しない。
+
+## ロール・権限
+
+- **初期**: 一般ユーザーと `admin`（管理者は松尾さん 1 名のみ）。
+- **管理者識別**: 特定 `uid` の **allowlist** で松尾さん本人を識別する。
+- **拡張性**: 将来の `teacher` / `grader` のため、`roles` は **配列**で持つ。
+
+## 課金（Stripe）
+
+- Firestore に **`billing` フィールド**（初期は空）を用意する。
+- 課金状態の変更は **Webhook 経由のサーバー（Functions）のみ**。クライアントから直接書き換えない。
+
+## ウェルカムメール
+
+- **送信**: クライアントから送らず、`Auth.onCreate` トリガーの Functions で処理する。
+- **冪等性**: 送信済みフラグ等で **二重送信を防ぐ**。
+
+## セキュリティの原則
+
+- **管理画面（Admin）**: 専用 URL（例: `/admin`）。**管理者 allowlist の uid 以外は一切アクセス不可**にガードする。
+- **信頼できる書き換え**: `entitlements` や `organizations` の変更は **必ずサーバー側**（クライアントに任せない）。
+
+## デプロイ
+
+- **本番の統一**: 本番の 2 アプリは `nexus0301` に集約。独自ドメイン（例: `nexus-learning.com`）で各サービスを運用する。
+- **検証**: `nexus0101` で検証完了後に本番へ。不要な Cloud Run インスタンスを増やさない。
+
+## エージェントへの作業方針
+
+- 変更は **依頼範囲に限定**する。無関係なリファクタは禁止する。

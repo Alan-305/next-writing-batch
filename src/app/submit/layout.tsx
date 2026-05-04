@@ -1,3 +1,6 @@
+import { AuthToolbar } from "@/components/auth/AuthToolbar";
+import { RequireAuth } from "@/components/auth/RequireAuth";
+
 export default function SubmitLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="app-shell app-shell--student">
@@ -5,9 +8,10 @@ export default function SubmitLayout({ children }: Readonly<{ children: React.Re
         <div className="app-shell-header-inner">
           <span className="app-shell-brand-student">添削革命</span>
           <span className="app-shell-badge-student">生徒用</span>
+          <AuthToolbar variant="student" />
         </div>
       </header>
-      {children}
+      <RequireAuth>{children}</RequireAuth>
     </div>
   );
 }

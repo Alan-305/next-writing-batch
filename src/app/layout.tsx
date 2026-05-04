@@ -1,4 +1,5 @@
 import "@/lib/fix-node-localstorage";
+import { FirebaseAuthProvider } from "@/components/auth/FirebaseAuthProvider";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -12,7 +13,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <FirebaseAuthProvider>{children}</FirebaseAuthProvider>
+      </body>
     </html>
   );
 }
