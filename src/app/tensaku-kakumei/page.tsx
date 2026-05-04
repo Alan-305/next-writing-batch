@@ -74,6 +74,31 @@ export default async function TensakuKakumeiPage() {
           </p>
         </section>
 
+        <section className="tensaku-section card" id="sanpou-yoshi">
+          <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
+            このアプリは単なるツールではなく、<strong>教育現場全体を幸せにする仕組み</strong>であることを大切にしています。
+          </p>
+          <h2>ツールが優れているだけでは、現場は変わらない。目指すのは「教育版・三方よし」</h2>
+          <p style={{ marginTop: 0 }}>
+            機能だけを積み上げても、教室の空気は動きません。教師・生徒・社会（開発の知見を託す側）の三方が得をする関係を、ひとつの設計として組み込みます。
+          </p>
+
+          <article className="tensaku-value">
+            <h3>教師よし</h3>
+            <p>添削を「苦行」から「楽しさ」へ。時間と体力を取り戻し、指導に集中できる余白をつくり,利用料は0円とします。</p>
+          </article>
+
+          <article className="tensaku-value">
+            <h3>生徒よし</h3>
+            <p>24時間、自分専用の「プロの添削」を。一貫した基準とフィードバックで、学びの手応えを届けます。</p>
+          </article>
+
+          <article className="tensaku-value">
+            <h3>開発者（社会）よし</h3>
+            <p>40年の指導法がAIの翼を得て広がる。現場の知見が形になり、多くの教室に届くことを目指します。</p>
+          </article>
+        </section>
+
         <section className="tensaku-section card" id="ai">
           <h2>AIは「敵」ではなく、最高の「助手」である</h2>
           <p>

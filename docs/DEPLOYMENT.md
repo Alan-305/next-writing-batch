@@ -11,6 +11,10 @@
 
 本番で GCS を使うなら `GCS_BUCKET_NAME` と認証情報を設定し、`DAY4_ALLOW_LOCAL_QR` は外すか `false` にしてください。
 
+## 添削革命トップの紹介動画（`/tensaku-kakumei.mp4`）
+
+大容量 MP4 は **Cloud Run の単発レスポンス上限（目安 32MB）** に当たると再生できません。本リポジトリでは **`assets/tensaku-kakumei.mp4`** を置き、`/tensaku-kakumei.mp4` の Route Handler が **Range 対応＋チャンク転送**で配信します。差し替えるときは **同パス**のファイルを入れ替えてください（`public/` 直下の同名 MP4 は使いません）。ポスター画像は従来どおり **`public/tensaku-kakumei.png`**（`/tensaku-kakumei.png`）です。
+
 ---
 
 このアプリは提出を **`data/submissions.json`**（サーバー上の1ファイル）に保存します。課題マスタは **`data/task-problems/{taskId}.json`** です。
