@@ -6,6 +6,8 @@ import type { NexusProductId } from "@/lib/constants/nexus-products";
 export type FirestoreUserProfile = {
   roles?: string[];
   organizationId?: string | null;
+  /** Stripe 等。初期は {}。更新はサーバー（Webhook）のみ想定 */
+  billing?: Record<string, unknown>;
   /** Functions のウェルカムメール送信済み（任意） */
   welcomeEmailSentAt?: Timestamp | null;
 };

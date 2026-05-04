@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { AuthToolbar } from "@/components/auth/AuthToolbar";
+import { RequireAuth } from "@/components/auth/RequireAuth";
+
 export default function OpsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="app-shell app-shell--teacher">
@@ -14,9 +17,10 @@ export default function OpsLayout({ children }: Readonly<{ children: React.React
             <Link href="/submit">生徒提出</Link>
             <Link href="/tensaku-kakumei">案内サイト</Link>
           </nav>
+          <AuthToolbar variant="teacher" />
         </div>
       </header>
-      {children}
+      <RequireAuth>{children}</RequireAuth>
     </div>
   );
 }

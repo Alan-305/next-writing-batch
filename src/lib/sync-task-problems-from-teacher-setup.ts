@@ -33,7 +33,10 @@ export function buildTaskProblemsMasterFromTeacherSetup(setup: ProofreadingSetup
 }
 
 /** 課題・添削設定の保存内容で `data/task-problems/{taskId}.json` を上書きする（提出プルダウン・添削の単一ソース化） */
-export async function syncTaskProblemsFromProofreadingSetup(setup: ProofreadingSetupJson): Promise<void> {
+export async function syncTaskProblemsFromProofreadingSetup(
+  setup: ProofreadingSetupJson,
+  meta?: { savedByUid: string; savedAt: string },
+): Promise<void> {
   const tid = setup.task_id.trim();
   if (!tid) {
     throw new Error("task_id is required");
@@ -41,7 +44,15 @@ export async function syncTaskProblemsFromProofreadingSetup(setup: ProofreadingS
   if (!setup.question.trim()) {
     throw new Error("question is required");
   }
-  const payload = buildTaskProblemsMasterFromTeacherSetup(setup);
+  const payload: Record<string, unknown> = {
+    ...buildTaskProblemsMasterFromTeacherSetup(setup),
+  };
+  if (meta) {
+    payload._meta = {
+      lastSavedByUid: meta.savedByUid,
+      lastSavedAt: meta.savedAt,
+    };
+  }
   const fp = taskProblemsFilePath(tid);
   await fs.mkdir(path.dirname(fp), { recursive: true });
   await writeJsonFileAtomic(fp, payload);

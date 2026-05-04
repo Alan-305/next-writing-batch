@@ -2,6 +2,10 @@
 
 export type ProofreadingSetupJson = {
   schema_version: 1;
+  /** 最後にサーバー保存したユーザーの Firebase Auth uid（API が付与） */
+  last_saved_by_uid?: string;
+  /** 最後にサーバー保存した日時（ISO 8601、API が付与） */
+  last_saved_at?: string;
   /**
    * 生徒提出の taskId・data/task-problems/{taskId}.json・batch --task-id と揃えるための ID。
    * Nexus 本体の tpwSettings には無い拡張フィールド（任意）。
@@ -31,7 +35,7 @@ export function sanitizeProofreadingSetup(raw: unknown): ProofreadingSetupJson {
   if (typeof o.content_max === "number") content_max = o.content_max;
   if (typeof o.grammar_max === "string") grammar_max = parseInt(o.grammar_max, 10) || 25;
   if (typeof o.content_max === "string") content_max = parseInt(o.content_max, 10) || 25;
-  return {
+  const base: ProofreadingSetupJson = {
     schema_version: 1,
     task_id: typeof o.task_id === "string" ? o.task_id : "",
     problem_memo: typeof o.problem_memo === "string" ? o.problem_memo : "",
@@ -42,6 +46,13 @@ export function sanitizeProofreadingSetup(raw: unknown): ProofreadingSetupJson {
     content_max: clampInt(content_max, 1, 100),
     question: typeof o.question === "string" ? o.question : "",
   };
+  if (typeof o.last_saved_by_uid === "string" && o.last_saved_by_uid.trim()) {
+    base.last_saved_by_uid = o.last_saved_by_uid.trim();
+  }
+  if (typeof o.last_saved_at === "string" && o.last_saved_at.trim()) {
+    base.last_saved_at = o.last_saved_at.trim();
+  }
+  return base;
 }
 
 export function isProofreadingSetupJson(raw: unknown): boolean {

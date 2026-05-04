@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { NexusSupportForm } from "@/components/NexusSupportForm";
 import { RegisteredTaskIdField } from "@/components/RegisteredTaskIdField";
 import { StudentCorrectionLookup } from "@/components/StudentCorrectionLookup";
@@ -24,6 +25,7 @@ type AnswerMode = "single" | "multipart";
 type ImportHint = { text: string; variant: "success" | "error" | "info" };
 
 export default function SubmitPage() {
+  const { user } = useFirebaseAuthContext();
   const [form, setForm] = useState({ ...initialMeta, essayText: "" });
   const [answerMode, setAnswerMode] = useState<AnswerMode>("single");
   const [essayParts, setEssayParts] = useState<string[]>(["", ""]);
@@ -77,9 +79,17 @@ export default function SubmitPage() {
           };
 
     try {
+      if (!user) {
+        setMessage("ログイン情報を読み込めませんでした。再ログインしてください。");
+        return;
+      }
+      const idToken = await user.getIdToken();
       const response = await fetch("/api/submissions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify(body),
       });
       const json = await response.json();

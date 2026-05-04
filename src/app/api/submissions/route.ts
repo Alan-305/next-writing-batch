@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
+
+import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { addSubmission, getSubmissions } from "@/lib/submissions-store";
 import { hydrateSubmissionForRegisteredTask } from "@/lib/submission-task-hydration";
 import { normalizeSubmissionFromBody, validateSubmissionInput } from "@/lib/validation";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   const submissions = await getSubmissions();
@@ -9,6 +13,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+
   const body = await request.json();
   const input = normalizeSubmissionFromBody(body);
 
@@ -51,7 +58,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const submission = await addSubmission(hydrated.input);
+  const submission = await addSubmission(hydrated.input, { submittedByUid: auth.uid });
   return NextResponse.json({
     ok: true,
     submissionId: submission.submissionId,

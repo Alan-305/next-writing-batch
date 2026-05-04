@@ -11,6 +11,7 @@ const db = admin.firestore();
 /**
  * 新規ユーザー登録時:
  * - users/{uid} と entitlements/{productId} の雛形をサーバーで作成（クライアントは書けないルールと整合）
+ * - billing は初期 {}（Stripe Webhook 等での更新のみ想定）
  * - RESEND_API_KEY が Functions の環境にあればウェルカムメール（冪等: welcomeEmailSentAt）
  *
  * リージョン未指定 = 既定の us-central1（初回デプロイで asia-northeast1 が失敗する事例の回避）。
@@ -31,6 +32,7 @@ export const onAuthUserCreate = functions.auth.user().onCreate(async (user) => {
     tx.set(userRef, {
       roles: [] as string[],
       organizationId: null,
+      billing: {},
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     tx.set(entRef, {

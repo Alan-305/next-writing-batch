@@ -29,6 +29,8 @@ cd /path/to/next-writing-batch
 
 ## 0.5 GCS 初回セットアップ（Day4・署名付きURL）
 
+本番 Firebase **`nexus0301`** と **同じ GCP プロジェクト**でバケットを使う場合、プロジェクトの取り違えがないか `docs/pilot-nexus0301-checklist.md` を参照してください（※ここでの手順 1〜7 は **GCS セットアップ**用。プロダクト仕様の区分 1〜7とは別です）。
+
 [Google Cloud コンソール](https://console.cloud.google.com/) で次を実施します（初回のみ）。
 
 1. **プロジェクト**を作成（または既存を選択）し、**請求先**を紐づける。  

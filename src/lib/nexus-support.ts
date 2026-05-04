@@ -28,9 +28,14 @@ function normalizeFromDisplay(s: string): string {
   return t;
 }
 
+/**
+ * Resend の from。検証済みドメイン以外（例: support@nexus-learning.com のまま）は API が 4xx になる。
+ * 未指定時は Resend ドキュメントの検証用と揃える（本番は DNS 検証後に RESEND_FROM_EMAIL を必ず設定）。
+ */
 function resendFrom(): string {
-  const sender = env("EMAIL_SENDER") || DEFAULT_BRAND_EMAIL;
-  return normalizeFromDisplay(env("RESEND_FROM_EMAIL") || sender);
+  const explicit = env("RESEND_FROM_EMAIL");
+  if (explicit) return normalizeFromDisplay(explicit);
+  return "Nexus Learning <onboarding@resend.dev>";
 }
 
 function supportTimeoutMs(): number {
@@ -188,7 +193,7 @@ async function sendViaResend(args: {
     });
     if (r.ok) return true;
     const detail = (await r.text()).slice(0, 2000);
-    console.error("[sendViaResend] HTTP", r.status, detail);
+    console.error("[sendViaResend] HTTP", r.status, detail, { from: fromAddr, to });
     return false;
   } catch (e) {
     console.warn("[sendViaResend] failed:", e);

@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
+import { getFirebaseAuth } from "@/lib/firebase/client";
 
 type Props = Readonly<{ children: React.ReactNode }>;
 
@@ -14,9 +15,14 @@ export function RequireAdmin({ children }: Props) {
   const router = useRouter();
   const pathname = usePathname() || "/admin";
 
+  const auth = getFirebaseAuth();
+  const resolvedUser = user ?? auth?.currentUser ?? null;
+
   useEffect(() => {
     if (!configured || authLoading) return;
-    if (!user) {
+    const a = getFirebaseAuth();
+    const ok = user ?? a?.currentUser ?? null;
+    if (!ok) {
       const next = encodeURIComponent(pathname);
       router.replace(`/sign-in?next=${next}`);
     }
@@ -36,11 +42,11 @@ export function RequireAdmin({ children }: Props) {
     return <p className="muted" style={{ margin: 24 }}>認証を確認しています…</p>;
   }
 
-  if (!user) {
+  if (!resolvedUser) {
     return <p className="muted" style={{ margin: 24 }}>ログイン画面へ移動します…</p>;
   }
 
-  if (!isAllowlistedAdminUid(user.uid)) {
+  if (!isAllowlistedAdminUid(resolvedUser.uid)) {
     return (
       <main className="card" style={{ margin: 24 }}>
         <h1 style={{ marginTop: 0 }}>アクセスできません</h1>

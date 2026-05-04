@@ -63,6 +63,7 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
     void getRedirectResult(auth)
       .then((result) => {
         if (!result?.user || typeof window === "undefined") return;
+        setUser(result.user);
         const stored = sessionStorage.getItem(AUTH_REDIRECT_NEXT_KEY);
         sessionStorage.removeItem(AUTH_REDIRECT_NEXT_KEY);
         const next =

@@ -1,6 +1,7 @@
 import path from "path";
 import { NextResponse } from "next/server";
 
+import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { sanitizeProofreadingSetup } from "@/lib/proofreading-setup-json";
 import { syncTaskProblemsFromProofreadingSetup } from "@/lib/sync-task-problems-from-teacher-setup";
 import {
@@ -12,6 +13,7 @@ import { taskProblemsFilePath } from "@/lib/load-task-problems-master";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const u = new URL(request.url);
@@ -34,6 +36,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -55,8 +60,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    await saveTeacherProofreadingSetup(setup);
-    await syncTaskProblemsFromProofreadingSetup(setup);
+    const at = new Date().toISOString();
+    const enriched = { ...setup, last_saved_by_uid: auth.uid, last_saved_at: at };
+    await saveTeacherProofreadingSetup(enriched);
+    await syncTaskProblemsFromProofreadingSetup(enriched, { savedByUid: auth.uid, savedAt: at });
     const tid = setup.task_id.trim();
     const cwd = process.cwd();
     const relTeacher = path.relative(cwd, teacherProofreadingSetupFilePath(tid)) || teacherProofreadingSetupFilePath(tid);

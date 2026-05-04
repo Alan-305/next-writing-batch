@@ -20,3 +20,4 @@ pnpm-debug.log*
 .DS_Store
 # Day4 PDF: auto-downloaded Noto Sans JP (OFL). Override path with DAY4_JP_FONT.
 batch/fonts/NotoSansJP-Variable.ttf
+credentials/

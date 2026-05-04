@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { TextareaWithFileDrop } from "@/components/TextareaWithFileDrop";
 import {
   clampInt,
@@ -24,6 +25,7 @@ function defaultFilename(school: string): string {
 }
 
 export default function ProofreadingSetupPage() {
+  const { user } = useFirebaseAuthContext();
   const [setup, setSetup] = useState<ProofreadingSetupJson>(() => sanitizeProofreadingSetup({}));
   const [structuredQuestion, setStructuredQuestion] = useState(false);
   const [message, setMessage] = useState("");
@@ -37,6 +39,12 @@ export default function ProofreadingSetupPage() {
   const jsonFileRef = useRef<HTMLInputElement>(null);
 
   const totalPoints = setup.content_max + setup.grammar_max;
+
+  const authHeader = useCallback(async (): Promise<Record<string, string> | null> => {
+    if (!user) return null;
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
+  }, [user]);
 
   const loadRegistryTasks = useCallback(async (opts?: { quiet?: boolean }) => {
     setRegistryLoading(true);
@@ -137,9 +145,14 @@ export default function ProofreadingSetupPage() {
     setSavingServer(true);
     setMessage("");
     try {
+      const ah = await authHeader();
+      if (!ah) {
+        setMessage("ログインしてください（教員・運用画面は Google ログインが必要です）。");
+        return;
+      }
       const res = await fetch("/api/ops/teacher-proofreading-setup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...ah },
         body: JSON.stringify(setup),
       });
       const j = (await res.json()) as { ok?: boolean; message?: string };
@@ -231,8 +244,14 @@ export default function ProofreadingSetupPage() {
     setDeletingRegistry(true);
     setMessage("");
     try {
+      const ah = await authHeader();
+      if (!ah) {
+        setDeletingRegistry(false);
+        setMessage("ログインしてください（教員・運用画面は Google ログインが必要です）。");
+        return;
+      }
       const q = encodeURIComponent(tid);
-      const res = await fetch(`/api/ops/registered-task?taskId=${q}`, { method: "DELETE" });
+      const res = await fetch(`/api/ops/registered-task?taskId=${q}`, { method: "DELETE", headers: { ...ah } });
       const j = (await res.json()) as { ok?: boolean; message?: string };
       if (!res.ok || !j?.ok) {
         setMessage(j?.message ?? "サーバーからの削除に失敗しました。");

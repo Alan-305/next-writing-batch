@@ -10,6 +10,8 @@ import type { SubmissionInput } from "@/lib/validation";
 export type Submission = SubmissionInput & {
   submissionId: string;
   submittedAt: string;
+  /** 提出 API が検証した Firebase Auth uid（ログイン提出時） */
+  submittedByUid?: string;
   status: "pending" | "processing" | "done" | "failed";
   /** 生徒が公開済み添削結果ページを初めて開いた日時（運用一覧の Viewed 表示用） */
   studentResultFirstViewedAt?: string;
@@ -130,7 +132,10 @@ export async function updateSubmissionById(
   return next;
 }
 
-export async function addSubmission(input: SubmissionInput): Promise<Submission> {
+export async function addSubmission(
+  input: SubmissionInput,
+  opts?: { submittedByUid?: string },
+): Promise<Submission> {
   const q = (input.question ?? "").trim();
   const memo = (input.problemMemo ?? "").trim();
   const multipart =
@@ -147,6 +152,7 @@ export async function addSubmission(input: SubmissionInput): Promise<Submission>
     studentId: input.studentId.trim(),
     studentName: input.studentName.trim(),
     essayText: input.essayText.trim(),
+    ...(opts?.submittedByUid ? { submittedByUid: opts.submittedByUid } : {}),
     ...(q ? { question: q } : {}),
     ...(memo ? { problemMemo: memo } : {}),
     ...(pid ? { problemId: pid } : {}),
