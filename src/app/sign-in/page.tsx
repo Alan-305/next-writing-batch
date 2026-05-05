@@ -9,6 +9,7 @@ import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebas
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
+import { useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
 function isPopupBlocked(e: unknown): boolean {
@@ -20,6 +21,7 @@ function SignInInner() {
   const params = useSearchParams();
   const nextRaw = (params.get("next") ?? "").trim();
   const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/hub";
+  const emulatorMode = useFirebaseEmulators();
   const { configured, user, authLoading, authRedirectHint } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,10 @@ function SignInInner() {
       router.replace(safeNext);
     } catch (e: unknown) {
       if (isPopupBlocked(e)) {
+        if (emulatorMode) {
+          setError("ポップアップがブロックされました。ブラウザ設定でポップアップを許可してください。");
+          return;
+        }
         try {
           await startGoogleRedirect();
           return;
@@ -79,6 +85,10 @@ function SignInInner() {
           setError(formatFirebaseAuthError(e2));
         }
       } else if (e instanceof FirebaseError && e.code === "auth/popup-closed-by-user") {
+        if (emulatorMode) {
+          setError("ポップアップが閉じられました。閉じずにアカウント選択まで進めてください。");
+          return;
+        }
         try {
           await startGoogleRedirect();
           return;
@@ -91,7 +101,7 @@ function SignInInner() {
     } finally {
       setBusy(false);
     }
-  }, [router, safeNext, startGoogleRedirect]);
+  }, [emulatorMode, router, safeNext, startGoogleRedirect]);
 
   if (!configured) {
     return (
@@ -135,10 +145,16 @@ function SignInInner() {
       <div className="card">
         <h1 style={{ marginTop: 0 }}>ログイン</h1>
         <p className="muted">このアプリでは Google アカウントでのみログインできます。</p>
-        <p className="muted" style={{ marginTop: 0 }}>
-          <strong>まず上のボタン（同じタブ・リダイレクト）</strong>をお試しください。Safari・社内ブラウザ・Cursor
-          内蔵ブラウザなどでは、ポップアップがすぐ閉じて <code>auth/popup-closed-by-user</code> になることがあります。
-        </p>
+        {emulatorMode ? (
+          <p className="muted" style={{ marginTop: 0 }}>
+            Emulator 検証中は、安定性のため <strong>ポップアップ方式のみ</strong>を使用します。
+          </p>
+        ) : (
+          <p className="muted" style={{ marginTop: 0 }}>
+            <strong>まず上のボタン（同じタブ・リダイレクト）</strong>をお試しください。Safari・社内ブラウザ・Cursor
+            内蔵ブラウザなどでは、ポップアップがすぐ閉じて <code>auth/popup-closed-by-user</code> になることがあります。
+          </p>
+        )}
         {origin ? (
           <div className="card" style={{ background: "#f1f5f9", marginBottom: 12 }}>
             <p style={{ marginTop: 0, marginBottom: 8 }}>
@@ -168,22 +184,24 @@ function SignInInner() {
         ) : null}
         {error ? <p className="error">{error}</p> : null}
         {authRedirectHint ? <p className="error">{authRedirectHint}</p> : null}
-        <p>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setError(null);
-              setBusy(true);
-              void startGoogleRedirect().catch((e: unknown) => {
-                setError(formatFirebaseAuthError(e));
-                setBusy(false);
-              });
-            }}
-          >
-            {busy ? "処理中…" : "Google でログイン（同じタブ・推奨）"}
-          </button>
-        </p>
+        {emulatorMode ? null : (
+          <p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setError(null);
+                setBusy(true);
+                void startGoogleRedirect().catch((e: unknown) => {
+                  setError(formatFirebaseAuthError(e));
+                  setBusy(false);
+                });
+              }}
+            >
+              {busy ? "処理中…" : "Google でログイン（同じタブ・推奨）"}
+            </button>
+          </p>
+        )}
         <p>
           <button
             type="button"
@@ -191,7 +209,7 @@ function SignInInner() {
             style={{ background: "#475569" }}
             onClick={() => void onGoogle()}
           >
-            別ウィンドウでログイン（ポップアップ）
+            {emulatorMode ? "Google でログイン（ポップアップ）" : "別ウィンドウでログイン（ポップアップ）"}
           </button>
         </p>
         <p className="muted" style={{ marginBottom: 0 }}>

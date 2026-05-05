@@ -1,6 +1,7 @@
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
+import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 
 import {
   firebaseEmulatorHost,
@@ -11,6 +12,7 @@ import {
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
+let fns: Functions | null = null;
 let emulatorsConnected = false;
 
 function getOrInitApp(): FirebaseApp {
@@ -24,6 +26,7 @@ function getOrInitApp(): FirebaseApp {
     app = null;
     auth = null;
     db = null;
+    fns = null;
     emulatorsConnected = false;
   }
   if (!app) {
@@ -78,6 +81,22 @@ export function getFirebaseFirestore(): Firestore | null {
   return db;
 }
 
+export function getFirebaseFunctions(): Functions | null {
+  if (typeof window === "undefined") return null;
+  if (!readFirebaseWebConfig()) return null;
+  if (!fns) {
+    try {
+      fns = getFunctions(getOrInitApp(), "us-central1");
+      maybeConnectEmulators();
+    } catch (e) {
+      console.error("[getFirebaseFunctions] Firebase Functions の初期化に失敗しました", e);
+      fns = null;
+      return null;
+    }
+  }
+  return fns;
+}
+
 function maybeConnectEmulators(): void {
   if (typeof window === "undefined" || emulatorsConnected) return;
   if (!useFirebaseEmulators()) return;
@@ -85,8 +104,10 @@ function maybeConnectEmulators(): void {
     const host = firebaseEmulatorHost();
     const authInst = auth ?? getAuth(getOrInitApp());
     const dbInst = db ?? getFirestore(getOrInitApp());
+    const fnsInst = fns ?? getFunctions(getOrInitApp(), "us-central1");
     connectAuthEmulator(authInst, `http://${host}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(dbInst, host, 8080);
+    connectFunctionsEmulator(fnsInst, host, 5001);
   } catch (e) {
     console.warn(
       "[maybeConnectEmulators] エミュレータ接続に失敗しました。FIREBASE_AUTH_EMULATOR_HOST や Emulator の起動を確認してください。本番接続を続行します。",

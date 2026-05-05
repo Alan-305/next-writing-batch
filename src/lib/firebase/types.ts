@@ -3,11 +3,21 @@ import type { Timestamp } from "firebase/firestore";
 import type { NexusProductId } from "@/lib/constants/nexus-products";
 
 /** users/{uid} に保存する想定のフィールド（クライアントは主に読み取り） */
+export type BillingInfo = {
+  status?: "none" | "active";
+  tickets?: number;
+  stripeCustomerId?: string | null;
+  lastCheckoutSessionId?: string | null;
+  lastTicketAdded?: number;
+  updatedAt?: Timestamp | null;
+};
+
+/** users/{uid} に保存する想定のフィールド（クライアントは主に読み取り） */
 export type FirestoreUserProfile = {
   roles?: string[];
   organizationId?: string | null;
   /** Stripe 等。初期は {}。更新はサーバー（Webhook）のみ想定 */
-  billing?: Record<string, unknown>;
+  billing?: BillingInfo;
   /** Functions のウェルカムメール送信済み（任意） */
   welcomeEmailSentAt?: Timestamp | null;
 };

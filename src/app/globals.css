@@ -898,6 +898,73 @@ td {
   max-width: 42em;
 }
 
+.student-settings-billing {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--student-accent, #bae6fd) 45%, #e2e8f0);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.student-settings-billing h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.student-settings-billing-lead {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+}
+
+.student-settings-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.student-settings-plan-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.88rem;
+}
+
+.student-settings-plan-option input {
+  margin: 0;
+}
+
+.student-settings-billing-error {
+  margin: 10px 0 0;
+  color: #b91c1c;
+  font-size: 0.86rem;
+}
+
+.student-settings-billing-result {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.student-settings-billing-result--success {
+  background: #ecfdf5;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.student-settings-billing-result--cancel {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+
 .student-settings-account {
   padding-top: 16px;
   border-top: 1px solid color-mix(in srgb, var(--student-accent, #bae6fd) 45%, #e2e8f0);

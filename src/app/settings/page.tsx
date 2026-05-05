@@ -1,11 +1,59 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import type { FirebaseError } from "firebase/app";
+import { useSearchParams } from "next/navigation";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { createStripeCheckoutSession, type BillingPlan } from "@/lib/billing/create-checkout-session";
+
+const PLAN_OPTIONS: Array<{ plan: BillingPlan; label: string; priceLabel: string; tickets: number }> = [
+  { plan: "1m", label: "1ヶ月", priceLabel: "2,000円", tickets: 5 },
+  { plan: "3m", label: "3ヶ月", priceLabel: "5,700円", tickets: 15 },
+  { plan: "6m", label: "6ヶ月", priceLabel: "10,000円", tickets: 30 },
+  { plan: "12m", label: "1年", priceLabel: "18,000円", tickets: 60 },
+];
 
 export default function SettingsPage() {
   const { user, signOutUser } = useFirebaseAuthContext();
+  const searchParams = useSearchParams();
+  const [selectedPlan, setSelectedPlan] = useState<BillingPlan>("1m");
+  const [isLoadingCheckout, setIsLoadingCheckout] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const checkoutResult = searchParams.get("checkout");
+
+  const selectedPlanInfo = useMemo(
+    () => PLAN_OPTIONS.find((item) => item.plan === selectedPlan) ?? PLAN_OPTIONS[0],
+    [selectedPlan],
+  );
+
+  const handleStartCheckout = async () => {
+    if (!user) {
+      setCheckoutError("購入するにはログインしてください。");
+      return;
+    }
+    setIsLoadingCheckout(true);
+    setCheckoutError(null);
+    try {
+      const origin = window.location.origin;
+      const result = await createStripeCheckoutSession({
+        plan: selectedPlan,
+        successUrl: `${origin}/settings?checkout=success`,
+        cancelUrl: `${origin}/settings?checkout=cancel`,
+      });
+      if (!result.url) {
+        throw new Error("Checkout URL が取得できませんでした。");
+      }
+      window.location.assign(result.url);
+    } catch (error) {
+      console.error("[billing] createStripeCheckoutSession failed", error);
+      const message = mapCheckoutErrorMessage(error);
+      setCheckoutError(message);
+    } finally {
+      setIsLoadingCheckout(false);
+    }
+  };
 
   return (
     <main>
@@ -17,6 +65,44 @@ export default function SettingsPage() {
         <p className="muted student-settings-hint">
           添削結果を PDF にしたいときは、結果ページで Mac は ⌘P、Windows は Ctrl+P から「PDF に保存」を選びます。
         </p>
+        {checkoutResult === "success" ? (
+          <p className="student-settings-billing-result student-settings-billing-result--success" role="status">
+            決済が完了しました。チケットを反映中です。反映されない場合は数秒後に再読み込みしてください。
+          </p>
+        ) : null}
+        {checkoutResult === "cancel" ? (
+          <p className="student-settings-billing-result student-settings-billing-result--cancel" role="status">
+            決済はキャンセルされました。プランを選び直して再度お試しください。
+          </p>
+        ) : null}
+        <section className="student-settings-billing" aria-label="チケット購入">
+          <h2>チケット購入（テスト）</h2>
+          <p className="muted student-settings-billing-lead">
+            プランを選ぶと Stripe Checkout（テスト）へ移動します。
+          </p>
+          <div className="student-settings-plan-grid" role="radiogroup" aria-label="購入プラン">
+            {PLAN_OPTIONS.map((option) => (
+              <label key={option.plan} className="student-settings-plan-option">
+                <input
+                  type="radio"
+                  name="billing-plan"
+                  value={option.plan}
+                  checked={selectedPlan === option.plan}
+                  onChange={() => setSelectedPlan(option.plan)}
+                  disabled={isLoadingCheckout}
+                />
+                <span>{option.label}</span>
+                <span>{option.tickets}回 / {option.priceLabel}</span>
+              </label>
+            ))}
+          </div>
+          <button type="button" disabled={isLoadingCheckout} onClick={() => void handleStartCheckout()}>
+            {isLoadingCheckout
+              ? "決済画面を準備中..."
+              : `${selectedPlanInfo.label}プランで購入（${selectedPlanInfo.priceLabel}）`}
+          </button>
+          {checkoutError ? <p className="student-settings-billing-error">{checkoutError}</p> : null}
+        </section>
         <div className="student-settings-account">
           <span className="muted student-settings-account-label">ログイン中</span>
           <p className="student-settings-email">{user?.email ?? user?.uid ?? "—"}</p>
@@ -27,4 +113,26 @@ export default function SettingsPage() {
       </div>
     </main>
   );
+}
+
+function mapCheckoutErrorMessage(error: unknown): string {
+  const code = (error as FirebaseError | undefined)?.code ?? "";
+  const rawMessage = (error as Error | undefined)?.message ?? "";
+
+  if (code === "functions/failed-precondition") {
+    return "決済設定が未完了です。STRIPE_PRICE_1M/3M/6M/12M と STRIPE_SECRET_KEY を確認してください。";
+  }
+  if (code === "functions/unauthenticated") {
+    return "ログイン状態を確認してから再度お試しください。";
+  }
+  if (code === "functions/unavailable") {
+    return "決済APIに接続できません。Functions Emulator 起動または Functions デプロイ状態を確認してください。";
+  }
+  if (code === "functions/internal") {
+    return "サーバー内部エラーです。Functionsログを確認してください（Stripe鍵やPrice ID未設定の可能性があります）。";
+  }
+  if (rawMessage.trim().length > 0) {
+    return rawMessage;
+  }
+  return "決済画面の起動に失敗しました。";
 }
