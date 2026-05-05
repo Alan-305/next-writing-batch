@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebase/auth";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
-import { AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
+import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
@@ -19,13 +20,26 @@ function SignInInner() {
   const params = useSearchParams();
   const nextRaw = (params.get("next") ?? "").trim();
   const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/hub";
-  const { configured, user, authLoading } = useFirebaseAuthContext();
+  const { configured, user, authLoading, authRedirectHint } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string>("");
 
   useEffect(() => {
     setOrigin(typeof window !== "undefined" ? window.location.origin : "");
+  }, []);
+
+  /** リダイレクト後に getRedirectResult が失敗したとき Provider が sessionStorage に残す */
+  useEffect(() => {
+    try {
+      const msg = sessionStorage.getItem(AUTH_REDIRECT_ERROR_KEY);
+      if (msg) {
+        sessionStorage.removeItem(AUTH_REDIRECT_ERROR_KEY);
+        setError(msg);
+      }
+    } catch {
+      /* sessionStorage 不可 */
+    }
   }, []);
 
   const startGoogleRedirect = useCallback(async () => {
@@ -52,9 +66,19 @@ function SignInInner() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       await signInWithPopup(auth, provider);
+      await new Promise<void>((resolve) => {
+        queueMicrotask(() => requestAnimationFrame(() => resolve()));
+      });
       router.replace(safeNext);
     } catch (e: unknown) {
       if (isPopupBlocked(e)) {
+        try {
+          await startGoogleRedirect();
+          return;
+        } catch (e2: unknown) {
+          setError(formatFirebaseAuthError(e2));
+        }
+      } else if (e instanceof FirebaseError && e.code === "auth/popup-closed-by-user") {
         try {
           await startGoogleRedirect();
           return;
@@ -112,7 +136,8 @@ function SignInInner() {
         <h1 style={{ marginTop: 0 }}>ログイン</h1>
         <p className="muted">このアプリでは Google アカウントでのみログインできます。</p>
         <p className="muted" style={{ marginTop: 0 }}>
-          ポップアップをブロックしているブラウザでは、自動的に<strong>同じタブで Google に移動する方式</strong>に切り替わります。手元でブロックを解除したい場合は、アドレスバー右のポップアップ許可も有効にしてください。
+          <strong>まず上のボタン（同じタブ・リダイレクト）</strong>をお試しください。Safari・社内ブラウザ・Cursor
+          内蔵ブラウザなどでは、ポップアップがすぐ閉じて <code>auth/popup-closed-by-user</code> になることがあります。
         </p>
         {origin ? (
           <div className="card" style={{ background: "#f1f5f9", marginBottom: 12 }}>
@@ -127,22 +152,26 @@ function SignInInner() {
               <code>{origin}</code>
             </p>
             <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              開発では <code>http://localhost:3000</code> で開くのが確実です（<code>127.0.0.1</code>・<code>0.0.0.0</code>・LAN
-              の IP は別エントリとして追加が必要なことが多いです）。
+              このリポの <code>npm run dev</code> は <code>0.0.0.0</code> 束縛のため、ブラウザが{" "}
+              <code>127.0.0.1</code> や LAN IP で開くと Firebase の承認済みドメインと一致せず失敗することがあります。確実にするには{" "}
+              <code>npm run dev:localhost</code> のあと <code>http://localhost:3000</code> で開いてください（
+              <code>127.0.0.1</code> は <code>localhost</code> とは別扱いで、Console に両方入れるのが安全です）。
+            </p>
+            <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
+              コンソールに <code>getProjectConfig</code> が <strong>403</strong> や{" "}
+              <code>Unable to verify that the app domain is authorized</code> がある場合は、上記の承認済みドメインに加え、
+              Google Cloud → 認証情報 → 使用中のブラウザ用 API キー（<code>NEXT_PUBLIC_FIREBASE_API_KEY</code> と同じ）で{" "}
+              <strong>HTTP リファラー制限</strong>に、いまの <code>{origin || "（このページのオリジン）"}</code>{" "}
+              を許可リストへ入れてください（例: <code>http://localhost:3000/*</code>）。
             </p>
           </div>
         ) : null}
         {error ? <p className="error">{error}</p> : null}
-        <p>
-          <button type="button" disabled={busy} onClick={() => void onGoogle()}>
-            {busy ? "処理中…" : "Google でログイン"}
-          </button>
-        </p>
+        {authRedirectHint ? <p className="error">{authRedirectHint}</p> : null}
         <p>
           <button
             type="button"
             disabled={busy}
-            style={{ background: "#475569" }}
             onClick={() => {
               setError(null);
               setBusy(true);
@@ -152,7 +181,17 @@ function SignInInner() {
               });
             }}
           >
-            ポップアップを使わずログイン（リダイレクト）
+            {busy ? "処理中…" : "Google でログイン（同じタブ・推奨）"}
+          </button>
+        </p>
+        <p>
+          <button
+            type="button"
+            disabled={busy}
+            style={{ background: "#475569" }}
+            onClick={() => void onGoogle()}
+          >
+            別ウィンドウでログイン（ポップアップ）
           </button>
         </p>
         <p className="muted" style={{ marginBottom: 0 }}>

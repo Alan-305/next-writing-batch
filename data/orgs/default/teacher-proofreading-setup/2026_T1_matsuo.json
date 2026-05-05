@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "task_id": "2026_T1_matsuo",
+  "problem_memo": "インターネット",
+  "teacher_name": "松尾直樹",
+  "teacher_email": "chokuju1224@yahoo.co.jp",
+  "school_name": "河合塾札幌校",
+  "grammar_max": 25,
+  "content_max": 25,
+  "question": "あなたが考えるインターネットの問題点を書きなさい。"
+}

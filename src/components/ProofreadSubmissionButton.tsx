@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+
 type CommonProps = {
   submissionId: string;
   taskId: string;
@@ -12,14 +14,17 @@ type Props = CommonProps & {
   status: string;
 };
 
-async function postRunProofread(body: {
-  taskId: string;
-  submissionIds: string[];
-  retryFailed: boolean;
-}): Promise<{ ok: boolean; message?: string }> {
+async function postRunProofread(
+  idToken: string,
+  body: {
+    taskId: string;
+    submissionIds: string[];
+    retryFailed: boolean;
+  },
+): Promise<{ ok: boolean; message?: string }> {
   const res = await fetch("/api/ops/run-proofread", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({
       taskId: body.taskId.trim(),
       submissionIds: body.submissionIds,
@@ -46,6 +51,7 @@ async function postRunProofread(body: {
 }
 
 export function ProofreadSubmissionButton({ submissionId, taskId, studentLabel, status }: Props) {
+  const { user } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
 
   const canRun =
@@ -64,7 +70,12 @@ export function ProofreadSubmissionButton({ submissionId, taskId, studentLabel, 
 
     setBusy(true);
     try {
-      const result = await postRunProofread({
+      if (!user) {
+        window.alert("ログインしてください。");
+        return;
+      }
+      const token = await user.getIdToken();
+      const result = await postRunProofread(token, {
         taskId,
         submissionIds: [submissionId],
         retryFailed: status === "failed" || status === "processing",
@@ -105,6 +116,7 @@ export function ProofreadSubmissionButton({ submissionId, taskId, studentLabel, 
 
 /** 課題・添削設定などを変えたあと、既に添削済み（done）の提出を Claude で出し直す */
 export function RedoProofreadSubmissionButton({ submissionId, taskId, studentLabel }: CommonProps) {
+  const { user } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
 
   const onClick = async () => {
@@ -118,7 +130,12 @@ export function RedoProofreadSubmissionButton({ submissionId, taskId, studentLab
 
     setBusy(true);
     try {
-      const result = await postRunProofread({
+      if (!user) {
+        window.alert("ログインしてください。");
+        return;
+      }
+      const token = await user.getIdToken();
+      const result = await postRunProofread(token, {
         taskId,
         submissionIds: [submissionId],
         retryFailed: false,

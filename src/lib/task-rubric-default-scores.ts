@@ -2,23 +2,25 @@ import { promises as fs } from "fs";
 import path from "path";
 
 import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
+import { organizationTaskRubricDefaultsPath } from "@/lib/org-data-layout";
 import type { TaskProblemsMaster } from "@/lib/task-problems-core";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "task-rubric-default-scores.json");
 
 type FileShape = Record<string, Record<string, number>>;
 
-async function ensureDataDir(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+async function ensureOrgDir(organizationId: string): Promise<void> {
+  await fs.mkdir(path.dirname(organizationTaskRubricDefaultsPath(organizationId)), { recursive: true });
 }
 
 /** 課題（taskId）ごとのルーブリック初期点（運用が最後に保存した値） */
-export async function loadTaskRubricDefaultScores(taskId: string): Promise<Record<string, number>> {
+export async function loadTaskRubricDefaultScores(
+  organizationId: string,
+  taskId: string,
+): Promise<Record<string, number>> {
   const tid = taskId.trim();
   if (!tid) return {};
+  const fp = organizationTaskRubricDefaultsPath(organizationId);
   try {
-    const raw = JSON.parse(await fs.readFile(DATA_FILE, "utf8")) as unknown;
+    const raw = JSON.parse(await fs.readFile(fp, "utf8")) as unknown;
     if (!raw || typeof raw !== "object") return {};
     const row = (raw as FileShape)[tid];
     if (!row || typeof row !== "object") return {};
@@ -52,6 +54,7 @@ function clampScoresToMaster(
 
 /** 提出保存時に呼び、同じ taskId の次回以降の初期点にする */
 export async function persistTaskRubricDefaultScores(
+  organizationId: string,
   taskId: string,
   master: TaskProblemsMaster,
   scores: Record<string, number>,
@@ -61,14 +64,15 @@ export async function persistTaskRubricDefaultScores(
 
   const clamped = clampScoresToMaster(master, scores);
 
-  await ensureDataDir();
+  await ensureOrgDir(organizationId);
+  const fp = organizationTaskRubricDefaultsPath(organizationId);
   let all: FileShape = {};
   try {
-    const raw = JSON.parse(await fs.readFile(DATA_FILE, "utf8")) as unknown;
+    const raw = JSON.parse(await fs.readFile(fp, "utf8")) as unknown;
     if (raw && typeof raw === "object") all = raw as FileShape;
   } catch {
     /* ファイルなし */
   }
   all[tid] = clamped;
-  await writeJsonFileAtomic(DATA_FILE, all);
+  await writeJsonFileAtomic(fp, all);
 }

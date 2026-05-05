@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { findLatestSubmissionByStudentLookup } from "@/lib/submissions-store";
 import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-display";
 import { formatExplanationForPublicView } from "@/lib/student-release";
@@ -16,6 +17,9 @@ type LookupBody = {
 };
 
 export async function POST(request: Request) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+
   let body: LookupBody;
   try {
     body = (await request.json()) as LookupBody;
@@ -34,7 +38,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const submission = await findLatestSubmissionByStudentLookup({ taskId, studentId, studentName });
+  const submission = await findLatestSubmissionByStudentLookup(auth.organizationId, {
+    taskId,
+    studentId,
+    studentName,
+  });
   if (!submission) {
     return NextResponse.json({
       ok: true,

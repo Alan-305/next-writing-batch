@@ -585,7 +585,7 @@ function nlDeductionsFromEvaluationLine(evaluation: string): { content: number; 
 }
 
 /** 添削バッチが既に【内容】＋【文法・語法・表現】型で explanation を保存しているか */
-function proofreadExplanationLooksSectionMerged(explanation: string): boolean {
+export function proofreadExplanationLooksSectionMerged(explanation: string): boolean {
   const t = (explanation ?? "").trim();
   return t.includes("【内容】") && (t.includes("【文法・語法・表現】") || t.includes("【文法】"));
 }
@@ -614,16 +614,22 @@ export function seedStudentReleaseFromProofread(pr: {
     : { contentComment: "", grammarComment: "" };
   const contentCommentFromApi = (pr.content_comment || "").trim();
   const grammarCommentFromApi = (pr.grammar_comment || "").trim();
-  /** JSON の content_comment / grammar_comment を優先（レガシー explanation の誤分割を防ぐ） */
-  const contentComment = contentCommentFromApi || splitFromExpl.contentComment;
-  const grammarComment = grammarCommentFromApi || splitFromExpl.grammarComment;
+  const alreadyMerged = proofreadExplanationLooksSectionMerged(explRaw);
+  /**
+   * マージ済み explanation 内の本文は realign 済みで減点と一致している。
+   * API の grammar_comment は未 realign のまま残ることがあり、箇条書きの（➖N点）だけ合計が食い違う。
+   */
+  const contentComment = alreadyMerged
+    ? splitFromExpl.contentComment.trim() || contentCommentFromApi
+    : contentCommentFromApi || splitFromExpl.contentComment;
+  const grammarComment = alreadyMerged
+    ? splitFromExpl.grammarComment.trim() || grammarCommentFromApi
+    : grammarCommentFromApi || splitFromExpl.grammarComment;
   const contentDed = Number(pr.content_deduction);
   const grammarDed = Number(pr.grammar_deduction);
   const hasEval = Boolean((pr.evaluation || "").trim());
   const generalComment =
     (pr.general_comment || "").trim() || (!hasEval ? legacyProofreadGeneralComment(pr) : "");
-
-  const alreadyMerged = proofreadExplanationLooksSectionMerged(explRaw);
   let explanationOut = formattedExpl;
   if (
     !alreadyMerged &&

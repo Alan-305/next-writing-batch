@@ -2,19 +2,23 @@ import { promises as fs } from "fs";
 import path from "path";
 import { unstable_noStore as noStore } from "next/cache";
 
+import { organizationTaskProblemsDir } from "@/lib/org-data-layout";
 import { parseTaskProblemsMaster, type TaskProblemsMaster } from "@/lib/task-problems-core";
 
-export function taskProblemsFilePath(taskId: string): string {
+export function taskProblemsFilePath(organizationId: string, taskId: string): string {
   const safe = taskId.replace(/[^a-zA-Z0-9._-]/g, "_") || "unknown";
-  return path.join(process.cwd(), "data", "task-problems", `${safe}.json`);
+  return path.join(organizationTaskProblemsDir(organizationId), `${safe}.json`);
 }
 
-export async function loadTaskProblemsMaster(taskId: string): Promise<TaskProblemsMaster | null> {
+export async function loadTaskProblemsMaster(
+  organizationId: string,
+  taskId: string,
+): Promise<TaskProblemsMaster | null> {
   noStore();
   const tid = taskId.trim();
   if (!tid) return null;
   try {
-    const buf = await fs.readFile(taskProblemsFilePath(tid), "utf8");
+    const buf = await fs.readFile(taskProblemsFilePath(organizationId, tid), "utf8");
     return parseTaskProblemsMaster(JSON.parse(buf) as unknown);
   } catch {
     return null;
@@ -22,11 +26,11 @@ export async function loadTaskProblemsMaster(taskId: string): Promise<TaskProble
 }
 
 /** 課題マスタ JSON を削除する。ファイルが無ければ false。 */
-export async function deleteTaskProblemsMasterFile(taskId: string): Promise<boolean> {
+export async function deleteTaskProblemsMasterFile(organizationId: string, taskId: string): Promise<boolean> {
   const tid = taskId.trim();
   if (!tid) return false;
   try {
-    await fs.unlink(taskProblemsFilePath(tid));
+    await fs.unlink(taskProblemsFilePath(organizationId, tid));
     return true;
   } catch (e) {
     const code = (e as NodeJS.ErrnoException)?.code;

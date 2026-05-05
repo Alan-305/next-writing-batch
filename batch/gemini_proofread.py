@@ -14,6 +14,7 @@ from gemini_working_model import get_working_model
 from nl_essay_feedback import (  # noqa: E402
     build_nl_essay_prompt,
     finalize_final_version_for_display,
+    grammar_body_from_merged_explanation,
     merge_proofread_explanation_for_storage,
     parse_free_writing_feedback,
     polish_final_essay_paragraphs,
@@ -151,6 +152,10 @@ def proofread_one(
                 content_deduction=cd_i,
                 grammar_deduction=gd_i,
             )
+            grammar_synced = grammar_body_from_merged_explanation(explanation_merged)
+            grammar_for_api = (
+                grammar_synced if (grammar_synced or "").strip() else (grammar_comment or "").strip()
+            )
 
             generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
             return NLEssayProofreadOutput(
@@ -158,7 +163,7 @@ def proofread_one(
                 general_comment=(general_comment or "").strip(),
                 explanation=explanation_merged,
                 content_comment=(content_comment or "").strip(),
-                grammar_comment=(grammar_comment or "").strip(),
+                grammar_comment=grammar_for_api,
                 content_deduction=cd_i,
                 grammar_deduction=gd_i,
                 final_version=(fv_for_store or "").strip(),

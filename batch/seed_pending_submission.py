@@ -24,12 +24,15 @@ DEFAULT_ESSAY = (
 )
 
 
+from org_paths import nwb_organization_id, submissions_json
+
+
 def _project_root() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 def _data_file() -> str:
-    return os.path.join(_project_root(), "data", "submissions.json")
+    return submissions_json(_project_root())
 
 
 def _ensure_data_file() -> None:
@@ -86,6 +89,7 @@ def main() -> None:
     row: Dict[str, Any] = {
         "submissionId": str(uuid.uuid4()),
         "submittedAt": now,
+        "organizationId": nwb_organization_id(),
         "status": "pending",
         "taskId": args.task_id.strip(),
         "studentId": args.student_id.strip(),

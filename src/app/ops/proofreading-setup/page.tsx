@@ -49,7 +49,10 @@ export default function ProofreadingSetupPage() {
   const loadRegistryTasks = useCallback(async (opts?: { quiet?: boolean }) => {
     setRegistryLoading(true);
     try {
-      const res = await fetch("/api/tasks/registry");
+      const ah = await authHeader();
+      const res = await fetch("/api/tasks/registry", {
+        headers: ah ? { ...ah } : {},
+      });
       const j = (await res.json()) as { ok?: boolean; tasks?: RegisteredTaskSummary[]; message?: string };
       if (!res.ok || !j?.ok) {
         if (!opts?.quiet) {
@@ -67,7 +70,7 @@ export default function ProofreadingSetupPage() {
     } finally {
       setRegistryLoading(false);
     }
-  }, []);
+  }, [authHeader]);
 
   useEffect(() => {
     void loadRegistryTasks();
@@ -182,9 +185,15 @@ export default function ProofreadingSetupPage() {
     setLoadingServer(true);
     setMessage("");
     try {
+      const ah = await authHeader();
+      if (!ah) {
+        setMessage("ログインしてください（教員・運用画面は Google ログインが必要です）。");
+        return;
+      }
       const q = encodeURIComponent(setup.task_id.trim());
       const res = await fetch(`/api/ops/teacher-proofreading-setup?taskId=${q}`, {
         method: "GET",
+        headers: { ...ah },
       });
       const j = (await res.json()) as { ok?: boolean; message?: string; setup?: ProofreadingSetupJson };
       if (!res.ok || !j?.setup) {

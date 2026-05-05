@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import type { RegistryTaskRow } from "@/components/RegisteredTaskIdField";
 
 type Props = {
@@ -19,6 +20,7 @@ export function OpsSubmissionTaskIdEditor({
   disabledReason,
 }: Props) {
   const router = useRouter();
+  const { user } = useFirebaseAuthContext();
   const [taskId, setTaskId] = useState(initialTaskId);
   const [tasks, setTasks] = useState<RegistryTaskRow[] | null>(null);
   const [registryErr, setRegistryErr] = useState("");
@@ -34,7 +36,12 @@ export function OpsSubmissionTaskIdEditor({
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch("/api/tasks/registry");
+        const headers: Record<string, string> = {};
+        if (user) {
+          const token = await user.getIdToken();
+          headers.Authorization = `Bearer ${token}`;
+        }
+        const r = await fetch("/api/tasks/registry", { headers });
         const j = (await r.json()) as { ok?: boolean; tasks?: RegistryTaskRow[]; message?: string };
         if (cancelled) return;
         if (j.ok && Array.isArray(j.tasks)) {
@@ -49,7 +56,7 @@ export function OpsSubmissionTaskIdEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   const taskIdSet = useMemo(() => new Set((tasks ?? []).map((t) => t.taskId)), [tasks]);
   const currentNotInRegistry =
@@ -66,9 +73,15 @@ export function OpsSubmissionTaskIdEditor({
     }
     setBusy(true);
     try {
+      if (!user) {
+        setError("ログインしてください。");
+        setBusy(false);
+        return;
+      }
+      const token = await user.getIdToken();
       const res = await fetch(`/api/submissions/${encodeURIComponent(submissionId)}/task-id`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ taskId: tid }),
       });
       const json = (await res.json().catch(() => ({}))) as {
@@ -81,7 +94,7 @@ export function OpsSubmissionTaskIdEditor({
         return;
       }
       setMessage(json?.message ?? "保存しました。");
-      router.refresh();
+      window.location.reload();
     } catch {
       setError("通信エラーが発生しました。");
     } finally {

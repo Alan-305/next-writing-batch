@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { runEssayHandwritingIngestClaude } from "@/lib/essay-handwriting-claude";
+import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
 
 export const runtime = "nodejs";
 
@@ -63,12 +64,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const parts = await Promise.all(
+    const rawParts = await Promise.all(
       media.map(async (f) => ({
         mimeType: guessMime(f),
         data: new Uint8Array(await f.arrayBuffer()),
+        fileName: f.name,
       })),
     );
+    const parts = await Promise.all(rawParts.map((p) => normalizeVisionImagePartForApi(p)));
 
     const text = await runEssayHandwritingIngestClaude({
       apiKey,

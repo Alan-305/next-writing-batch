@@ -1,0 +1,9 @@
+{
+  "productTitle": "添削革命",
+  "badgeLabel": "生徒用（検証テナント）",
+  "schoolDisplayName": "テナント検証: tenant-demo-east",
+  "primaryColor": "#5b21b6",
+  "accentColor": "#8b5cf6",
+  "surfaceTintStart": "#faf5ff",
+  "surfaceTintEnd": "#ede9fe"
+}

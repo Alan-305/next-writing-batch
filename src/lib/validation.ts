@@ -1,4 +1,5 @@
 import { joinEssayMultipartBlocks } from "@/lib/essay-multipart";
+import { countEnglishWords, MAX_SYSTEM_ESSAY_WORDS } from "@/lib/english-word-count";
 
 export type SubmissionInput = {
   taskId: string;
@@ -128,6 +129,14 @@ export function validateSubmissionInput(input: SubmissionInput): ValidationError
   const pid = (input.problemId ?? "").trim();
   if (pid.length > PROBLEM_ID_MAX) {
     errors.problemId = `problemId は ${PROBLEM_ID_MAX} 文字以内にしてください`;
+  }
+
+  const essayForWords = input.essayText.trim();
+  if (!errors.essayText && essayForWords) {
+    const wc = countEnglishWords(essayForWords);
+    if (wc > MAX_SYSTEM_ESSAY_WORDS) {
+      errors.essayText = `現在 ${wc} 語です。${MAX_SYSTEM_ESSAY_WORDS}語を超えているため、短く調整してください。`;
+    }
   }
 
   return errors;

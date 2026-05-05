@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
 import { runProblemIngestGemini } from "@/lib/problem-ingest-gemini";
+import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
 
 export const runtime = "nodejs";
 
@@ -69,12 +70,14 @@ export async function POST(request: Request) {
   const toIngest = mode === "plain" ? media.slice(0, 1) : media;
 
   try {
-    const parts = await Promise.all(
+    const rawParts = await Promise.all(
       toIngest.map(async (f) => ({
         mimeType: guessMime(f),
         data: new Uint8Array(await f.arrayBuffer()),
+        fileName: f.name,
       })),
     );
+    const parts = await Promise.all(rawParts.map((p) => normalizeVisionImagePartForApi(p)));
 
     const text = await runProblemIngestGemini({
       apiKey,

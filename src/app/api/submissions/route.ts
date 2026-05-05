@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 
-import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
 import { addSubmission, getSubmissions } from "@/lib/submissions-store";
 import { hydrateSubmissionForRegisteredTask } from "@/lib/submission-task-hydration";
 import { normalizeSubmissionFromBody, validateSubmissionInput } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const submissions = await getSubmissions();
+export async function GET(request: Request) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+  await migrateLegacyOrgLayoutOnce();
+  const submissions = await getSubmissions(auth.organizationId);
   return NextResponse.json({ ok: true, data: submissions });
 }
 
 export async function POST(request: Request) {
-  const auth = await verifyBearerUid(request);
+  const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
 
   const body = await request.json();
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const hydrated = await hydrateSubmissionForRegisteredTask(input);
+  const hydrated = await hydrateSubmissionForRegisteredTask(auth.organizationId, input);
   if (!hydrated.ok) {
     return NextResponse.json(
       {
@@ -58,7 +62,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const submission = await addSubmission(hydrated.input, { submittedByUid: auth.uid });
+  const submission = await addSubmission(auth.organizationId, hydrated.input, { submittedByUid: auth.uid });
   return NextResponse.json({
     ok: true,
     submissionId: submission.submissionId,

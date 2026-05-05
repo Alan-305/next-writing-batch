@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { getSubmissions } from "@/lib/submissions-store";
 import { runPackageZipSelection } from "@/lib/run-package-zip-batch";
 
 export const maxDuration = 300;
@@ -12,6 +14,9 @@ type Body = {
 };
 
 export async function POST(request: Request) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+
   let body: Body;
   try {
     body = (await request.json()) as Body;
@@ -20,9 +25,11 @@ export async function POST(request: Request) {
   }
 
   const mode = String(body.mode ?? "").trim();
+  const orgId = auth.organizationId;
+
   if (mode === "task") {
     const taskId = String(body.taskId ?? "").trim();
-    const result = await runPackageZipSelection({ mode: "task", taskId });
+    const result = await runPackageZipSelection({ organizationId: orgId, mode: "task", taskId });
     if (!result.ok) {
       return NextResponse.json(
         {
@@ -48,7 +55,21 @@ export async function POST(request: Request) {
     const submissionIds = Array.isArray(raw)
       ? raw.map((x) => String(x ?? "").trim()).filter(Boolean)
       : [];
-    const result = await runPackageZipSelection({ mode: "selection", submissionIds });
+    const allowed = new Set(
+      (await getSubmissions(orgId)).map((s) => String(s.submissionId ?? "").trim()),
+    );
+    const filtered = submissionIds.filter((id) => allowed.has(id));
+    if (filtered.length !== submissionIds.length) {
+      return NextResponse.json(
+        { ok: false, message: "選択の一部がこの組織の提出に含まれません。" },
+        { status: 403 },
+      );
+    }
+    const result = await runPackageZipSelection({
+      organizationId: orgId,
+      mode: "selection",
+      submissionIds: filtered,
+    });
     if (!result.ok) {
       return NextResponse.json(
         {

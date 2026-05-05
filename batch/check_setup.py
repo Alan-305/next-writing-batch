@@ -59,20 +59,23 @@ def main() -> int:
         print("  ・このチェックの前に: export ANTHROPIC_API_KEY='…'")
         ok = False
 
-    subs = root / "data" / "submissions.json"
+    batch_dir = root / "batch"
+    if str(batch_dir) not in sys.path:
+        sys.path.insert(0, str(batch_dir))
+    from org_paths import submissions_json  # noqa: E402
+
+    subs = Path(submissions_json(str(root)))
     if subs.is_file():
         try:
             data = json.loads(subs.read_text(encoding="utf-8"))
             n = len(data) if isinstance(data, list) else 0
-            print(f"[OK] data/submissions.json が読めます（{n} 件）。")
+            print(f"[OK] {subs} が読めます（{n} 件）。NWB_ORGANIZATION_ID 未設定時は default テナントです。")
         except Exception as e:
             print(f"[要対応] submissions.json が壊れている可能性: {e}")
             ok = False
     else:
-        print("[情報] data/submissions.json がありません（まだ提出が無い状態）。")
+        print(f"[情報] {subs} がありません（まだ提出が無い状態）。NWB_ORGANIZATION_ID でテナントを切り替えられます。")
 
-    batch_dir = root / "batch"
-    sys.path.insert(0, str(batch_dir))
     try:
         from gemini_working_model import get_working_model  # noqa: E402
 

@@ -17,9 +17,11 @@ from day4_gcs import upload_mp3_and_get_signed_url
 
 from nl_essay_feedback import pdf_feedback_lines_for_day4, read_aloud_essay_for_day4
 
+from org_paths import submissions_json
+
 
 def _data_file(project_root: str) -> str:
-    return os.path.join(project_root, "data", "submissions.json")
+    return submissions_json(project_root)
 
 
 def _ensure_data_file(project_root: str) -> None:

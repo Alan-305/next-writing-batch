@@ -1,9 +1,10 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
 type Props = Readonly<{ children: React.ReactNode }>;
@@ -19,18 +20,44 @@ export function RequireAuth({ children }: Props) {
   const { configured, user, authLoading } = useFirebaseAuthContext();
   const router = useRouter();
   const pathname = usePathname() || "/";
+  const signInRedirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const auth = getFirebaseAuth();
   const resolvedUser = user ?? auth?.currentUser ?? null;
 
   useEffect(() => {
     if (!configured || authLoading) return;
+
+    if (signInRedirectTimerRef.current) {
+      clearTimeout(signInRedirectTimerRef.current);
+      signInRedirectTimerRef.current = null;
+    }
+
     const a = getFirebaseAuth();
     const ok = user ?? a?.currentUser ?? null;
-    if (!ok) {
-      const next = encodeURIComponent(pathname);
-      router.replace(`/sign-in?next=${next}`);
-    }
+    if (ok) return;
+
+    /** Google リダイレクト戻り直後は sessionStorage に残る。getRedirectResult / setUser 確定まで待つ。 */
+    const delayMs =
+      typeof window !== "undefined" && sessionStorage.getItem(AUTH_REDIRECT_NEXT_KEY)
+        ? 6_000
+        : 2_000;
+
+    signInRedirectTimerRef.current = setTimeout(() => {
+      signInRedirectTimerRef.current = null;
+      const stillNoUser = !getFirebaseAuth()?.currentUser;
+      if (stillNoUser) {
+        const next = encodeURIComponent(pathname);
+        router.replace(`/sign-in?next=${next}`);
+      }
+    }, delayMs);
+
+    return () => {
+      if (signInRedirectTimerRef.current) {
+        clearTimeout(signInRedirectTimerRef.current);
+        signInRedirectTimerRef.current = null;
+      }
+    };
   }, [configured, authLoading, user, router, pathname]);
 
   if (!configured) {

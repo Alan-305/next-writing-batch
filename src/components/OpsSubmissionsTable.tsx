@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { DeleteSubmissionButton } from "@/components/DeleteSubmissionButton";
 import {
   ProofreadSubmissionButton,
@@ -106,6 +107,7 @@ const PAGE_OPTIONS = [25, 50, 100, 200] as const;
 
 export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props) {
   const router = useRouter();
+  const { user } = useFirebaseAuthContext();
   const total = rows.length;
 
   const [query, setQuery] = useState("");
@@ -266,9 +268,15 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
     setZipBusy(true);
     setZipMsg("");
     try {
+      if (!user) {
+        setZipMsg("ログインしてください。");
+        setZipBusy(false);
+        return;
+      }
+      const token = await user.getIdToken();
       const res = await fetch("/api/ops/package-zip", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ mode: "selection", submissionIds: ids }),
       });
       const j = (await res.json()) as { ok?: boolean; message?: string; stdout?: string; stderr?: string };

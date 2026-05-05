@@ -15,13 +15,15 @@ import zipfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from org_paths import submissions_json
+
 
 def _project_root() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 def _data_file(project_root: str) -> str:
-    return os.path.join(project_root, "data", "submissions.json")
+    return submissions_json(project_root)
 
 
 def _load_submissions(project_root: str) -> List[Dict[str, Any]]:

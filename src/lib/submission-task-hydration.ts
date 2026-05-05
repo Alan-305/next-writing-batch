@@ -11,9 +11,12 @@ export type HydrateResult =
  * 提出の taskId が課題マスタに登録されていることを確認し、
  * problemId / question をマスタから補完する（生徒フォームは課題文を送らない前提）。
  */
-export async function hydrateSubmissionForRegisteredTask(input: SubmissionInput): Promise<HydrateResult> {
+export async function hydrateSubmissionForRegisteredTask(
+  organizationId: string,
+  input: SubmissionInput,
+): Promise<HydrateResult> {
   const taskId = input.taskId.trim();
-  const master = await loadTaskProblemsMaster(taskId);
+  const master = await loadTaskProblemsMaster(organizationId, taskId);
   if (!master) {
     return {
       ok: false,

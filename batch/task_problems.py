@@ -10,6 +10,8 @@ import os
 import re
 from typing import Any, Dict, Optional
 
+from org_paths import task_problems_dir
+
 
 def _safe_task_file_stem(task_id: str) -> str:
     t = (task_id or "").strip()
@@ -20,7 +22,7 @@ def _safe_task_file_stem(task_id: str) -> str:
 
 def load_task_master(project_root: str, task_id: str) -> Optional[Dict[str, Any]]:
     stem = _safe_task_file_stem(task_id)
-    path = os.path.join(project_root, "data", "task-problems", f"{stem}.json")
+    path = os.path.join(task_problems_dir(project_root), f"{stem}.json")
     if not os.path.isfile(path):
         return None
     try:

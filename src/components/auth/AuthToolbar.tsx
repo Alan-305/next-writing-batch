@@ -23,8 +23,9 @@ export function AuthToolbar({ variant }: Props) {
   const muted = variant === "student";
   return (
     <div
+      className={variant === "student" ? "auth-toolbar auth-toolbar--student" : "auth-toolbar auth-toolbar--teacher"}
       style={{
-        marginLeft: "auto",
+        marginLeft: variant === "teacher" ? "auto" : undefined,
         display: "flex",
         alignItems: "center",
         gap: 12,

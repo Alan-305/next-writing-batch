@@ -1,24 +1,31 @@
 import { NextResponse } from "next/server";
 
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { hydrateSubmissionForRegisteredTask } from "@/lib/submission-task-hydration";
+import { findSubmissionForTenant } from "@/lib/submission-tenant-assert";
 import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
-import { getSubmissionById, updateSubmissionById } from "@/lib/submissions-store";
+import { updateSubmissionById } from "@/lib/submissions-store";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 import type { SubmissionInput } from "@/lib/validation";
 
 type RouteContext = { params: Promise<{ submissionId: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+
   const { submissionId: rawParam } = await context.params;
   const sid = decodeURIComponent(rawParam || "").trim();
   if (!sid) {
     return NextResponse.json({ ok: false, message: "submissionId が必要です。" }, { status: 400 });
   }
 
-  const submission = await getSubmissionById(sid);
-  if (!submission) {
+  const hit = await findSubmissionForTenant(sid, auth.organizationId);
+  if (!hit) {
     return NextResponse.json(submissionNotFoundBody(), { status: 404 });
   }
+  const submission = hit.submission;
+  const orgId = hit.organizationId;
 
   if (submission.studentRelease?.operatorApprovedAt) {
     return NextResponse.json(
@@ -73,7 +80,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         essayMultipart: false,
       };
 
-  const hydrated = await hydrateSubmissionForRegisteredTask(base);
+  const hydrated = await hydrateSubmissionForRegisteredTask(orgId, base);
   if (!hydrated.ok) {
     return NextResponse.json(
       {

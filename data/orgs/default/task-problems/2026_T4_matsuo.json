@@ -1,0 +1,29 @@
+{
+  "taskId": "2026_T4_matsuo",
+  "rubric": {
+    "maxTotal": 50,
+    "items": [
+      {
+        "id": "content",
+        "label": "内容",
+        "max": 25
+      },
+      {
+        "id": "grammar",
+        "label": "文法・語法",
+        "max": 25
+      }
+    ]
+  },
+  "problems": [
+    {
+      "problemId": "default",
+      "title": "対面コミュニケーションはそれ以外のものより良いのか？",
+      "question": "対面コミュニケーションはそれ以外のものより良いのか？"
+    }
+  ],
+  "_meta": {
+    "lastSavedByUid": "WDTffv63Z1WlAoxagpP4OQBv1AM2",
+    "lastSavedAt": "2026-05-04T10:00:00.669Z"
+  }
+}

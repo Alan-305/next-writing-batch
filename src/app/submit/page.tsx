@@ -1,8 +1,14 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { joinEssayMultipartBlocks } from "@/lib/essay-multipart";
+import {
+  countEnglishWords,
+  MAX_OFFICIAL_ESSAY_WORDS,
+  MAX_SYSTEM_ESSAY_WORDS,
+} from "@/lib/english-word-count";
 import { NexusSupportForm } from "@/components/NexusSupportForm";
 import { RegisteredTaskIdField } from "@/components/RegisteredTaskIdField";
 import { StudentCorrectionLookup } from "@/components/StudentCorrectionLookup";
@@ -44,9 +50,25 @@ export default function SubmitPage() {
     return form.essayText.length;
   }, [answerMode, essayParts, form.essayText.length]);
 
+  const essayTextForWordCount = useMemo(() => {
+    if (answerMode === "multipart") {
+      return joinEssayMultipartBlocks(essayParts);
+    }
+    return form.essayText;
+  }, [answerMode, essayParts, form.essayText]);
+
+  const wordCount = useMemo(() => countEnglishWords(essayTextForWordCount), [essayTextForWordCount]);
+
+  const wordCountBlocksSubmit = wordCount > MAX_SYSTEM_ESSAY_WORDS;
+
+  const getAccessToken = useCallback(async () => {
+    if (!user) return null;
+    return user.getIdToken();
+  }, [user]);
+
   const onFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submitting) return;
+    if (submitting || wordCountBlocksSubmit) return;
     setSubmitConfirmOpen(true);
   };
 
@@ -144,6 +166,7 @@ export default function SubmitPage() {
           errorText={errors.taskId}
           problemId={problemId}
           onProblemIdChange={setProblemId}
+          getAccessToken={getAccessToken}
         />
         {errors.problemId ? <p className="error">{errors.problemId}</p> : null}
 
@@ -211,7 +234,7 @@ export default function SubmitPage() {
         {answerMode === "single" ? (
           <>
             <TextareaWithFileDrop
-              label="英文の解答（50〜2000文字）"
+              label={`英文の解答（50〜2000文字・目安${MAX_OFFICIAL_ESSAY_WORDS}語まで）`}
               hint={
                 <span>
                   用紙やノートの<strong>写真</strong>、<strong>PDF</strong>、<strong>テキスト</strong>をドロップして文字起こし・テキスト抽出します。誤読やレイアウト崩れがある場合は、必ず手で直してから送信してください。
@@ -240,7 +263,11 @@ export default function SubmitPage() {
               <div key={i}>
                 <TextareaWithFileDrop
                   label={`Question ${i + 1}（設問 (${i + 1}) の英文）`}
-                  hint={<span>各設問15文字以上。設問ごとに最大2500文字。</span>}
+                  hint={
+                    <span>
+                      各設問15文字以上。設問ごとに最大2500文字。全体の英単語数は目安{MAX_OFFICIAL_ESSAY_WORDS}語、上限{MAX_SYSTEM_ESSAY_WORDS}語です。
+                    </span>
+                  }
                   rows={6}
                   placeholder={`設問 (${i + 1}) の英文を入力するか、ファイルから取り込んでください。`}
                   value={part}
@@ -284,9 +311,30 @@ export default function SubmitPage() {
           </div>
         )}
 
-        <span>文字数（目安）: {charCount}</span>
+        <div style={{ marginTop: 8 }}>
+          <span>文字数（目安）: {charCount}</span>
+          {" · "}
+          <span>英単語数（目安）: {wordCount}</span>
+        </div>
+        {wordCount > 0 ? (
+          wordCount <= MAX_OFFICIAL_ESSAY_WORDS ? (
+            <p className="success" style={{ margin: "8px 0 0" }}>
+              現在 {wordCount} 語です。
+            </p>
+          ) : wordCount <= MAX_SYSTEM_ESSAY_WORDS ? (
+            <p className="warning" style={{ margin: "8px 0 0" }}>
+              現在 {wordCount} 語です。{MAX_OFFICIAL_ESSAY_WORDS}
+              語を少し超えていますが、このまま添削可能です。
+            </p>
+          ) : (
+            <p className="error" style={{ margin: "8px 0 0" }}>
+              現在 {wordCount} 語です。{MAX_SYSTEM_ESSAY_WORDS}
+              語を超えているため、短く調整してください。
+            </p>
+          )
+        ) : null}
 
-        <button type="submit" disabled={submitting} style={{ marginTop: 12 }}>
+        <button type="submit" disabled={submitting || wordCountBlocksSubmit} style={{ marginTop: 12 }}>
           {submitting ? "送信中..." : "内容を確認して送信"}
         </button>
       </form>

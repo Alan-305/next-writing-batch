@@ -254,7 +254,11 @@ export function TextareaWithFileDrop({
           try {
             setStatus("問題文を読み取り中…");
             const structured = structuredProblemReading.checked;
-            const { text: geminiText, usedFirstOnly } = await fetchGeminiProblemIngest(geminiMedia, structured);
+            const normalizedProblemMedia = await normalizeGeminiMediaFiles(geminiMedia);
+            const { text: geminiText, usedFirstOnly } = await fetchGeminiProblemIngest(
+              normalizedProblemMedia,
+              structured,
+            );
             if (!geminiText.trim()) {
               setStatus("");
               onNotify?.(

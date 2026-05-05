@@ -6,6 +6,7 @@ import { promisify } from "util";
 const execFileAsync = promisify(execFile);
 
 export type RunDay4Input = {
+  organizationId: string;
   taskId: string;
   workers?: number;
   /** 指定時はその受付IDだけ処理（run_day4_tts_qr_pdf.py --submission-ids） */
@@ -101,10 +102,15 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
   }
 
   const t0 = Date.now();
+  const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  const oid = (input.organizationId ?? "").trim();
+  if (oid) {
+    childEnv.NWB_ORGANIZATION_ID = oid;
+  }
   try {
     const { stdout, stderr } = await execFileAsync(python, args, {
       cwd: process.cwd(),
-      env: { ...process.env },
+      env: childEnv,
       maxBuffer: MAX_BUFFER,
       timeout: TIMEOUT_MS,
     });

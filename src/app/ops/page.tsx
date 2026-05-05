@@ -11,6 +11,24 @@ export default function OpsHomePage() {
       </header>
 
       <section className="ops-home-grid" aria-label="主要作業">
+        <Link href="/ops/tenant" className="ops-home-action ops-home-action--tenant">
+          <span className="ops-home-action-icon" aria-hidden>
+            🧩
+          </span>
+          <span className="ops-home-action-title">テナント（検証）</span>
+          <span className="ops-home-action-desc">今どの組織 ID で動いているか確認し、開発時だけ別テナントに切り替えられます。</span>
+          <span className="ops-home-action-cta">テナントを開く</span>
+        </Link>
+
+        <Link href="/ops/student-appearance" className="ops-home-action ops-home-action--appearance">
+          <span className="ops-home-action-icon" aria-hidden>
+            🎨
+          </span>
+          <span className="ops-home-action-title">生徒画面の見た目</span>
+          <span className="ops-home-action-desc">色や学校名など、生徒が見る画面のトーンを組織単位で変えます。</span>
+          <span className="ops-home-action-cta">見た目を開く</span>
+        </Link>
+
         <Link href="/ops/proofreading-setup" className="ops-home-action ops-home-action--setup">
           <span className="ops-home-action-icon" aria-hidden>
             ⚙

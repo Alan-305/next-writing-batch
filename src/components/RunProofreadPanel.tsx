@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+
 type Props = {
   /** pending がある課題ID（件数表示用） */
   pendingTaskIds: string[];
@@ -21,6 +23,7 @@ export function RunProofreadPanel({
   failedTaskIds,
   failedByTaskId,
 }: Props) {
+  const { user } = useFirebaseAuthContext();
   const taskChoices = useMemo(
     () => mergeSorted(pendingTaskIds, failedTaskIds),
     [pendingTaskIds, failedTaskIds],
@@ -49,9 +52,15 @@ export function RunProofreadPanel({
       window.dispatchEvent(new CustomEvent("proofread:run-start", { detail: { taskId: tid } }));
     }
     try {
+      if (!user) {
+        setError("ログインしてください。");
+        setBusy(false);
+        return;
+      }
+      const token = await user.getIdToken();
       const res = await fetch("/api/ops/run-proofread", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           taskId: tid,
           workers,

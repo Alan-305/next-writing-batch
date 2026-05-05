@@ -3,7 +3,7 @@
  * クライアントの /admin ガード用（NEXT_PUBLIC_*）。値は .env.local のみに書き、リポジトリに含めない。
  */
 export function parseAdminUidAllowlist(): Set<string> {
-  const raw = process.env.NEXT_PUBLIC_FIREBASE_ADMIN_UIDS ?? "";
+  const raw = (process.env.NEXT_PUBLIC_FIREBASE_ADMIN_UIDS ?? "").replace(/\r/g, "").trim();
   return new Set(
     raw
       .split(",")
@@ -13,6 +13,7 @@ export function parseAdminUidAllowlist(): Set<string> {
 }
 
 export function isAllowlistedAdminUid(uid: string | undefined | null): boolean {
-  if (!uid) return false;
-  return parseAdminUidAllowlist().has(uid);
+  const t = (uid ?? "").trim();
+  if (!t) return false;
+  return parseAdminUidAllowlist().has(t);
 }

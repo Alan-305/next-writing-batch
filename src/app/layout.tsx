@@ -1,4 +1,5 @@
 import "@/lib/fix-node-localstorage";
+import { DevChunkLoadRecovery } from "@/components/DevChunkLoadRecovery";
 import { FirebaseAuthProvider } from "@/components/auth/FirebaseAuthProvider";
 import type { Metadata } from "next";
 import "./globals.css";
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <DevChunkLoadRecovery />
         <FirebaseAuthProvider>{children}</FirebaseAuthProvider>
       </body>
     </html>

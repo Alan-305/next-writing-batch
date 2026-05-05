@@ -815,6 +815,28 @@ def _grammar_block_has_deduction_marks(text: str) -> bool:
     return bool(re.search(r"（\s*-?\s*\d+\s*点\s*）", t))
 
 
+def grammar_body_from_merged_explanation(explanation: str) -> Optional[str]:
+    """
+    merge_proofread_explanation_for_storage 後の全文から、【文法】見出しの次行〜
+    「文法減点 合計」行の直前までを取り出す（realign 済みの箇条書きと一致させる用）。
+    """
+    s = (explanation or "").replace("\r\n", "\n").replace("\r", "\n")
+    if not s.strip():
+        return None
+    for head in (_GRAMMAR_SECTION_HEAD_PY, "【文法】"):
+        hi = s.find(head)
+        if hi < 0:
+            continue
+        tail = s[hi + len(head) :].lstrip("\n")
+        out_lines: List[str] = []
+        for ln in tail.split("\n"):
+            if re.match(r"^\s*文法減点\s*合計\s*[:：]", ln):
+                break
+            out_lines.append(ln)
+        return "\n".join(out_lines).strip()
+    return None
+
+
 def merge_proofread_explanation_for_storage(
     *,
     body_explanation: str,

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { AdminTenantRoster } from "@/components/admin/AdminTenantRoster";
+import { AdminTenantSwitcher } from "@/components/admin/AdminTenantSwitcher";
 import { AuthToolbar } from "@/components/auth/AuthToolbar";
 import { RequireAdmin } from "@/components/auth/RequireAdmin";
 
@@ -16,9 +18,11 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
             <nav className="app-shell-nav" aria-label="管理ナビ">
               <Link href="/admin">管理トップ</Link>
             </nav>
+            <AdminTenantSwitcher />
             <AuthToolbar variant="teacher" />
           </div>
         </header>
+        <AdminTenantRoster />
         {children}
       </div>
     </RequireAdmin>

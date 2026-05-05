@@ -30,12 +30,14 @@ def _hydrate_claude_key_from_disk() -> None:
 
 _hydrate_claude_key_from_disk()
 
+from org_paths import submissions_json
+
 from gemini_proofread import proofread_one
 from task_problems import resolve_proofreading_question
 
 
 def _data_file() -> str:
-    return os.path.join(_project_root(), "data", "submissions.json")
+    return submissions_json(_project_root())
 
 
 def _ensure_data_file() -> None:

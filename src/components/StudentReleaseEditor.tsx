@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import {
   formatExplanationForPublicView,
+  proofreadExplanationLooksSectionMerged,
   seedStudentReleaseFromProofread,
   splitExplanationToSections,
   type StudentRelease,
@@ -101,6 +103,7 @@ export function StudentReleaseEditor({
   teacherSetupScoreDefaults,
 }: Props) {
   const router = useRouter();
+  const { user } = useFirebaseAuthContext();
   const seeded = useMemo(() => {
     if (initialRelease) return initialRelease;
     if (status === "done" && proofread) {
@@ -143,20 +146,22 @@ export function StudentReleaseEditor({
       return base;
     },
   );
-  const [contentComment, setContentComment] = useState(() =>
-    firstNonEmptyComment(
+  const [contentComment, setContentComment] = useState(() => {
+    const merged = proofreadExplanationLooksSectionMerged(String(proofread?.explanation ?? ""));
+    return firstNonEmptyComment(
       seeded?.contentComment,
-      proofread?.content_comment,
-      aiSplitComments.contentComment,
-    ),
-  );
-  const [grammarComment, setGrammarComment] = useState(() =>
-    firstNonEmptyComment(
+      merged ? aiSplitComments.contentComment : proofread?.content_comment,
+      merged ? proofread?.content_comment : aiSplitComments.contentComment,
+    );
+  });
+  const [grammarComment, setGrammarComment] = useState(() => {
+    const merged = proofreadExplanationLooksSectionMerged(String(proofread?.explanation ?? ""));
+    return firstNonEmptyComment(
       seeded?.grammarComment,
-      proofread?.grammar_comment,
-      aiSplitComments.grammarComment,
-    ),
-  );
+      merged ? aiSplitComments.grammarComment : proofread?.grammar_comment,
+      merged ? proofread?.grammar_comment : aiSplitComments.grammarComment,
+    );
+  });
   const [contentDeduction, setContentDeduction] = useState(() => {
     const saved = Number(seeded?.contentDeduction);
     if (Number.isFinite(saved)) return clampInt(saved, 0, contentMax);
@@ -186,13 +191,14 @@ export function StudentReleaseEditor({
 
   const reimportFromProofread = () => {
     if (!proofread) return;
+    const mergedFmt = proofreadExplanationLooksSectionMerged(String(proofread.explanation ?? ""));
     const mergedContent = firstNonEmptyComment(
-      proofread.content_comment,
-      aiSplitComments.contentComment,
+      mergedFmt ? aiSplitComments.contentComment : proofread.content_comment,
+      mergedFmt ? proofread.content_comment : aiSplitComments.contentComment,
     );
     const mergedGrammar = firstNonEmptyComment(
-      proofread.grammar_comment,
-      aiSplitComments.grammarComment,
+      mergedFmt ? aiSplitComments.grammarComment : proofread.grammar_comment,
+      mergedFmt ? proofread.grammar_comment : aiSplitComments.grammarComment,
     );
     const nextFinalText = sanitizeFinalEssayArtifactText(
       coalesceText(proofread.final_essay ?? proofread.final_version ?? ""),
@@ -246,6 +252,11 @@ export function StudentReleaseEditor({
     setMessage("");
     setError("");
     try {
+      if (!user) {
+        setError("ログインしてください。");
+        return;
+      }
+      const idToken = await user.getIdToken();
       const body: Record<string, unknown> = {
         scores: effectiveScores,
         generalComment: "",
@@ -263,7 +274,7 @@ export function StudentReleaseEditor({
 
       const res = await fetch(`/api/submissions/${encodeURIComponent(submissionId)}/student-release`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify(body),
       });
       const json = await res.json();
@@ -279,7 +290,7 @@ export function StudentReleaseEditor({
       if (opts.runDay4After) {
         const d4 = await fetch("/api/ops/run-day4", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({
             taskId,
             submissionId,
@@ -292,13 +303,13 @@ export function StudentReleaseEditor({
             `運用は確定しましたが、Day4 の生成に失敗しました: ${d4json?.message ?? d4.statusText}。` +
               ` ターミナルから batch/run_day4_tts_qr_pdf.py を実行することもできます。`,
           );
-          router.refresh();
+          window.location.reload();
           return;
         }
       }
 
       setMessage(opts.successMessage);
-      router.refresh();
+      window.location.reload();
     } catch {
       setError("通信エラーが発生しました。");
     } finally {

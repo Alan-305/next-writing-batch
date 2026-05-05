@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 
+import { organizationTaskProblemsDir } from "@/lib/org-data-layout";
 import { parseTaskProblemsMaster } from "@/lib/task-problems-core";
 import { loadTeacherProofreadingSetup } from "@/lib/teacher-proofreading-setup-store";
 
@@ -17,11 +18,11 @@ export type RegisteredTaskSummary = {
 };
 
 /**
- * `data/task-problems/*.json` から登録済み課題一覧を構築する。
+ * `data/orgs/{organizationId}/task-problems/*.json` から登録済み課題一覧を構築する。
  * 同一 taskId が複数ファイルに存在する場合は先勝ち。
  */
-export async function listRegisteredTasks(): Promise<RegisteredTaskSummary[]> {
-  const dir = path.join(process.cwd(), "data", "task-problems");
+export async function listRegisteredTasks(organizationId: string): Promise<RegisteredTaskSummary[]> {
+  const dir = organizationTaskProblemsDir(organizationId);
   let names: string[] = [];
   try {
     names = await fs.readdir(dir);
@@ -59,7 +60,7 @@ export async function listRegisteredTasks(): Promise<RegisteredTaskSummary[]> {
 
   await Promise.all(
     rows.map(async (row) => {
-      const teacher = await loadTeacherProofreadingSetup(row.taskId);
+      const teacher = await loadTeacherProofreadingSetup(organizationId, row.taskId);
       if (!teacher) return;
       const parts = [teacher.school_name?.trim(), teacher.problem_memo?.trim()].filter(Boolean);
       if (parts.length > 0) {

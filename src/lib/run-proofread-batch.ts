@@ -8,6 +8,8 @@ import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 const execFileAsync = promisify(execFile);
 
 export type RunProofreadInput = {
+  /** テナント（Python は `NWB_ORGANIZATION_ID` で受け取る） */
+  organizationId: string;
   taskId: string;
   workers?: number;
   limit?: number;
@@ -40,6 +42,7 @@ export function proofreadScriptPath(): string {
 }
 
 export async function runProofreadBatch(input: RunProofreadInput): Promise<RunProofreadResult> {
+  const organizationId = (input.organizationId ?? "").trim();
   const taskId = (input.taskId ?? "").trim();
   const submissionIds = (input.submissionIds ?? [])
     .map((x) => String(x ?? "").trim())
@@ -83,6 +86,9 @@ export async function runProofreadBatch(input: RunProofreadInput): Promise<RunPr
 
   const key = resolveEffectiveAnthropicApiKey();
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  if (organizationId) {
+    childEnv.NWB_ORGANIZATION_ID = organizationId;
+  }
   if (key) {
     if (!(childEnv.ANTHROPIC_API_KEY ?? "").trim()) childEnv.ANTHROPIC_API_KEY = key;
   }

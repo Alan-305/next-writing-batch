@@ -12,8 +12,8 @@ const TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_SELECTION_IDS = 200;
 
 export type PackageZipInput =
-  | { mode: "task"; taskId: string }
-  | { mode: "selection"; submissionIds: string[] };
+  | { organizationId: string; mode: "task"; taskId: string }
+  | { organizationId: string; mode: "selection"; submissionIds: string[] };
 
 export type PackageZipResult =
   | { ok: true; stdout: string; stderr: string; durationMs: number }
@@ -57,10 +57,15 @@ export async function runPackageZipSelection(input: PackageZipInput): Promise<Pa
   }
 
   const t0 = Date.now();
+  const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  const oid = (input.organizationId ?? "").trim();
+  if (oid) {
+    childEnv.NWB_ORGANIZATION_ID = oid;
+  }
   try {
     const { stdout, stderr } = await execFileAsync(python, args, {
       cwd: process.cwd(),
-      env: { ...process.env },
+      env: childEnv,
       maxBuffer: MAX_BUFFER,
       timeout: TIMEOUT_MS,
     });

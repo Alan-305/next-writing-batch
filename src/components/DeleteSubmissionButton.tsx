@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { TwoStepDeleteConfirm, type TwoStepDeletePhase } from "@/components/TwoStepDeleteConfirm";
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
  * dev の HMR と .next のチャンク番号がズレたときに Cannot find module './NNN.js' が出るのを避ける。
  */
 export function DeleteSubmissionButton({ submissionId, confirmLabel }: Props) {
+  const { user } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<TwoStepDeletePhase>(null);
 
@@ -21,8 +23,14 @@ export function DeleteSubmissionButton({ submissionId, confirmLabel }: Props) {
     setDialog(null);
     setBusy(true);
     try {
+      if (!user) {
+        window.alert("ログインしてください。");
+        return;
+      }
+      const token = await user.getIdToken();
       const res = await fetch(`/api/submissions/${encodeURIComponent(submissionId)}`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
       if (!res.ok) {

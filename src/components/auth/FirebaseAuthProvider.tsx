@@ -1,14 +1,16 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getRedirectResult, onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
+import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
 import { onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import { isFirebaseClientConfigured } from "@/lib/firebase/config";
-import { AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
+import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
+import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase/client";
+import { getRedirectResultOnce } from "@/lib/firebase/redirect-result-once";
 import { userEntitlementRef, userProfileRef } from "@/lib/firebase/firestore-paths";
 import type { EntitlementDoc, FirestoreUserProfile } from "@/lib/firebase/types";
 
@@ -16,6 +18,8 @@ export type FirebaseAuthContextValue = {
   configured: boolean;
   user: User | null;
   authLoading: boolean;
+  /** Google リダイレクト戻りで getRedirectResult が空だったときのヒント（画面表示用） */
+  authRedirectHint: string | null;
   /** Firestore users/{uid}（未作成時は null） */
   profile: FirestoreUserProfile | null;
   profileLoading: boolean;
@@ -42,6 +46,7 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
   const configured = useMemo(() => isFirebaseClientConfigured(), []);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(configured);
+  const [authRedirectHint, setAuthRedirectHint] = useState<string | null>(null);
   const [profile, setProfile] = useState<FirestoreUserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [entitlement, setEntitlement] = useState<EntitlementDoc | null>(null);
@@ -59,24 +64,67 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
     }
     setAuthLoading(true);
 
-    /** ルートで一度だけ処理（子の Strict Mode 再マウントで結果が捨てられないようにする） */
-    void getRedirectResult(auth)
-      .then((result) => {
-        if (!result?.user || typeof window === "undefined") return;
-        setUser(result.user);
-        const stored = sessionStorage.getItem(AUTH_REDIRECT_NEXT_KEY);
-        sessionStorage.removeItem(AUTH_REDIRECT_NEXT_KEY);
-        const next =
-          stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : "/hub";
-        router.replace(next);
-      })
-      .catch(() => {});
+    let cancelled = false;
+    let unsub: (() => void) | null = null;
 
-    const unsub = onAuthStateChanged(auth, (next) => {
-      setUser(next);
-      setAuthLoading(false);
-    });
-    return () => unsub();
+    const REDIRECT_EMPTY_HINT = [
+      "Google から戻りましたが、ログイン結果を Firebase が受け取れませんでした（エラーは出ていないことがあります）。",
+      "① 必ず http://localhost:3000 で開き、npm run dev:localhost を使う。",
+      "② Firebase Console → Authentication → 承認済みドメイン に localhost がある。",
+      "③ Google Cloud のブラウザ API キーに http://localhost:3000/* と https://（projectId）.firebaseapp.com/* がある。",
+      "④ OAuth 同意画面が「テスト」のとき、使う Gmail をテストユーザーに追加している。",
+      "⑤ 同じタブでもう一度「Google でログイン」を試す（キャッシュ修正済み）。",
+    ].join("\n");
+
+    void (async () => {
+      try {
+        const result = await getRedirectResultOnce(auth);
+        if (cancelled) return;
+
+        if (result?.user) {
+          setAuthRedirectHint(null);
+          setUser(result.user);
+          const stored = sessionStorage.getItem(AUTH_REDIRECT_NEXT_KEY);
+          const next =
+            stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : "/hub";
+          queueMicrotask(() => {
+            requestAnimationFrame(() => {
+              sessionStorage.removeItem(AUTH_REDIRECT_NEXT_KEY);
+              router.replace(next);
+            });
+          });
+        } else if (typeof window !== "undefined" && sessionStorage.getItem(AUTH_REDIRECT_NEXT_KEY)) {
+          sessionStorage.removeItem(AUTH_REDIRECT_NEXT_KEY);
+          try {
+            sessionStorage.setItem(AUTH_REDIRECT_ERROR_KEY, REDIRECT_EMPTY_HINT);
+          } catch {
+            /* sessionStorage 不可 */
+          }
+          setAuthRedirectHint(REDIRECT_EMPTY_HINT);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        try {
+          sessionStorage.setItem(AUTH_REDIRECT_ERROR_KEY, formatFirebaseAuthError(e));
+        } catch {
+          /* sessionStorage 不可 */
+        }
+        setAuthRedirectHint(formatFirebaseAuthError(e));
+        console.error("[FirebaseAuthProvider] getRedirectResult に失敗しました", e);
+      } finally {
+        if (cancelled) return;
+        unsub = onAuthStateChanged(auth, (next) => {
+          setUser(next);
+          if (next) setAuthRedirectHint(null);
+          setAuthLoading(false);
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, [configured, router]);
 
   useEffect(() => {
@@ -165,6 +213,7 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
       configured,
       user,
       authLoading,
+      authRedirectHint,
       profile,
       profileLoading,
       entitlement,
@@ -176,6 +225,7 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
       configured,
       user,
       authLoading,
+      authRedirectHint,
       profile,
       profileLoading,
       entitlement,

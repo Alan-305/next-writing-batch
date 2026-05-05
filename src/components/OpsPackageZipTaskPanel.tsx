@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+
 type RegistryRow = { taskId: string; displayLabel: string };
 
 export function OpsPackageZipTaskPanel() {
+  const { user } = useFirebaseAuthContext();
   const [tasks, setTasks] = useState<RegistryRow[] | null>(null);
   const [taskId, setTaskId] = useState("");
   const [loadErr, setLoadErr] = useState("");
@@ -16,7 +19,12 @@ export function OpsPackageZipTaskPanel() {
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch("/api/tasks/registry");
+        const headers: Record<string, string> = {};
+        if (user) {
+          const token = await user.getIdToken();
+          headers.Authorization = `Bearer ${token}`;
+        }
+        const r = await fetch("/api/tasks/registry", { headers });
         const j = (await r.json()) as { ok?: boolean; tasks?: RegistryRow[]; message?: string };
         if (cancelled) return;
         if (j.ok && Array.isArray(j.tasks)) {
@@ -31,7 +39,7 @@ export function OpsPackageZipTaskPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user]);
 
   const onZipByTask = async () => {
     const tid = taskId.trim();
@@ -45,9 +53,15 @@ export function OpsPackageZipTaskPanel() {
     setBusy(true);
     setMsg("");
     try {
+      if (!user) {
+        setMsg("ログインしてください。");
+        setBusy(false);
+        return;
+      }
+      const token = await user.getIdToken();
       const res = await fetch("/api/ops/package-zip", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ mode: "task", taskId: tid }),
       });
       const j = (await res.json()) as { ok?: boolean; message?: string; stdout?: string; stderr?: string };

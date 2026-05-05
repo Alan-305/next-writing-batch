@@ -1,17 +1,7 @@
-import { AuthToolbar } from "@/components/auth/AuthToolbar";
-import { RequireAuth } from "@/components/auth/RequireAuth";
+import type { ReactNode } from "react";
 
-export default function ResultLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <div className="app-shell app-shell--student">
-      <header className="app-shell-header app-shell-header--student no-print">
-        <div className="app-shell-header-inner">
-          <span className="app-shell-brand-student">添削革命</span>
-          <span className="app-shell-badge-student">生徒用</span>
-          <AuthToolbar variant="student" />
-        </div>
-      </header>
-      <RequireAuth>{children}</RequireAuth>
-    </div>
-  );
+import { StudentAppShellLayout } from "@/components/student/StudentAppShellLayout";
+
+export default function ResultLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return <StudentAppShellLayout>{children}</StudentAppShellLayout>;
 }

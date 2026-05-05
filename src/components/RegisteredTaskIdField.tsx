@@ -16,6 +16,8 @@ type Props = {
   /** 複数設問の課題のみ表示 */
   problemId?: string;
   onProblemIdChange?: (problemId: string) => void;
+  /** 課題レジストリ取得時に付与する Firebase ID トークン（テナント分離用） */
+  getAccessToken?: () => Promise<string | null>;
 };
 
 /**
@@ -28,6 +30,7 @@ export function RegisteredTaskIdField({
   errorText,
   problemId,
   onProblemIdChange,
+  getAccessToken,
 }: Props) {
   const [tasks, setTasks] = useState<RegistryTaskRow[] | null>(null);
   const [fetchErr, setFetchErr] = useState("");
@@ -36,7 +39,10 @@ export function RegisteredTaskIdField({
     let cancelled = false;
     void (async () => {
       try {
-        const r = await fetch("/api/tasks/registry");
+        const headers: Record<string, string> = {};
+        const token = await getAccessToken?.();
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const r = await fetch("/api/tasks/registry", { headers });
         const j = (await r.json()) as { ok?: boolean; tasks?: RegistryTaskRow[]; message?: string };
         if (cancelled) return;
         if (j.ok && Array.isArray(j.tasks)) {
@@ -51,7 +57,7 @@ export function RegisteredTaskIdField({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [getAccessToken]);
 
   const selected = useMemo(() => tasks?.find((t) => t.taskId === value), [tasks, value]);
   const hasTasks = Array.isArray(tasks) && tasks.length > 0;

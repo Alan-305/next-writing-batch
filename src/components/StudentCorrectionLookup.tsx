@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { RegisteredTaskIdField } from "@/components/RegisteredTaskIdField";
 import { formatExplanationForPublicView } from "@/lib/student-release";
 
@@ -78,6 +79,11 @@ function downloadTextFile(filename: string, body: string) {
 }
 
 export function StudentCorrectionLookup() {
+  const { user } = useFirebaseAuthContext();
+  const getAccessToken = useCallback(async () => {
+    if (!user) return null;
+    return user.getIdToken();
+  }, [user]);
   const [form, setForm] = useState(emptyLookup);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -93,9 +99,12 @@ export function StudentCorrectionLookup() {
     setMetaAtLookup(null);
     const snapshot = { ...form };
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const token = await getAccessToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
       const response = await fetch("/api/submissions/lookup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(form),
       });
       const json = await response.json();
@@ -140,8 +149,11 @@ export function StudentCorrectionLookup() {
       <form className="card" onSubmit={onSubmit}>
         <RegisteredTaskIdField
           value={form.taskId}
-          onTaskIdChange={(tid) => setForm((p) => ({ ...p, taskId: tid }))}
+          onTaskIdChange={(tid) => {
+            setForm((p) => ({ ...p, taskId: tid }));
+          }}
           disabled={loading}
+          getAccessToken={getAccessToken}
         />
         <label className="field">
           <span>学籍番号</span>

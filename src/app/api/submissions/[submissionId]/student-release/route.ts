@@ -1,41 +1,42 @@
 import { NextResponse } from "next/server";
 
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { countEnglishWords } from "@/lib/english-word-count";
 import { buildStudentReleaseFromPatch, type StudentReleasePatchBody } from "@/lib/student-release";
 import { splitExplanationIntoContentGrammarSections } from "@/lib/student-release";
 import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
-import { getSubmissionById, updateSubmissionById } from "@/lib/submissions-store";
+import { findSubmissionForTenant } from "@/lib/submission-tenant-assert";
+import { updateSubmissionById } from "@/lib/submissions-store";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { postAnalysisPhase1ToAppsScript } from "@/lib/nexus-support";
 import { persistTaskRubricDefaultScores } from "@/lib/task-rubric-default-scores";
 
 type RouteContext = { params: Promise<{ submissionId: string }> };
 
-function countEnglishWords(text: string): number {
-  const t = (text || "").trim();
-  if (!t) return 0;
-  const words = t.match(/[A-Za-z]+(?:'[A-Za-z]+)?/g);
-  return words ? words.length : 0;
-}
-
 export async function PATCH(request: Request, context: RouteContext) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+
   const { submissionId } = await context.params;
   const sid = decodeURIComponent(submissionId || "").trim();
   if (!sid) {
     return NextResponse.json({ ok: false, message: "submissionId is required" }, { status: 400 });
   }
 
-  const submission = await getSubmissionById(sid);
-  if (!submission) {
+  const hit = await findSubmissionForTenant(sid, auth.organizationId);
+  if (!hit) {
     return NextResponse.json(submissionNotFoundBody(), { status: 404 });
   }
+  const submission = hit.submission;
+  const orgId = hit.organizationId;
 
-  const master = await loadTaskProblemsMaster(submission.taskId);
+  const master = await loadTaskProblemsMaster(orgId, submission.taskId);
   if (!master) {
     return NextResponse.json(
       {
         ok: false,
         code: "TASK_MASTER_MISSING",
-        message: `課題マスタが見つかりません: data/task-problems/${submission.taskId}.json`,
+        message: `課題マスタが見つかりません（テナント: ${orgId}）: taskId=${submission.taskId}`,
         taskId: submission.taskId,
       },
       { status: 422 },
@@ -97,7 +98,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }));
 
   if (updated) {
-    await persistTaskRubricDefaultScores(submission.taskId, master, release.scores);
+    await persistTaskRubricDefaultScores(orgId, submission.taskId, master, release.scores);
 
     const prevFinalizedAt = String(submission.studentRelease?.operatorFinalizedAt ?? "").trim();
     const nextFinalizedAt = String(release.operatorFinalizedAt ?? "").trim();

@@ -4,12 +4,16 @@ import { randomUUID } from "crypto";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
+import { defaultOrganizationId } from "@/lib/organization-id";
+import { migrateLegacyOrgLayoutOnce, organizationSubmissionsFilePath, listOrganizationIdsOnDisk } from "@/lib/org-data-layout";
 import type { StudentRelease } from "@/lib/student-release";
 import type { SubmissionInput } from "@/lib/validation";
 
 export type Submission = SubmissionInput & {
   submissionId: string;
   submittedAt: string;
+  /** 提出が属するテナント（未設定の旧データは読み取り時に default とみなす） */
+  organizationId?: string;
   /** 提出 API が検証した Firebase Auth uid（ログイン提出時） */
   submittedByUid?: string;
   status: "pending" | "processing" | "done" | "failed";
@@ -52,50 +56,83 @@ export type Submission = SubmissionInput & {
   };
 };
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "submissions.json");
+function effectiveOrganizationId(row: Submission): string {
+  const raw = (row.organizationId ?? "").trim();
+  return raw || defaultOrganizationId();
+}
 
-async function ensureDataFile(): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+async function ensureDataFile(organizationId: string): Promise<void> {
+  await migrateLegacyOrgLayoutOnce();
+  const fp = organizationSubmissionsFilePath(organizationId);
+  await fs.mkdir(path.dirname(fp), { recursive: true });
   try {
-    await fs.access(DATA_FILE);
+    await fs.access(fp);
   } catch {
-    await writeJsonFileAtomic(DATA_FILE, []);
+    await writeJsonFileAtomic(fp, []);
   }
 }
 
-export async function getSubmissions(): Promise<Submission[]> {
+export async function getSubmissions(organizationId: string): Promise<Submission[]> {
   noStore();
-  await ensureDataFile();
-  const content = await fs.readFile(DATA_FILE, "utf8");
+  await ensureDataFile(organizationId);
+  const fp = organizationSubmissionsFilePath(organizationId);
+  const content = await fs.readFile(fp, "utf8");
   const parsed = JSON.parse(content) as Submission[];
   return parsed.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }
 
-export async function getSubmissionById(submissionId: string): Promise<Submission | null> {
-  const submissions = await getSubmissions();
+export async function getSubmissionByIdInOrganization(
+  organizationId: string,
+  submissionId: string,
+): Promise<Submission | null> {
+  const submissions = await getSubmissions(organizationId);
   return submissions.find((s) => s.submissionId === submissionId) ?? null;
 }
 
-/** 照会フォーム用：全角半角・連続空白をそろえて比較 */
+export type SubmissionWithOrganization = { submission: Submission; organizationId: string };
+
+/** 受付 ID はテナント横断で一意とし、公開用リンクなどで検索する。 */
+export async function findSubmissionAcrossOrganizations(
+  submissionId: string,
+): Promise<SubmissionWithOrganization | null> {
+  noStore();
+  await migrateLegacyOrgLayoutOnce();
+  const sid = (submissionId ?? "").trim();
+  if (!sid) return null;
+
+  const orgIds = await listOrganizationIdsOnDisk();
+  for (const oid of orgIds) {
+    const row = await getSubmissionByIdInOrganization(oid, sid);
+    if (row) {
+      return { submission: row, organizationId: oid };
+    }
+  }
+  return null;
+}
+
+export async function getSubmissionById(submissionId: string): Promise<Submission | null> {
+  const hit = await findSubmissionAcrossOrganizations(submissionId);
+  return hit?.submission ?? null;
+}
+
+/** 全角半角・連続空白をそろえて比較 */
 function normalizeLookupToken(s: string): string {
   return s.normalize("NFKC").trim().replace(/\s+/g, " ");
 }
 
 /**
- * 課題ID・学籍番号・氏名が一致する提出のうち、提出日時が最新の1件を返す。
+ * 同一テナント内で、課題ID・学籍番号・氏名が一致する提出のうち最新の1件。
  */
-export async function findLatestSubmissionByStudentLookup(args: {
-  taskId: string;
-  studentId: string;
-  studentName: string;
-}): Promise<Submission | null> {
+export async function findLatestSubmissionByStudentLookup(
+  organizationId: string,
+  args: { taskId: string; studentId: string; studentName: string },
+): Promise<Submission | null> {
   const taskId = normalizeLookupToken(args.taskId);
   const studentId = normalizeLookupToken(args.studentId);
   const studentName = normalizeLookupToken(args.studentName);
   if (!taskId || !studentId || !studentName) return null;
 
-  const submissions = await getSubmissions();
+  const submissions = await getSubmissions(organizationId);
   const matches = submissions.filter(
     (s) =>
       normalizeLookupToken(s.taskId) === taskId &&
@@ -107,32 +144,54 @@ export async function findLatestSubmissionByStudentLookup(args: {
   return matches[0] ?? null;
 }
 
-export async function deleteSubmissionById(submissionId: string): Promise<boolean> {
-  await ensureDataFile();
-  const content = await fs.readFile(DATA_FILE, "utf8");
+export async function deleteSubmissionByIdInOrganization(
+  organizationId: string,
+  submissionId: string,
+): Promise<boolean> {
+  await ensureDataFile(organizationId);
+  const fp = organizationSubmissionsFilePath(organizationId);
+  const content = await fs.readFile(fp, "utf8");
   const rows = JSON.parse(content) as Submission[];
   const next = rows.filter((s) => s.submissionId !== submissionId);
   if (next.length === rows.length) return false;
-  await writeJsonFileAtomic(DATA_FILE, next);
+  await writeJsonFileAtomic(fp, next);
   return true;
+}
+
+export async function deleteSubmissionById(submissionId: string): Promise<boolean> {
+  const hit = await findSubmissionAcrossOrganizations(submissionId);
+  if (!hit) return false;
+  return deleteSubmissionByIdInOrganization(hit.organizationId, submissionId);
+}
+
+export async function updateSubmissionByIdInOrganization(
+  organizationId: string,
+  submissionId: string,
+  updater: (row: Submission) => Submission,
+): Promise<Submission | null> {
+  await ensureDataFile(organizationId);
+  const fp = organizationSubmissionsFilePath(organizationId);
+  const content = await fs.readFile(fp, "utf8");
+  const rows = JSON.parse(content) as Submission[];
+  const idx = rows.findIndex((s) => s.submissionId === submissionId);
+  if (idx < 0) return null;
+  const next = updater(rows[idx]!);
+  rows[idx] = next;
+  await writeJsonFileAtomic(fp, rows);
+  return next;
 }
 
 export async function updateSubmissionById(
   submissionId: string,
   updater: (row: Submission) => Submission,
 ): Promise<Submission | null> {
-  await ensureDataFile();
-  const content = await fs.readFile(DATA_FILE, "utf8");
-  const rows = JSON.parse(content) as Submission[];
-  const idx = rows.findIndex((s) => s.submissionId === submissionId);
-  if (idx < 0) return null;
-  const next = updater(rows[idx]!);
-  rows[idx] = next;
-  await writeJsonFileAtomic(DATA_FILE, rows);
-  return next;
+  const hit = await findSubmissionAcrossOrganizations(submissionId);
+  if (!hit) return null;
+  return updateSubmissionByIdInOrganization(hit.organizationId, submissionId, updater);
 }
 
 export async function addSubmission(
+  organizationId: string,
   input: SubmissionInput,
   opts?: { submittedByUid?: string },
 ): Promise<Submission> {
@@ -147,6 +206,7 @@ export async function addSubmission(
   const submission: Submission = {
     submissionId: randomUUID(),
     submittedAt: new Date().toISOString(),
+    organizationId,
     status: "pending",
     taskId: input.taskId.trim(),
     studentId: input.studentId.trim(),
@@ -164,8 +224,8 @@ export async function addSubmission(
       : {}),
   };
 
-  const current = await getSubmissions();
+  const current = await getSubmissions(organizationId);
   current.unshift(submission);
-  await writeJsonFileAtomic(DATA_FILE, current);
+  await writeJsonFileAtomic(organizationSubmissionsFilePath(organizationId), current);
   return submission;
 }
