@@ -231,17 +231,16 @@ function SignInInner() {
               <code>{origin}</code>
             </p>
             <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              このリポの <code>npm run dev</code> は <code>0.0.0.0</code> 束縛のため、ブラウザが{" "}
-              <code>127.0.0.1</code> や LAN IP で開くと Firebase の承認済みドメインと一致せず失敗することがあります。確実にするには{" "}
-              <code>npm run dev:localhost</code> のあと <code>http://localhost:3000</code> で開いてください（
-              <code>127.0.0.1</code> は <code>localhost</code> とは別扱いで、Console に両方入れるのが安全です）。
+              Cloud Run 運用では、今のホスト（例: <code>...run.app</code> / 独自ドメイン）を Firebase
+              の承認済みドメインへ追加してください。ローカル検証時のみ <code>localhost</code> や <code>127.0.0.1</code>{" "}
+              を追加します（<code>localhost</code> と <code>127.0.0.1</code> は別ホスト扱いです）。
             </p>
             <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
               コンソールに <code>getProjectConfig</code> が <strong>403</strong> や{" "}
               <code>Unable to verify that the app domain is authorized</code> がある場合は、上記の承認済みドメインに加え、
               Google Cloud → 認証情報 → 使用中のブラウザ用 API キー（<code>NEXT_PUBLIC_FIREBASE_API_KEY</code> と同じ）で{" "}
               <strong>HTTP リファラー制限</strong>に、いまの <code>{origin || "（このページのオリジン）"}</code>{" "}
-              を許可リストへ入れてください（例: <code>http://localhost:3000/*</code>）。
+              を許可リストへ入れてください（例: <code>https://{origin ? new URL(origin).host : "your-host"}/*</code>）。
             </p>
           </div>
         ) : null}

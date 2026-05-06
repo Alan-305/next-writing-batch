@@ -9,15 +9,15 @@ const FRIENDLY_BY_CODE: Record<string, string> = {
   "auth/popup-blocked":
     "ポップアップがブロックされています。アドレスバー付近でポップアップを許可するか、「ポップアップを使わずログイン（リダイレクト）」をご利用ください。",
   "auth/unauthorized-domain":
-    "この URL のホストは Firebase の「承認済みドメイン」に含まれていません。http://localhost:3000 で開くか、Console にいまのアドレスのホストを追加してください。",
+    "この URL のホストは Firebase の「承認済みドメイン」に含まれていません。Firebase Console の承認済みドメインに、いま開いているホスト（例: next-writing-batch-xxxxx.asia-northeast1.run.app など）を追加してください。",
 };
 
 /** Google OAuth が「The requested action is invalid」で返すときの共通ヒント（ポップアップ／リダイレクト両方で出うる） */
 const INVALID_ACTION_HINT = [
   "Google 側でログインが拒否されています（ポップアップでもリダイレクトでも同じ原因のことが多いです）。次を確認してください。",
-  "① Firebase Console → Authentication → 設定 → 承認済みドメインに、いまアドレスバーのホスト（例: localhost）がある。",
+  "① Firebase Console → Authentication → 設定 → 承認済みドメインに、いまアドレスバーのホストがある。",
   "② Google Cloud → OAuth 同意画面が「テスト」のとき、ログインに使う Gmail を「テストユーザー」に追加している（未追加だとこの英文になりがちです）。",
-  "③ Google Cloud → 認証情報 → OAuth 2.0 クライアント（Web）に、JavaScript 生成元（例: http://localhost:3000）と、リダイレクト URI「https://（NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN の値）/__/auth/handler」がある。",
+  "③ Google Cloud → 認証情報 → OAuth 2.0 クライアント（Web）に、JavaScript 生成元（現在のオリジン）と、リダイレクト URI「https://（NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN の値）/__/auth/handler」がある。",
   "④ Firebase → Authentication → Sign-in method で Google が有効。",
 ].join("\n");
 
@@ -36,8 +36,8 @@ function messageLooksLikeUnauthorizedAppDomain(msg: string): boolean {
 
 const DOMAIN_AND_API_KEY_HINT = [
   "Firebase が「このサイトのドメインを検証できない」と判断しています（開発者ツールに getProjectConfig 403 や Unable to verify… と出ることがあります）。次を順に確認してください。",
-  "① Firebase Console → Authentication → 設定 → 承認済みドメインに、いまアドレスバーのホスト（例: localhost）を追加する。127.0.0.1 や LAN の IP で開いている場合は、その文字列も別エントリとして追加する。",
-  "② Google Cloud Console → API とサービス → 認証情報 → このプロジェクトの「ブラウザ用」API キー（NEXT_PUBLIC_FIREBASE_API_KEY と同じキー）を開き、アプリケーションの制限が「HTTP リファラー（ウェブサイト）」なら、http://localhost:3000/* のように今のオリジンを追加する（未設定なら一時的に「なし」で動作確認できるが、本番前に制限を戻す）。",
+  "① Firebase Console → Authentication → 設定 → 承認済みドメインに、いまアドレスバーのホストを追加する。",
+  "② Google Cloud Console → API とサービス → 認証情報 → このプロジェクトの「ブラウザ用」API キー（NEXT_PUBLIC_FIREBASE_API_KEY と同じキー）を開き、アプリケーションの制限が「HTTP リファラー（ウェブサイト）」なら、いまのオリジン（例: https://<host>/*）を追加する。",
   "③ .env.local の NEXT_PUBLIC_FIREBASE_* が、その Firebase プロジェクトの値と一致していること。",
 ].join("\n");
 
