@@ -324,6 +324,9 @@ export default function OpsTicketsPage() {
               : `${selectedPlanInfo.label}プランで購入（${selectedPlanInfo.priceLabel}）`}
           </button>
         </p>
+        <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: "0.92rem" }}>
+          購入に進む前に、利用規約・特定商取引法に基づく表記・返金ポリシーをご確認ください（試験運用中のため、内容は調整する場合があります）。
+        </p>
         {checkoutError ? <p className="admin-tenant-roster-error">{checkoutError}</p> : null}
       </div>
 

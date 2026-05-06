@@ -142,6 +142,9 @@ export default function SettingsPage() {
               ? "決済画面を準備中..."
               : `${selectedPlanInfo.label}プランで購入（${selectedPlanInfo.priceLabel}）`}
           </button>
+          <p className="muted" style={{ marginTop: 10, marginBottom: 0, fontSize: "0.92rem" }}>
+            購入に進む前に、利用規約・特定商取引法に基づく表記・返金ポリシーをご確認ください（試験運用中のため、内容は調整する場合があります）。
+          </p>
           {checkoutError ? <p className="student-settings-billing-error">{checkoutError}</p> : null}
         </section>
         <div className="student-settings-account">
