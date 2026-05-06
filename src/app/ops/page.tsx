@@ -56,6 +56,15 @@ export default function OpsHomePage() {
           <span className="ops-home-action-cta">納品 ZIP を開く</span>
         </Link>
 
+        <Link href="/ops/tickets" className="ops-home-action ops-home-action--tenant">
+          <span className="ops-home-action-icon" aria-hidden>
+            🎟
+          </span>
+          <span className="ops-home-action-title">チケット状況</span>
+          <span className="ops-home-action-desc">自分のテナントの生徒・教員の残チケットと直近消費を確認します。</span>
+          <span className="ops-home-action-cta">チケット状況を開く</span>
+        </Link>
+
         <Link href="/tensaku-kakumei#support" className="ops-home-action ops-home-action--inquiry">
           <span className="ops-home-action-icon" aria-hidden>
             ✉

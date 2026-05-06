@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FirebaseError } from "firebase/app";
 import { useSearchParams } from "next/navigation";
+import { onSnapshot } from "firebase/firestore";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { createStripeCheckoutSession, type BillingPlan } from "@/lib/billing/create-checkout-session";
+import type { BillingInfo } from "@/lib/firebase/types";
+import { getFirebaseFirestore } from "@/lib/firebase/client";
+import { userProfileRef } from "@/lib/firebase/firestore-paths";
 
 const PLAN_OPTIONS: Array<{ plan: BillingPlan; label: string; priceLabel: string; tickets: number }> = [
   { plan: "1m", label: "1ヶ月", priceLabel: "2,000円", tickets: 5 },
@@ -22,11 +26,34 @@ export default function SettingsPage() {
   const [isLoadingCheckout, setIsLoadingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const checkoutResult = searchParams.get("checkout");
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
 
   const selectedPlanInfo = useMemo(
     () => PLAN_OPTIONS.find((item) => item.plan === selectedPlan) ?? PLAN_OPTIONS[0],
     [selectedPlan],
   );
+
+  useEffect(() => {
+    if (!user) {
+      setBilling(null);
+      return;
+    }
+    const db = getFirebaseFirestore();
+    if (!db) return;
+    const ref = userProfileRef(db, user.uid);
+    return onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) {
+          setBilling(null);
+          return;
+        }
+        const data = (snap.data() ?? {}) as { billing?: BillingInfo };
+        setBilling((data.billing ?? null) as BillingInfo | null);
+      },
+      () => setBilling(null),
+    );
+  }, [user]);
 
   const handleStartCheckout = async () => {
     if (!user) {
@@ -75,6 +102,20 @@ export default function SettingsPage() {
             決済はキャンセルされました。プランを選び直して再度お試しください。
           </p>
         ) : null}
+        <section className="student-settings-billing" aria-label="チケット残高">
+          <h2>チケット残高</h2>
+          <p className="muted student-settings-billing-lead" style={{ marginBottom: 8 }}>
+            添削を実行するとチケットが減ります。残りは自動で更新されます。
+          </p>
+          <p style={{ marginTop: 0 }}>
+            残り: <strong>{typeof billing?.tickets === "number" ? billing.tickets : "—"}</strong>
+          </p>
+          <p className="muted" style={{ marginTop: 0, marginBottom: 0 }}>
+            直近の消費:{" "}
+            {typeof billing?.lastProofreadTicketConsume === "number" ? billing.lastProofreadTicketConsume : "—"} /{" "}
+            {billing?.lastProofreadTicketAt ? "記録あり" : "—"}
+          </p>
+        </section>
         <section className="student-settings-billing" aria-label="チケット購入">
           <h2>チケット購入（テスト）</h2>
           <p className="muted student-settings-billing-lead">

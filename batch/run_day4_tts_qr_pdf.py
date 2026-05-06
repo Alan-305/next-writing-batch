@@ -58,6 +58,14 @@ def _signed_url_or_local(*, local_audio_url: str) -> str:
     return local_audio_url
 
 
+def _gcs_bucket_from_env() -> str:
+    for key in ("GCS_BUCKET_NAME", "FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"):
+        val = os.environ.get(key, "").strip()
+        if val:
+            return val
+    return ""
+
+
 def _friendly_day4_error(err: str) -> str:
     e = (err or "").strip()
     if e.startswith("missing_env:"):
@@ -154,7 +162,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if not os.environ.get("GCS_BUCKET_NAME", "").strip():
+    if not _gcs_bucket_from_env():
         if args.qr and not args.allow_local_qr:
             print(
                 "[day4] --qr 指定: QR 用の公開音声URLに GCS か --allow-local-qr が必要です。"
@@ -224,8 +232,9 @@ def main() -> None:
             if not mp3:
                 raise RuntimeError("tts_failed")
 
-            gcs_bucket = os.environ.get("GCS_BUCKET_NAME", "").strip()
-            if gcs_bucket:
+            gcs_bucket = _gcs_bucket_from_env()
+            # 明示的に --allow-local-qr が付いている場合は、GCS設定が見えていてもローカルURLを優先する。
+            if gcs_bucket and not args.allow_local_qr:
                 expires_days = int(os.environ.get("GCS_SIGNED_URL_EXPIRE_DAYS", "180").strip() or "180")
                 object_name = f"audio/{task_id}/{mp3_filename}"
                 audio_url = upload_mp3_and_get_signed_url(

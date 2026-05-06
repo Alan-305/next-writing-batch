@@ -8,7 +8,20 @@ export type BillingInfo = {
   tickets?: number;
   stripeCustomerId?: string | null;
   lastCheckoutSessionId?: string | null;
+  /** checkout.session.completed 時に Webhook から保存（管理画面の返金用） */
+  lastPaymentIntentId?: string | null;
   lastTicketAdded?: number;
+  /** charge.refunded 連携（任意） */
+  lastRefundChargeId?: string | null;
+  lastRefundTicketsDeducted?: number;
+  lastRefundAmountDelta?: number;
+  /** adminAdjustBillingTickets（任意） */
+  lastManualTicketDelta?: number;
+  lastManualTicketReason?: string | null;
+  lastManualTicketByUid?: string | null;
+  /** 添削 API 成功後のチケット消費（任意） */
+  lastProofreadTicketConsume?: number;
+  lastProofreadTicketAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 };
 

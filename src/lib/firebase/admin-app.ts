@@ -24,8 +24,13 @@ export function getFirebaseAdminApp(): App {
 
   const useEmulators = (process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATOR ?? "").trim().toLowerCase() === "true";
   const publicEmulatorHost = (process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST ?? "127.0.0.1").trim() || "127.0.0.1";
-  if (useEmulators && !(process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "").trim()) {
-    process.env.FIREBASE_AUTH_EMULATOR_HOST = `${publicEmulatorHost}:9099`;
+  if (useEmulators) {
+    if (!(process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "").trim()) {
+      process.env.FIREBASE_AUTH_EMULATOR_HOST = `${publicEmulatorHost}:9099`;
+    }
+    if (!(process.env.FIRESTORE_EMULATOR_HOST ?? "").trim()) {
+      process.env.FIRESTORE_EMULATOR_HOST = `${publicEmulatorHost}:8080`;
+    }
   }
   const emulator = (process.env.FIREBASE_AUTH_EMULATOR_HOST ?? "").trim();
   if (emulator) {

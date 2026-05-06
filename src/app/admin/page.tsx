@@ -9,8 +9,11 @@ export default function AdminHomePage() {
         <p style={{ marginTop: 0 }}>
           このエリアは <code>NEXT_PUBLIC_FIREBASE_ADMIN_UIDS</code> に登録された Firebase Auth uid のみが利用できます。
         </p>
+        <p style={{ marginBottom: 12 }}>
+          <Link href="/admin/billing">チケット手動調整（管理者・例外返金など）</Link>
+        </p>
         <p className="muted" style={{ marginBottom: 0 }}>
-          今後、課金・権利付与などサーバー連携の UI はここに追加します。運用バッチは従来どおり{" "}
+          運用バッチは従来どおり{" "}
           <Link href="/ops">/ops</Link> を利用してください。ヘッダーの <strong>テナント</strong>{" "}
           プルダウンで代理テナントを選ぶと、同じブラウザでは運用 API もその{" "}
           <code>{"data/orgs/{id}/"}</code> として解決されます（空欄で Firestore の organizationId に戻ります）。その直下に、当該テナントの{" "}

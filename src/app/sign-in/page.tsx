@@ -21,11 +21,14 @@ function SignInInner() {
   const params = useSearchParams();
   const nextRaw = (params.get("next") ?? "").trim();
   const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/hub";
+  const inviteOrg = (params.get("org") ?? "").trim();
   const emulatorMode = useFirebaseEmulators();
   const { configured, user, authLoading, authRedirectHint } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string>("");
+  const [inviteApplying, setInviteApplying] = useState(false);
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
 
   useEffect(() => {
     setOrigin(typeof window !== "undefined" ? window.location.origin : "");
@@ -68,6 +71,23 @@ function SignInInner() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       await signInWithPopup(auth, provider);
+      if (inviteOrg) {
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          const res = await fetch("/api/invite/accept", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ organizationId: inviteOrg }),
+          });
+          if (!res.ok) {
+            const j = (await res.json()) as { message?: string };
+            throw new Error(j?.message ?? "招待リンクの適用に失敗しました。");
+          }
+        }
+      }
       await new Promise<void>((resolve) => {
         queueMicrotask(() => requestAnimationFrame(() => resolve()));
       });
@@ -101,7 +121,50 @@ function SignInInner() {
     } finally {
       setBusy(false);
     }
-  }, [emulatorMode, router, safeNext, startGoogleRedirect]);
+  }, [emulatorMode, inviteOrg, router, safeNext, startGoogleRedirect]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user || !inviteOrg) {
+      setInviteResult(null);
+      setInviteApplying(false);
+      return;
+    }
+    setInviteApplying(true);
+    setInviteResult(null);
+    (async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch("/api/invite/accept", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ organizationId: inviteOrg }),
+        });
+        const j = (await res.json()) as { ok?: boolean; changed?: boolean; message?: string; organizationId?: string };
+        if (!cancelled) {
+          if (!res.ok || !j?.ok) {
+            setInviteResult(j?.message ?? "招待リンクの適用に失敗しました。");
+          } else {
+            setInviteResult(
+              j.changed
+                ? `招待リンクを適用しました（organizationId: ${j.organizationId ?? inviteOrg}）。`
+                : `招待リンクを確認しました（organizationId: ${j.organizationId ?? inviteOrg}）。`,
+            );
+          }
+        }
+      } catch {
+        if (!cancelled) setInviteResult("招待リンクの適用に失敗しました。");
+      } finally {
+        if (!cancelled) setInviteApplying(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteOrg, user]);
 
   if (!configured) {
     return (
@@ -183,6 +246,13 @@ function SignInInner() {
           </div>
         ) : null}
         {error ? <p className="error">{error}</p> : null}
+        {inviteOrg ? (
+          <p className="muted" style={{ marginTop: 0 }}>
+            招待リンクからアクセスしています（organizationId: <code>{inviteOrg}</code>）
+          </p>
+        ) : null}
+        {inviteApplying ? <p className="muted">招待リンクを適用中です…</p> : null}
+        {inviteResult ? <p className={inviteResult.includes("失敗") ? "error" : "success"}>{inviteResult}</p> : null}
         {authRedirectHint ? <p className="error">{authRedirectHint}</p> : null}
         {emulatorMode ? null : (
           <p>
