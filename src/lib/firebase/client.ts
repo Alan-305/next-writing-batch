@@ -1,5 +1,14 @@
+import { FirebaseError } from "firebase/app";
 import { type FirebaseApp, getApps, initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  connectAuthEmulator,
+  getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 
@@ -54,7 +63,25 @@ export function getFirebaseAuth(): Auth | null {
   if (!readFirebaseWebConfig()) return null;
   if (!auth) {
     try {
-      auth = getAuth(getOrInitApp());
+      const ap = getOrInitApp();
+      // リダイレクトログインは保留状態を IndexedDB に載せる。getAuth 既定だけだと戻りで空になる環境がある。
+      if (useFirebaseEmulators()) {
+        auth = getAuth(ap);
+      } else {
+        try {
+          auth = initializeAuth(ap, {
+            persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+            // initializeAuth だけだとリゾルバが無く、redirect/popup/getRedirectResult が auth/argument-error になる。
+            popupRedirectResolver: browserPopupRedirectResolver,
+          });
+        } catch (e) {
+          if (e instanceof FirebaseError && e.code === "auth/already-initialized") {
+            auth = getAuth(ap);
+          } else {
+            throw e;
+          }
+        }
+      }
       maybeConnectEmulators();
     } catch (e) {
       console.error("[getFirebaseAuth] Firebase Auth の初期化に失敗しました", e);

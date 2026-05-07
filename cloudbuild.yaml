@@ -2,18 +2,48 @@
 # 使い方: gcloud builds submit --config=cloudbuild.yaml .
 # 置換例: gcloud builds submit --config=cloudbuild.yaml . \
 #   --substitutions=_SERVICE_NAME=next-writing-batch,_REGION=asia-northeast1,_REPO=next-writing-batch
+#
+# 初回: Secret Manager に firebase-build.env と同じ中身のシークレットを作成する。
+#   gcloud secrets create ${_NEXT_PUBLIC_ENV_SECRET} --data-file=firebase-build.env --project=YOUR_PROJECT_ID
+# シークレット読み取り: gcloud builds submit はプロジェクト既定で
+#   PROJECT_NUMBER-compute@developer.gserviceaccount.com
+# として実行されることがある。PERMISSION_DENIED ならこの SA にも secretAccessor を付与する。
+# （従来どおり @cloudbuild.gserviceaccount.com だけでは足りない場合がある。）
 substitutions:
   _SERVICE_NAME: next-writing-batch
   _REGION: asia-northeast1
   _REPO: next-writing-batch
+  _NEXT_PUBLIC_ENV_SECRET: next-writing-batch-next-public-env
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
+  # ユーザー定義置換 ${_NEXT_PUBLIC_ENV_SECRET} は bash の -c 文字列内では展開されないことがあるため、
+  # env 経由で渡す（空の --secret で gcloud が失敗するのを防ぐ）。
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    env:
+      - "NWB_NEXT_PUBLIC_ENV_SECRET=${_NEXT_PUBLIC_ENV_SECRET}"
+      # cloud-sdk ステップでは環境変数 PROJECT_ID が入らないことがあり set -u で落ちるため、置換で明示する
+      - "NWB_PROJECT_ID=${PROJECT_ID}"
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        gcloud secrets versions access latest \
+          --secret="$$NWB_NEXT_PUBLIC_ENV_SECRET" \
+          --project="$$NWB_PROJECT_ID" \
+          > /workspace/firebase-build.env
+        test -s /workspace/firebase-build.env
+
   - name: gcr.io/cloud-builders/docker
+    env:
+      - DOCKER_BUILDKIT=1
     args:
       - build
+      - --secret
+      - id=next_public_env,src=/workspace/firebase-build.env
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$BUILD_ID
       - .
@@ -23,23 +53,67 @@ steps:
       - push
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$BUILD_ID
 
+  # 新イメージをデプロイし、firebase-build.env の NEXT_PUBLIC_* だけを既存の Cloud Run 環境にマージする。
+  # （--env-vars-file は他の環境変数を消すことがあるため使わない。Next サーバーが layout で readFirebaseWebConfig() するにはランタイムの NEXT_PUBLIC_* が必要。）
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE_NAME}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$BUILD_ID
-      - --region=${_REGION}
-      - --platform=managed
-      - --port=8080
-      - --memory=2Gi
-      - --cpu=2
-      - --timeout=900
-      - --max-instances=1
-      - --min-instances=0
-      - --allow-unauthenticated
-      - --quiet
+      - -c
+      - |
+        set -euo pipefail
+        IMAGE="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}:${BUILD_ID}"
+        gcloud run deploy "${_SERVICE_NAME}" \
+          --image="$$IMAGE" \
+          --region="${_REGION}" \
+          --project="${PROJECT_ID}" \
+          --platform=managed \
+          --port=8080 \
+          --memory=2Gi \
+          --cpu=2 \
+          --timeout=900 \
+          --max-instances=1 \
+          --min-instances=0 \
+          --allow-unauthenticated \
+          --quiet
+        # ADMIN_UIDS だけ値にカンマがある。他は「KEY=VAL,KEY2=VAL2」で1回、UID は ^|^ で1回（gcloud topic escaping）。
+        batch=""
+        admin_uids_entry=""
+        while IFS= read -r line || [ -n "$$line" ]; do
+          line=$$(printf '%s' "$$line" | sed 's/\r$$//')
+          [[ -z "$${line// }" ]] && continue
+          [[ "$$line" == \#* ]] && continue
+          case "$$line" in
+            NEXT_PUBLIC_*=*) ;;
+            *) continue ;;
+          esac
+          key="$${line%%=*}"
+          val="$${line#*=}"
+          [[ -z "$$val" ]] && continue
+          entry="$$key=$$val"
+          if [[ "$$key" == "NEXT_PUBLIC_FIREBASE_ADMIN_UIDS" ]]; then
+            admin_uids_entry="$$entry"
+            continue
+          fi
+          if [[ -z "$$batch" ]]; then
+            batch="$$entry"
+          else
+            batch="$${batch},$$entry"
+          fi
+        done < /workspace/firebase-build.env
+        if [[ -n "$$batch" ]]; then
+          gcloud run services update "${_SERVICE_NAME}" \
+            --region="${_REGION}" \
+            --project="${PROJECT_ID}" \
+            --quiet \
+            --update-env-vars="$$batch"
+        fi
+        if [[ -n "$$admin_uids_entry" ]]; then
+          gcloud run services update "${_SERVICE_NAME}" \
+            --region="${_REGION}" \
+            --project="${PROJECT_ID}" \
+            --quiet \
+            --update-env-vars="^|^$$admin_uids_entry"
+        fi
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$BUILD_ID

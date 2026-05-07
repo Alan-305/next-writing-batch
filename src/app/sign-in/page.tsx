@@ -11,6 +11,7 @@ import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
 import { useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
+import { resetRedirectResultCacheForNewFlow } from "@/lib/firebase/redirect-result-once";
 
 function isPopupBlocked(e: unknown): boolean {
   return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "auth/popup-blocked";
@@ -53,6 +54,7 @@ function SignInInner() {
       setError("Firebase が初期化できません。環境変数を確認してください。");
       return;
     }
+    resetRedirectResultCacheForNewFlow();
     sessionStorage.setItem(AUTH_REDIRECT_NEXT_KEY, safeNext);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });

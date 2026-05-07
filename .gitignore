@@ -4,6 +4,8 @@ node_modules
 # ローカル秘密（GCS 鍵パス・バケット名など）— コミット禁止
 .env.local
 .env*.local
+# Docker / Cloud Build 用の NEXT_PUBLIC_* 一式（firebase-build.env.example を参照）
+firebase-build.env
 # バッチ成果物（容量大・個人データに近い）— コミットしない
 output/
 data/submissions.json

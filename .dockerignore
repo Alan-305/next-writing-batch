@@ -5,6 +5,7 @@ node_modules
 .cursor
 .env.local
 .env.*.local
+firebase-build.env
 npm-debug.log*
 output
 data/*

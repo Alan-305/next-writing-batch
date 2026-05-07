@@ -6,11 +6,18 @@ import { onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
-import { isFirebaseClientConfigured } from "@/lib/firebase/config";
+import {
+  readFirebaseWebConfig,
+  seedClientFirebaseWebConfig,
+  type FirebaseWebConfig,
+} from "@/lib/firebase/config";
 import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase/client";
-import { getRedirectResultOnce } from "@/lib/firebase/redirect-result-once";
+import {
+  getRedirectResultOnce,
+  resetRedirectResultCacheForNewFlow,
+} from "@/lib/firebase/redirect-result-once";
 import { userEntitlementRef, userProfileRef } from "@/lib/firebase/firestore-paths";
 import type { EntitlementDoc, FirestoreUserProfile } from "@/lib/firebase/types";
 
@@ -41,9 +48,16 @@ export function useFirebaseAuthContext(): FirebaseAuthContextValue {
   return v;
 }
 
-export function FirebaseAuthProvider({ children }: Readonly<{ children: React.ReactNode }>) {
+export function FirebaseAuthProvider({
+  children,
+  webConfig,
+}: Readonly<{ children: React.ReactNode; webConfig: FirebaseWebConfig | null }>) {
   const router = useRouter();
-  const configured = useMemo(() => isFirebaseClientConfigured(), []);
+  if (typeof window !== "undefined") {
+    seedClientFirebaseWebConfig(webConfig);
+  }
+  /** Cloud Run 等ではサーバー実行時も process.env に NEXT_PUBLIC_* が必要（cloudbuild の --env-vars-file）。 */
+  const configured = readFirebaseWebConfig() !== null;
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(configured);
   const [authRedirectHint, setAuthRedirectHint] = useState<string | null>(null);
@@ -69,11 +83,10 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
 
     const REDIRECT_EMPTY_HINT = [
       "Google から戻りましたが、ログイン結果を Firebase が受け取れませんでした（エラーは出ていないことがあります）。",
-      "① 必ず http://localhost:3000 で開き、npm run dev:localhost を使う。",
-      "② Firebase Console → Authentication → 承認済みドメイン に localhost がある。",
-      "③ Google Cloud のブラウザ API キーに http://localhost:3000/* と https://（projectId）.firebaseapp.com/* がある。",
-      "④ OAuth 同意画面が「テスト」のとき、使う Gmail をテストユーザーに追加している。",
-      "⑤ 同じタブでもう一度「Google でログイン」を試す（キャッシュ修正済み）。",
+      "① 本番: アドレスバーのホスト（例: …run.app）を Firebase の承認済みドメインと、ブラウザ用 API キーの HTTP リファラーに追加する。",
+      "② ローカル: http://localhost:3000 で開き npm run dev:localhost。承認済みドメインに localhost。",
+      "③ OAuth が「テスト」のときはテストユーザーを追加（本番公開なら不要）。",
+      "④ ポップアップでログインできる場合はそちらも可。同じタブでもう一度リダイレクトを試す。",
     ].join("\n");
 
     void (async () => {
@@ -204,6 +217,7 @@ export function FirebaseAuthProvider({ children }: Readonly<{ children: React.Re
     const auth = getFirebaseAuth();
     if (!auth) return;
     await firebaseSignOut(auth);
+    resetRedirectResultCacheForNewFlow();
   }, []);
 
   const roles = profile?.roles ?? [];
