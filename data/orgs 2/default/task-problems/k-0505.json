@@ -1,0 +1,29 @@
+{
+  "taskId": "k-0505",
+  "rubric": {
+    "maxTotal": 50,
+    "items": [
+      {
+        "id": "content",
+        "label": "内容",
+        "max": 25
+      },
+      {
+        "id": "grammar",
+        "label": "文法・語法",
+        "max": 25
+      }
+    ]
+  },
+  "problems": [
+    {
+      "problemId": "default",
+      "title": "環境",
+      "question": "環境問題への取り組みで個人でできることはなんだと思いますか。あなたの考えを80〜100語の英文で書きなさい。"
+    }
+  ],
+  "_meta": {
+    "lastSavedByUid": "M1KErU2Og4UZCpICSZoyKKt2A7c2",
+    "lastSavedAt": "2026-05-04T22:06:52.296Z"
+  }
+}

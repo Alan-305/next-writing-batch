@@ -213,16 +213,10 @@ function SignInInner() {
       <div className="card">
         <h1 style={{ marginTop: 0 }}>ログイン</h1>
         <p className="muted">このアプリでは Google アカウントでのみログインできます。</p>
-        {emulatorMode ? (
-          <p className="muted" style={{ marginTop: 0 }}>
-            Emulator 検証中は、安定性のため <strong>ポップアップ方式のみ</strong>を使用します。
-          </p>
-        ) : (
-          <p className="muted" style={{ marginTop: 0 }}>
-            <strong>まず上のボタン（同じタブ・リダイレクト）</strong>をお試しください。Safari・社内ブラウザ・Cursor
-            内蔵ブラウザなどでは、ポップアップがすぐ閉じて <code>auth/popup-closed-by-user</code> になることがあります。
-          </p>
-        )}
+        <p className="muted" style={{ marginTop: 0 }}>
+          現在は安定性を優先して、<strong>ポップアップ方式を推奨</strong>しています。リダイレクト方式で戻り結果が
+          空になる環境があるためです。
+        </p>
         {origin ? (
           <div className="card" style={{ background: "#f1f5f9", marginBottom: 12 }}>
             <p style={{ marginTop: 0, marginBottom: 8 }}>
@@ -274,6 +268,16 @@ function SignInInner() {
         {inviteApplying ? <p className="muted">招待リンクを適用中です…</p> : null}
         {inviteResult ? <p className={inviteResult.includes("失敗") ? "error" : "success"}>{inviteResult}</p> : null}
         {authRedirectHint ? <p className="error">{authRedirectHint}</p> : null}
+        <p>
+          <button
+            type="button"
+            disabled={busy}
+            style={{ background: "#475569" }}
+            onClick={() => void onGoogle()}
+          >
+            {busy ? "処理中…" : "Google でログイン（推奨）"}
+          </button>
+        </p>
         {emulatorMode ? null : (
           <p>
             <button
@@ -288,20 +292,10 @@ function SignInInner() {
                 });
               }}
             >
-              {busy ? "処理中…" : "Google でログイン（同じタブ・推奨）"}
+              {busy ? "処理中…" : "同じタブでログイン（リダイレクトを試す）"}
             </button>
           </p>
         )}
-        <p>
-          <button
-            type="button"
-            disabled={busy}
-            style={{ background: "#475569" }}
-            onClick={() => void onGoogle()}
-          >
-            {emulatorMode ? "Google でログイン（ポップアップ）" : "別ウィンドウでログイン（ポップアップ）"}
-          </button>
-        </p>
         <p className="muted" style={{ marginBottom: 0 }}>
           <Link href="/hub">キャンセルしてハブへ</Link>
         </p>

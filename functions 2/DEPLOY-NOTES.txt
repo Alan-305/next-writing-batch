@@ -1,0 +1,22 @@
+Cloud Functions（Gen1）デプロイでビルドが失敗するときのメモ
+============================================================
+
+1) よくある本番原因（ログに "Access to bucket gcf-sources-... denied" と出る場合）
+   Google Cloud のデフォルト Compute サービスアカウントに、
+   ソース用バケット gcf-sources-<プロジェクト番号>-<リージョン> への参照権限が無い状態です。
+
+   対処（どちらか／両方）:
+   - Cloud Console → IAM → プリンシパル「<プロジェクト番号>-compute@developer.gserviceaccount.com」に
+     ロール「ストレージ オブジェクト閲覧者」(roles/storage.objectViewer) をプロジェクトに付与する
+   - または Cloud Storage → 該当 gcf-sources-* バケット → アクセス権 に上記プリンシパルを追加
+
+   変更後、再度: npm run firebase:deploy-functions
+
+2) 「イメージを何日保持するか」の対話プロンプト（Artifact Registry）
+   - npm run firebase:deploy-functions は、デプロイの前に us-central1（と過去に使った可能性のある asia-northeast1）へ
+     「1 日で削除」のポリシーを --force で当て直してから deploy します（対話を避ける）。
+   - それでも聞かれる場合は、CLI が「ポリシーなし」を推奨しない状態にする:
+       npm run firebase:functions:opt-out-artifact-cleanup
+     （古いイメージは溜まる可能性あり。必要なら後から Cloud Console で手動整理）
+   - 手動だけの場合:
+       npm run firebase:functions:set-artifact-cleanup

@@ -1,0 +1,25 @@
+{
+  "taskId": "2026_T2_matsuo",
+  "rubric": {
+    "maxTotal": 50,
+    "items": [
+      {
+        "id": "content",
+        "label": "内容",
+        "max": 25
+      },
+      {
+        "id": "grammar",
+        "label": "文法・語法",
+        "max": 25
+      }
+    ]
+  },
+  "problems": [
+    {
+      "problemId": "default",
+      "title": "2026英語表現第２講：環境問題",
+      "question": "環境問題への取り組みで、個人でできることは何だと思いますか。"
+    }
+  ]
+}

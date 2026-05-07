@@ -1,0 +1,29 @@
+{
+  "taskId": "2026_T1_matsuo",
+  "rubric": {
+    "maxTotal": 50,
+    "items": [
+      {
+        "id": "content",
+        "label": "内容",
+        "max": 25
+      },
+      {
+        "id": "grammar",
+        "label": "文法・語法",
+        "max": 25
+      }
+    ]
+  },
+  "problems": [
+    {
+      "problemId": "default",
+      "title": "インターネット",
+      "question": "あなたが考えるインターネットの問題点を書きなさい。"
+    }
+  ],
+  "_meta": {
+    "lastSavedByUid": "M1KErU2Og4UZCpICSZoyKKt2A7c2",
+    "lastSavedAt": "2026-05-06T07:57:13.048Z"
+  }
+}
