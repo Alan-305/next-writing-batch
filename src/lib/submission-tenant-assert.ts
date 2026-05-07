@@ -1,5 +1,5 @@
 import {
-  findSubmissionAcrossOrganizations,
+  getSubmissionByIdInOrganization,
   type SubmissionWithOrganization,
 } from "@/lib/submissions-store";
 
@@ -10,10 +10,7 @@ export async function findSubmissionForTenant(
   submissionId: string,
   requestOrganizationId: string,
 ): Promise<SubmissionWithOrganization | null> {
-  const hit = await findSubmissionAcrossOrganizations(submissionId);
-  if (!hit) return null;
-  if (hit.organizationId !== requestOrganizationId) {
-    return null;
-  }
-  return hit;
+  const submission = await getSubmissionByIdInOrganization(requestOrganizationId, submissionId);
+  if (!submission) return null;
+  return { submission, organizationId: requestOrganizationId };
 }

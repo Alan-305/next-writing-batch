@@ -2,10 +2,12 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { unstable_noStore as noStore } from "next/cache";
+import { FieldPath } from "firebase-admin/firestore";
 
 import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
 import { defaultOrganizationId } from "@/lib/organization-id";
 import { migrateLegacyOrgLayoutOnce, organizationSubmissionsFilePath, listOrganizationIdsOnDisk } from "@/lib/org-data-layout";
+import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import type { StudentRelease } from "@/lib/student-release";
 import type { SubmissionInput } from "@/lib/validation";
 
@@ -72,13 +74,58 @@ async function ensureDataFile(organizationId: string): Promise<void> {
   }
 }
 
-export async function getSubmissions(organizationId: string): Promise<Submission[]> {
-  noStore();
+function orgDocRef(organizationId: string) {
+  return getAdminFirestore().collection("organizations").doc(organizationId);
+}
+
+function orgSubmissionsCol(organizationId: string) {
+  return orgDocRef(organizationId).collection("submissions");
+}
+
+export async function syncSubmissionsFileMirrorFromFirestore(organizationId: string): Promise<void> {
   await ensureDataFile(organizationId);
+  const snap = await orgSubmissionsCol(organizationId).orderBy("submittedAt", "desc").get();
+  const rows = snap.docs.map((d) => d.data() as Submission);
+  await writeJsonFileAtomic(organizationSubmissionsFilePath(organizationId), rows);
+}
+
+async function backfillFromFileToFirestoreIfEmpty(organizationId: string): Promise<void> {
+  await ensureDataFile(organizationId);
+  const col = orgSubmissionsCol(organizationId);
+  const exists = await col.limit(1).get();
+  if (!exists.empty) return;
+
   const fp = organizationSubmissionsFilePath(organizationId);
   const content = await fs.readFile(fp, "utf8");
-  const parsed = JSON.parse(content) as Submission[];
-  return parsed.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  const rows = JSON.parse(content) as Submission[];
+  if (!Array.isArray(rows) || rows.length === 0) return;
+
+  const db = getAdminFirestore();
+  const chunks: Submission[][] = [];
+  for (let i = 0; i < rows.length; i += 200) chunks.push(rows.slice(i, i + 200));
+
+  for (const chunk of chunks) {
+    const batch = db.batch();
+    for (const row of chunk) {
+      const sid = String(row.submissionId ?? "").trim();
+      if (!sid) continue;
+      const normalized: Submission = {
+        ...row,
+        submissionId: sid,
+        organizationId: organizationId,
+      };
+      batch.set(col.doc(sid), normalized, { merge: true });
+    }
+    await batch.commit();
+  }
+}
+
+export async function getSubmissions(organizationId: string): Promise<Submission[]> {
+  noStore();
+  await backfillFromFileToFirestoreIfEmpty(organizationId);
+  const snap = await orgSubmissionsCol(organizationId).orderBy("submittedAt", "desc").get();
+  const rows = snap.docs.map((d) => d.data() as Submission);
+  return rows.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }
 
 export async function getSubmissionByIdInOrganization(
@@ -96,16 +143,27 @@ export async function findSubmissionAcrossOrganizations(
   submissionId: string,
 ): Promise<SubmissionWithOrganization | null> {
   noStore();
-  await migrateLegacyOrgLayoutOnce();
   const sid = (submissionId ?? "").trim();
   if (!sid) return null;
 
+  const db = getAdminFirestore();
+  const byId = await db
+    .collectionGroup("submissions")
+    .where(FieldPath.documentId(), "==", sid)
+    .limit(1)
+    .get();
+  if (!byId.empty) {
+    const doc = byId.docs[0]!;
+    const organizationId = doc.ref.parent.parent?.id ?? defaultOrganizationId();
+    return { submission: doc.data() as Submission, organizationId };
+  }
+
+  // 旧データ互換: ディスクのみ残っている場合のフォールバック
+  await migrateLegacyOrgLayoutOnce();
   const orgIds = await listOrganizationIdsOnDisk();
   for (const oid of orgIds) {
     const row = await getSubmissionByIdInOrganization(oid, sid);
-    if (row) {
-      return { submission: row, organizationId: oid };
-    }
+    if (row) return { submission: row, organizationId: oid };
   }
   return null;
 }
@@ -148,13 +206,11 @@ export async function deleteSubmissionByIdInOrganization(
   organizationId: string,
   submissionId: string,
 ): Promise<boolean> {
-  await ensureDataFile(organizationId);
-  const fp = organizationSubmissionsFilePath(organizationId);
-  const content = await fs.readFile(fp, "utf8");
-  const rows = JSON.parse(content) as Submission[];
-  const next = rows.filter((s) => s.submissionId !== submissionId);
-  if (next.length === rows.length) return false;
-  await writeJsonFileAtomic(fp, next);
+  const ref = orgSubmissionsCol(organizationId).doc(submissionId);
+  const snap = await ref.get();
+  if (!snap.exists) return false;
+  await ref.delete();
+  await syncSubmissionsFileMirrorFromFirestore(organizationId);
   return true;
 }
 
@@ -169,15 +225,18 @@ export async function updateSubmissionByIdInOrganization(
   submissionId: string,
   updater: (row: Submission) => Submission,
 ): Promise<Submission | null> {
-  await ensureDataFile(organizationId);
-  const fp = organizationSubmissionsFilePath(organizationId);
-  const content = await fs.readFile(fp, "utf8");
-  const rows = JSON.parse(content) as Submission[];
-  const idx = rows.findIndex((s) => s.submissionId === submissionId);
-  if (idx < 0) return null;
-  const next = updater(rows[idx]!);
-  rows[idx] = next;
-  await writeJsonFileAtomic(fp, rows);
+  const db = getAdminFirestore();
+  const ref = orgSubmissionsCol(organizationId).doc(submissionId);
+  const next = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const current = snap.data() as Submission;
+    const updated = updater(current);
+    tx.set(ref, updated, { merge: false });
+    return updated;
+  });
+  if (!next) return null;
+  await syncSubmissionsFileMirrorFromFirestore(organizationId);
   return next;
 }
 
@@ -224,8 +283,7 @@ export async function addSubmission(
       : {}),
   };
 
-  const current = await getSubmissions(organizationId);
-  current.unshift(submission);
-  await writeJsonFileAtomic(organizationSubmissionsFilePath(organizationId), current);
+  await orgSubmissionsCol(organizationId).doc(submission.submissionId).set(submission);
+  await syncSubmissionsFileMirrorFromFirestore(organizationId);
   return submission;
 }

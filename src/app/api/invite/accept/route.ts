@@ -36,37 +36,55 @@ export async function POST(request: Request) {
 
   const db = getAdminFirestore();
   const userRef = db.collection("users").doc(auth.uid);
-  const snap = await userRef.get();
-  if (!snap.exists) {
-    return NextResponse.json({ ok: false, message: "ユーザーが見つかりません。" }, { status: 404 });
-  }
+  const tx = await db.runTransaction(async (t) => {
+    const snap = await t.get(userRef);
+    if (!snap.exists) {
+      // Auth.onCreate より先に招待 API が呼ばれるケースを許容する（初回ログイン直後の競合対策）。
+      t.set(
+        userRef,
+        {
+          roles: [],
+          organizationId,
+          billing: {},
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      return { changed: true, organizationId };
+    }
 
-  const roles = normalizeRoles(snap.get("roles"));
-  if (isTeacherByRoles(roles)) {
-    return NextResponse.json({ ok: false, message: "教員アカウントには招待リンクを適用できません。" }, { status: 400 });
-  }
+    const roles = normalizeRoles(snap.get("roles"));
+    if (isTeacherByRoles(roles)) {
+      return { error: "教員アカウントには招待リンクを適用できません。", status: 400 as const };
+    }
 
-  const current = String(snap.get("organizationId") ?? "").trim();
-  if (current && current !== organizationId) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message:
-          "すでに別の organizationId が設定されています。移籍は管理者操作で変更してください。",
+    const current = String(snap.get("organizationId") ?? "").trim();
+    if (current && current !== organizationId) {
+      return {
+        error: "すでに別の organizationId が設定されています。移籍は管理者操作で変更してください。",
+        status: 409 as const,
         currentOrganizationId: current,
-      },
-      { status: 409 },
-    );
-  }
+      };
+    }
 
-  if (current !== organizationId) {
-    await userRef.set({ organizationId }, { merge: true });
+    if (current !== organizationId) {
+      t.set(userRef, { organizationId }, { merge: true });
+      return { changed: true, organizationId };
+    }
+    return { changed: false, organizationId };
+  });
+
+  if ("error" in tx) {
+    return NextResponse.json(
+      { ok: false, message: tx.error, currentOrganizationId: tx.currentOrganizationId ?? undefined },
+      { status: tx.status },
+    );
   }
 
   return NextResponse.json({
     ok: true,
-    organizationId,
-    changed: current !== organizationId,
+    organizationId: tx.organizationId,
+    changed: tx.changed,
   });
 }
 

@@ -3,6 +3,7 @@ import path from "path";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { organizationTaskProblemsDir } from "@/lib/org-data-layout";
+import { loadTaskProblemsMasterFromFirestore } from "@/lib/task-problems-firestore";
 import { parseTaskProblemsMaster, type TaskProblemsMaster } from "@/lib/task-problems-core";
 
 export function taskProblemsFilePath(organizationId: string, taskId: string): string {
@@ -17,6 +18,8 @@ export async function loadTaskProblemsMaster(
   noStore();
   const tid = taskId.trim();
   if (!tid) return null;
+  const fromFirestore = await loadTaskProblemsMasterFromFirestore(organizationId, tid);
+  if (fromFirestore) return fromFirestore;
   try {
     const buf = await fs.readFile(taskProblemsFilePath(organizationId, tid), "utf8");
     return parseTaskProblemsMaster(JSON.parse(buf) as unknown);

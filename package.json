@@ -23,7 +23,8 @@
     "firebase:deploy-functions:prod": "npx firebase-tools functions:artifacts:setpolicy --location us-central1 --days 1 --force && (npx firebase-tools functions:artifacts:setpolicy --location asia-northeast1 --days 1 --force || true) && CI=1 npx firebase-tools deploy --only functions --project production",
     "firebase:deploy-functions:debug": "npx firebase-tools functions:artifacts:setpolicy --location us-central1 --days 1 --force && (npx firebase-tools functions:artifacts:setpolicy --location asia-northeast1 --days 1 --force || true) && CI=1 npx firebase-tools deploy --only functions --debug",
     "firebase:functions:set-artifact-cleanup": "npx firebase-tools functions:artifacts:setpolicy --location us-central1 --days 1 --force",
-    "firebase:functions:opt-out-artifact-cleanup": "npx firebase-tools functions:artifacts:setpolicy --location us-central1 --none --force && (npx firebase-tools functions:artifacts:setpolicy --location asia-northeast1 --none --force || true)"
+    "firebase:functions:opt-out-artifact-cleanup": "npx firebase-tools functions:artifacts:setpolicy --location us-central1 --none --force && (npx firebase-tools functions:artifacts:setpolicy --location asia-northeast1 --none --force || true)",
+    "backup:submissions:csv": "node scripts/export-submissions-csv.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

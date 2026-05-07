@@ -42,7 +42,13 @@ export function OpsSubmissionDetailClient() {
         const res = await fetch(`/api/ops/submissions/${encodeURIComponent(submissionId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const json = (await res.json()) as Bundle;
+        const text = await res.text();
+        let json: Bundle = {};
+        try {
+          json = (text ? JSON.parse(text) : {}) as Bundle;
+        } catch {
+          json = { message: text || "読み込みに失敗しました。" };
+        }
         if (cancelled) return;
         if (!res.ok) {
           setErr((json as { message?: string }).message ?? "読み込みに失敗しました。");

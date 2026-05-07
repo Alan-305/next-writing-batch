@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { deleteTaskProblemsMasterFile } from "@/lib/load-task-problems-master";
 import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
+import { deleteTaskProblemsMasterFromFirestore } from "@/lib/task-problems-firestore";
 import { deleteTeacherProofreadingSetup } from "@/lib/teacher-proofreading-setup-store";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 
@@ -30,9 +31,13 @@ export async function DELETE(request: Request) {
   try {
     await migrateLegacyOrgLayoutOnce();
     const removedTaskProblems = await deleteTaskProblemsMasterFile(auth.organizationId, taskId);
+    const removedTaskProblemsFirestore = await deleteTaskProblemsMasterFromFirestore(
+      auth.organizationId,
+      taskId,
+    );
     const removedTeacherSetup = await deleteTeacherProofreadingSetup(auth.organizationId, taskId);
 
-    if (!removedTaskProblems && !removedTeacherSetup) {
+    if (!removedTaskProblems && !removedTaskProblemsFirestore && !removedTeacherSetup) {
       return NextResponse.json(
         {
           ok: false,
@@ -43,12 +48,16 @@ export async function DELETE(request: Request) {
     }
 
     const parts: string[] = [];
-    if (removedTaskProblems) parts.push("提出プルダウン用の課題マスタ");
+    if (removedTaskProblems || removedTaskProblemsFirestore) parts.push("提出プルダウン用の課題マスタ");
     if (removedTeacherSetup) parts.push("課題・添削設定の保存 JSON");
     return NextResponse.json({
       ok: true,
       message: `削除しました: ${parts.join("、")}。既存の提出データはそのまま残ります。`,
-      removed: { taskProblems: removedTaskProblems, teacherSetup: removedTeacherSetup },
+      removed: {
+        taskProblemsFile: removedTaskProblems,
+        taskProblemsFirestore: removedTaskProblemsFirestore,
+        teacherSetup: removedTeacherSetup,
+      },
     });
   } catch (e) {
     return NextResponse.json(

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
 import {
-  consumeProofreadTickets,
-  getTicketBalanceForUid,
+  consumeProofreadTicketsFromOrganization,
+  getTicketBalanceForOrganization,
 } from "@/lib/billing/proofread-ticket-firestore";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { estimateProofreadTicketCost } from "@/lib/proofread-ticket-cost";
 import { runProofreadBatch } from "@/lib/run-proofread-batch";
-import { getSubmissions } from "@/lib/submissions-store";
+import { getSubmissions, syncSubmissionsFileMirrorFromFirestore } from "@/lib/submissions-store";
 
 /** 1 件でも Gemini が遅いと 5 分を超えることがある。exec の TIMEOUT_MS（14 分）に近づける。 */
 export const maxDuration = 900;
@@ -81,13 +81,13 @@ export async function POST(request: Request) {
 
   const skipTicketGate = (process.env.NWB_SKIP_PROOFREAD_TICKET_GATE ?? "").trim() === "true";
   if (!skipTicketGate) {
-    const balance = await getTicketBalanceForUid(auth.uid);
+    const balance = await getTicketBalanceForOrganization(auth.organizationId);
     if (balance < ticketCost) {
       return NextResponse.json(
         {
           ok: false,
           code: "INSUFFICIENT_TICKETS",
-          message: `チケットが不足しています（必要: ${ticketCost} / 残り: ${balance}）。購入または管理者による調整が必要です。`,
+          message: `チケットが不足しています（必要: ${ticketCost} / テナント残り合計: ${balance}）。購入または管理者による調整が必要です。`,
           requiredTickets: ticketCost,
           balance,
         },
@@ -95,6 +95,9 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  // Day3 バッチはローカル submissions.json を読むため、実行直前に Firestore 正本から同期する。
+  await syncSubmissionsFileMirrorFromFirestore(auth.organizationId);
 
   const result = await runProofreadBatch({
     organizationId: auth.organizationId,
@@ -118,21 +121,28 @@ export async function POST(request: Request) {
   }
 
   let ticketsAfter: number | undefined;
+  let ticketConsumedFrom: Array<{ uid: string; amount: number }> | undefined;
   let ticketWarning: string | undefined;
   if (!skipTicketGate) {
-    const consumed = await consumeProofreadTickets(auth.uid, ticketCost);
+    const consumed = await consumeProofreadTicketsFromOrganization(
+      auth.organizationId,
+      ticketCost,
+      auth.uid,
+    );
     if (!consumed.ok) {
       ticketWarning =
         consumed.code === "INSUFFICIENT"
-          ? "添削は完了しましたが、チケット減算時に残高不足が検出されました（同時実行など）。管理者に billing を確認してください。"
-          : "添削は完了しましたがユーザードキュメントが見つかり、チケットを減算できませんでした。";
+          ? "添削は完了しましたが、減算時にテナント残高不足が検出されました（同時実行など）。管理者に billing を確認してください。"
+          : "添削は完了しましたが、減算対象ユーザーが見つからずチケットを減算できませんでした。";
       console.error("[run-proofread] ticket consume failed after successful batch", {
         uid: auth.uid,
+        organizationId: auth.organizationId,
         ticketCost,
         code: consumed.code,
       });
     } else {
-      ticketsAfter = consumed.tickets;
+      ticketsAfter = consumed.remainingTotal;
+      ticketConsumedFrom = consumed.consumedFrom;
     }
   }
 
@@ -142,6 +152,7 @@ export async function POST(request: Request) {
     durationMs: result.durationMs,
     ticketsConsumed: skipTicketGate ? 0 : ticketCost,
     ticketsRemaining: ticketsAfter,
+    ticketConsumedFrom,
     ticketWarning,
     stdout: result.stdout,
     stderr: result.stderr,

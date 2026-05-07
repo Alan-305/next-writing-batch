@@ -5,6 +5,7 @@ import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
 import { taskProblemsFilePath } from "@/lib/load-task-problems-master";
 import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
 import type { ProofreadingSetupJson } from "@/lib/proofreading-setup-json";
+import { upsertTaskProblemsMasterToFirestore } from "@/lib/task-problems-firestore";
 
 /** 教員「サーバーに保存」と同期する課題マスタの単一設問 ID（添削バッチの解決と一致させる） */
 export const TEACHER_SYNC_DEFAULT_PROBLEM_ID = "default";
@@ -59,4 +60,5 @@ export async function syncTaskProblemsFromProofreadingSetup(
   const fp = taskProblemsFilePath(organizationId, tid);
   await fs.mkdir(path.dirname(fp), { recursive: true });
   await writeJsonFileAtomic(fp, payload);
+  await upsertTaskProblemsMasterToFirestore(organizationId, payload);
 }

@@ -1,5 +1,5 @@
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
-import { resolveOrganizationIdForUid } from "@/lib/firebase/admin-firestore";
+import { describeOrganizationIdForUid, getAdminFirestore, resolveOrganizationIdForUid } from "@/lib/firebase/admin-firestore";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
 /** HttpOnly Cookie 名（管理者が API 解決で「代理」するテナント） */
@@ -29,6 +29,49 @@ export function getAdminActingOrganizationIdFromRequest(request: Request): strin
   return s || null;
 }
 
+function normalizeRoles(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((r): r is string => typeof r === "string").map((r) => r.trim().toLowerCase());
+}
+
+function isTeacherByRoles(roles: string[]): boolean {
+  return roles.includes("teacher") || roles.includes("admin");
+}
+
+function teacherOrgFromUid(uid: string): string {
+  const candidate = sanitizeOrganizationIdForPath(`org_${uid}`)?.toLowerCase();
+  if (candidate) return candidate;
+  return "org_default";
+}
+
+async function ensureTeacherOrganizationId(uid: string): Promise<string> {
+  const db = getAdminFirestore();
+  const userRef = db.collection("users").doc(uid);
+  const generated = teacherOrgFromUid(uid);
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) {
+      tx.set(
+        userRef,
+        {
+          roles: ["teacher"],
+          organizationId: generated,
+          billing: {},
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+      return;
+    }
+    const current = String(snap.get("organizationId") ?? "").trim();
+    if (current) return;
+    tx.set(userRef, { organizationId: generated }, { merge: true });
+  });
+
+  return generated;
+}
+
 /**
  * API 用の組織 ID。管理者 allowlist かつ代理 Cookie があればそれを優先し、それ以外は Firestore の users/{uid}.organizationId。
  */
@@ -36,6 +79,24 @@ export async function resolveEffectiveOrganizationIdForApi(uid: string, request:
   if (isAllowlistedAdminUid(uid)) {
     const acting = getAdminActingOrganizationIdFromRequest(request);
     if (acting) return acting;
+    const resolved = await describeOrganizationIdForUid(uid);
+    if (!resolved.usedFallback) return resolved.resolvedOrganizationId;
+    return ensureTeacherOrganizationId(uid);
   }
+
+  const resolved = await describeOrganizationIdForUid(uid);
+  if (!resolved.usedFallback) return resolved.resolvedOrganizationId;
+
+  try {
+    const snap = await getAdminFirestore().collection("users").doc(uid).get();
+    if (!snap.exists) return resolveOrganizationIdForUid(uid);
+    const roles = normalizeRoles(snap.get("roles"));
+    if (isTeacherByRoles(roles)) {
+      return ensureTeacherOrganizationId(uid);
+    }
+  } catch {
+    // 読み取り失敗時は従来どおり fallback（default）を返す。
+  }
+
   return resolveOrganizationIdForUid(uid);
 }

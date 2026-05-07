@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { getSubmissions } from "@/lib/submissions-store";
 import { runDay4Batch } from "@/lib/run-day4-batch";
+import { syncSubmissionsFileMirrorFromFirestore } from "@/lib/submissions-store";
 
 /** Day4 は TTS / PDF 生成で時間がかかることがある（batch 側タイムアウトに合わせ長め） */
 export const maxDuration = 900;
@@ -45,6 +46,9 @@ export async function POST(request: Request) {
       );
     }
   }
+
+  // Day4 バッチもローカル submissions.json を読むため、実行直前に Firestore 正本から同期する。
+  await syncSubmissionsFileMirrorFromFirestore(auth.organizationId);
 
   const result = await runDay4Batch({
     organizationId: auth.organizationId,

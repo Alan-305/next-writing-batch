@@ -96,7 +96,8 @@ export async function GET(request: Request) {
     const rows: TicketRow[] = snap.docs.map((doc) => {
       const uid = doc.id;
       const roles = normalizeRoles(doc.get("roles"));
-      const kind: "teacher" | "student" = isTeacherByRoles(roles) ? "teacher" : "student";
+      const isTeacherLike = uid === auth.uid || isAllowlistedAdminUid(uid) || isTeacherByRoles(roles);
+      const kind: "teacher" | "student" = isTeacherLike ? "teacher" : "student";
       const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
       const tickets = Math.max(0, Math.floor(numberOrZero(billing["tickets"])));
       const lastConsumeRaw = billing["lastProofreadTicketConsume"];

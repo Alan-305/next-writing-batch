@@ -71,6 +71,7 @@ export default function OpsTicketsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const currentUid = getFirebaseAuth()?.currentUser?.uid ?? "";
 
   const selectedPlanInfo = useMemo(
     () => PLAN_OPTIONS.find((item) => item.plan === selectedPlan) ?? PLAN_OPTIONS[0],
@@ -90,6 +91,8 @@ export default function OpsTicketsPage() {
   const inviteQrUrl = inviteUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
     : "";
+  const tenantLabel = (data?.organizationId ?? "").trim() || "default";
+  const selectableStudents = (data?.students ?? []).filter((s) => s.uid !== currentUid);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -337,14 +340,17 @@ export default function OpsTicketsPage() {
         <p className="muted admin-tenant-roster-lead">
           同一テナントの生徒にのみ配布できます。配布した分は教員の残チケットから減算されます。
         </p>
+        <p className="muted" style={{ marginTop: 0 }}>
+          現在の配布テナント: <code>{tenantLabel}</code>
+        </p>
         <form onSubmit={(e) => void handleGrant(e)}>
           <div className="field">
             <span>配布先（生徒）</span>
             <select value={targetUid} onChange={(e) => setTargetUid(e.target.value)} disabled={grantBusy}>
               <option value="">選択してください</option>
-              {(data?.students ?? []).map((s) => (
+              {selectableStudents.map((s) => (
                 <option key={s.uid} value={s.uid}>
-                  {s.displayLabel}（残り {s.tickets}）
+                  {s.displayLabel}（org: {tenantLabel} / 残り {s.tickets}）
                 </option>
               ))}
             </select>
