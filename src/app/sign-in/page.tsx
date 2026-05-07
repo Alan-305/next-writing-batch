@@ -9,7 +9,7 @@ import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebas
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
-import { useFirebaseEmulators } from "@/lib/firebase/config";
+import { readFirebaseWebConfig, useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { resetRedirectResultCacheForNewFlow } from "@/lib/firebase/redirect-result-once";
 
@@ -28,11 +28,14 @@ function SignInInner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string>("");
+  const [firebaseAuthDomain, setFirebaseAuthDomain] = useState<string>("");
   const [inviteApplying, setInviteApplying] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
 
   useEffect(() => {
     setOrigin(typeof window !== "undefined" ? window.location.origin : "");
+    const cfg = readFirebaseWebConfig();
+    setFirebaseAuthDomain(cfg?.authDomain ?? "");
   }, []);
 
   /** リダイレクト後に getRedirectResult が失敗したとき Provider が sessionStorage に残す */
@@ -232,6 +235,22 @@ function SignInInner() {
             <p style={{ marginBottom: 0 }}>
               <code>{origin}</code>
             </p>
+            {firebaseAuthDomain ? (
+              <>
+                <p className="muted" style={{ marginTop: 12, marginBottom: 8 }}>
+                  次の値は、このアプリが Firebase SDK に渡している <code>authDomain</code> です（<code>NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN</code>{" "}
+                  未設定なら <code>{`{projectId}.firebaseapp.com`}</code> になります）。
+                </p>
+                <p style={{ marginTop: 0, marginBottom: 0 }}>
+                  <code>{firebaseAuthDomain}</code>
+                </p>
+                <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
+                  Google Cloud → 認証情報 → OAuth 2.0 クライアント（Web）の <strong>承認済みリダイレクト URI</strong> は通常{" "}
+                  <code>{`https://${firebaseAuthDomain}/__/auth/handler`}</code> です（この値がズレると、Google から戻っても{" "}
+                  <code>getRedirectResult</code> が空になることがあります）。
+                </p>
+              </>
+            ) : null}
             <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
               Cloud Run 運用では、今のホスト（例: <code>...run.app</code> / 独自ドメイン）を Firebase
               の承認済みドメインへ追加してください。ローカル検証時のみ <code>localhost</code> や <code>127.0.0.1</code>{" "}
