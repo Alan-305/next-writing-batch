@@ -1,6 +1,5 @@
 {
   "projects": {
-    "default": "nexus0101-35b17",
-    "production": "nexus0301"
+    "default": "nexus0101-35b17"
   }
 }

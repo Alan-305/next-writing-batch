@@ -5,6 +5,7 @@ import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "fireb
 import { onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
+import { callWelcomeEmailRetry } from "@/lib/auth/welcome-email-retry";
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import {
   readFirebaseWebConfig,
@@ -174,6 +175,7 @@ export function FirebaseAuthProvider({
               data.organizationId === undefined || data.organizationId === null
                 ? null
                 : String(data.organizationId),
+            welcomeEmailSentAt: data.welcomeEmailSentAt,
           });
         }
         setProfileLoading(false);
@@ -212,6 +214,29 @@ export function FirebaseAuthProvider({
       unsubEnt();
     };
   }, [configured, user]);
+
+  useEffect(() => {
+    if (!configured || profileLoading || !user?.uid || !user.email || !profile) return;
+    if (profile.welcomeEmailSentAt != null) return;
+    if (typeof window === "undefined") return;
+
+    const sk = `nwb_welcome_retry:${user.uid}`;
+    const state = sessionStorage.getItem(sk);
+    if (state === "done" || state === "pending") return;
+    sessionStorage.setItem(sk, "pending");
+
+    const timer = window.setTimeout(() => {
+      sessionStorage.setItem(sk, "done");
+      void callWelcomeEmailRetry().catch(() => {});
+    }, 12000);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (sessionStorage.getItem(sk) === "pending") {
+        sessionStorage.removeItem(sk);
+      }
+    };
+  }, [configured, profileLoading, user?.uid, user?.email, profile]);
 
   const signOutUser = useCallback(async () => {
     const auth = getFirebaseAuth();

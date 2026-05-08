@@ -2,13 +2,18 @@ import { FieldValue } from "firebase-admin/firestore";
 
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import type { Submission } from "@/lib/submissions-store";
+
+export type TicketConsumeReason = "day4_finalize" | "legacy_proofread_label";
 
 /**
- * 添削バッチ成功後にチケットを減算する（憲法: Webhook 以外のサーバー更新はここに限定）。
+ * 単一 UID の `billing.tickets` を減算する。
+ * Day4 確定時は `day4_finalize` を指定し、証跡フィールドを lastDay4Finalize* に記録する。
  */
 export async function consumeProofreadTickets(
   uid: string,
   count: number,
+  reason: TicketConsumeReason = "legacy_proofread_label",
 ): Promise<{ ok: true; tickets: number } | { ok: false; code: "INSUFFICIENT" | "NO_USER" }> {
   const u = (uid ?? "").trim();
   const c = Math.floor(Number(count));
@@ -34,14 +39,24 @@ export async function consumeProofreadTickets(
         throw new Error("INSUFFICIENT");
       }
       resultTickets = Math.max(0, current - c);
+      const nextBilling =
+        reason === "day4_finalize"
+          ? {
+              ...existingBilling,
+              tickets: resultTickets,
+              lastDay4FinalizeTicketConsume: c,
+              lastDay4FinalizeTicketAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            }
+          : {
+              ...existingBilling,
+              tickets: resultTickets,
+              lastProofreadTicketConsume: c,
+              lastProofreadTicketAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            };
       tx.update(userRef, {
-        billing: {
-          ...existingBilling,
-          tickets: resultTickets,
-          lastProofreadTicketConsume: c,
-          lastProofreadTicketAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
+        billing: nextBilling,
       });
       tx.set(
         entRef,
@@ -72,6 +87,39 @@ export async function getTicketBalanceForUid(uid: string): Promise<number> {
   return typeof t === "number" && Number.isFinite(t) ? Math.max(0, Math.floor(t)) : 0;
 }
 
+/**
+ * Day3 添削を実行する前に、対象各行の提出者 UID ごとに残チケットが足りるかだけ検査する（減算はしない）。
+ * 教員の残高は見ない。未ログイン提出（submittedByUid なし）は不可。
+ */
+export async function assertStudentsHaveTicketsForProofreadRows(
+  rows: Submission[],
+): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const counts = new Map<string, number>();
+  for (const s of rows) {
+    const uid = String(s.submittedByUid ?? "").trim();
+    if (!uid) {
+      return {
+        ok: false,
+        code: "SUBMITTER_UID_REQUIRED",
+        message:
+          "添削対象に、ログイン提出でない行があります。生徒アカウントにチケットを配布し、ログインして提出したものだけ添削できます。",
+      };
+    }
+    counts.set(uid, (counts.get(uid) ?? 0) + 1);
+  }
+  for (const [uid, need] of counts) {
+    const bal = await getTicketBalanceForUid(uid);
+    if (bal < need) {
+      return {
+        ok: false,
+        code: "INSUFFICIENT_STUDENT_TICKETS",
+        message: `生徒のチケットが不足しています（1 提出あたり必要枚数: ${need} / 対象 uid の残り: ${bal}）。教員から該当生徒へチケットを配布してください。`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 export async function getTicketBalanceForOrganization(organizationId: string): Promise<number> {
   const oid = (organizationId ?? "").trim();
   if (!oid) return 0;
@@ -90,18 +138,34 @@ type OrgConsumeResult =
   | { ok: true; remainingTotal: number; consumedTotal: number; consumedFrom: Array<{ uid: string; amount: number }> }
   | { ok: false; code: "INSUFFICIENT" | "NO_MEMBER" };
 
+export type ProofreadOrgConsumeOptions = {
+  /**
+   * 先にチケットを使う UID（例: 該当提出の `submittedByUid`）。
+   * 共有プールのうち「提出した生徒」から減らしたいときに指定する。
+   */
+  prioritizeUids?: string[];
+  /**
+   * 最後に回す UID（例: 添削ボタンを押した教員）。テナント内に他メンバーの残チケットがある間は減らない。
+   */
+  deprioritizeUid?: string;
+};
+
 /**
  * 同一 organizationId のユーザー全体を共有プールとして減算する。
- * まず preferredUid を優先し、足りない分を同一テナントの他ユーザーから順に減算する。
+ * - prioritizeUids にあるメンバーを先に、deprioritizeUid（運用者）は最後に消費する。
+ * - 未指定時は残高が多い順（従来の安定ソート）。
  */
 export async function consumeProofreadTicketsFromOrganization(
   organizationId: string,
   count: number,
-  preferredUid?: string,
+  options?: ProofreadOrgConsumeOptions,
 ): Promise<OrgConsumeResult> {
   const oid = (organizationId ?? "").trim();
   const c = Math.floor(Number(count));
-  const preferred = (preferredUid ?? "").trim();
+  const dep = String(options?.deprioritizeUid ?? "").trim();
+  const rawPri = (options?.prioritizeUids ?? []).map((u) => String(u ?? "").trim()).filter(Boolean);
+  const prioritizeSet = new Set(rawPri.filter((u) => u !== dep));
+
   if (!oid || !Number.isFinite(c) || c <= 0) {
     return { ok: true, remainingTotal: 0, consumedTotal: 0, consumedFrom: [] };
   }
@@ -110,20 +174,26 @@ export async function consumeProofreadTicketsFromOrganization(
   const userSnap = await db.collection("users").where("organizationId", "==", oid).get();
   if (userSnap.empty) return { ok: false, code: "NO_MEMBER" };
 
-  type Row = { uid: string; current: number; billing: Record<string, unknown> };
+  type Row = { uid: string; current: number; billing: Record<string, unknown>; tier: number };
+  const tierFor = (uid: string): number => {
+    if (dep && uid === dep) return 2;
+    if (prioritizeSet.has(uid)) return 0;
+    return 1;
+  };
+
   const rows: Row[] = userSnap.docs.map((doc) => {
     const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
     const t = billing["tickets"];
     const current = typeof t === "number" && Number.isFinite(t) ? Math.max(0, Math.floor(t)) : 0;
-    return { uid: doc.id, current, billing };
+    const uid = doc.id;
+    return { uid, current, billing, tier: tierFor(uid) };
   });
 
   const total = rows.reduce((acc, r) => acc + r.current, 0);
   if (total < c) return { ok: false, code: "INSUFFICIENT" };
 
   const prioritized = [...rows].sort((a, b) => {
-    if (a.uid === preferred && b.uid !== preferred) return -1;
-    if (b.uid === preferred && a.uid !== preferred) return 1;
+    if (a.tier !== b.tier) return a.tier - b.tier;
     return b.current - a.current;
   });
 

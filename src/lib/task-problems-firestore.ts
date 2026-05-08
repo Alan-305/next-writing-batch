@@ -1,5 +1,14 @@
+import path from "path";
+
+import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import { organizationTaskProblemsDir } from "@/lib/org-data-layout";
 import { parseTaskProblemsMaster, type TaskProblemsMaster } from "@/lib/task-problems-core";
+
+function taskProblemsMirrorFilePath(organizationId: string, taskId: string): string {
+  const safe = (taskId ?? "").replace(/[^a-zA-Z0-9._-]/g, "_") || "unknown";
+  return path.join(organizationTaskProblemsDir(organizationId), `${safe}.json`);
+}
 
 function col(organizationId: string) {
   return getAdminFirestore().collection("organizations").doc(organizationId).collection("taskProblems");
@@ -58,4 +67,33 @@ export async function deleteTaskProblemsMasterFromFirestore(
   if (!snap.exists) return false;
   await ref.delete();
   return true;
+}
+
+/**
+ * Day3/Day4 バッチは `data/orgs/{org}/task-problems/{taskId}.json` のみ参照する。
+ * Cloud Run でインスタンス間にディスクが共有されないため、バッチ実行直前に Firestore 正から同期する。
+ */
+export async function syncTaskProblemsFileMirrorFromFirestore(
+  organizationId: string,
+): Promise<number> {
+  const orgId = (organizationId ?? "").trim();
+  if (!orgId) return 0;
+  const snap = await col(orgId).get();
+  let written = 0;
+  for (const doc of snap.docs) {
+    const master = doc.get("master") as unknown;
+    if (
+      master === undefined ||
+      master === null ||
+      typeof master !== "object" ||
+      Array.isArray(master)
+    ) {
+      continue;
+    }
+    const tid = String(doc.get("taskId") ?? doc.id ?? "").trim();
+    if (!tid) continue;
+    await writeJsonFileAtomic(taskProblemsMirrorFilePath(orgId, tid), master);
+    written++;
+  }
+  return written;
 }

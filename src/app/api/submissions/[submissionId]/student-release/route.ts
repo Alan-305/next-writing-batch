@@ -92,37 +92,67 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
-  const updated = await updateSubmissionById(sid, (row) => ({
-    ...row,
-    studentRelease: release,
-  }));
+  let updated: Awaited<ReturnType<typeof updateSubmissionById>>;
+  try {
+    updated = await updateSubmissionById(sid, (row) => ({
+      ...row,
+      studentRelease: release,
+    }));
+  } catch (e) {
+    console.error("[student-release] updateSubmissionById", e);
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "SAVE_FAILED",
+        message:
+          e instanceof Error
+            ? e.message
+            : "提出の保存に失敗しました（サーバー側のストレージエラーなど）。",
+      },
+      { status: 500 },
+    );
+  }
 
-  if (updated) {
+  if (!updated) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "SAVE_FAILED",
+        message:
+          "提出の保存に失敗しました（ドキュメントが見つからない、または同時更新と競合した可能性があります）。",
+      },
+      { status: 409 },
+    );
+  }
+
+  try {
     await persistTaskRubricDefaultScores(orgId, submission.taskId, master, release.scores);
+  } catch (e) {
+    console.warn("[student-release] persistTaskRubricDefaultScores failed (submission already saved):", e);
+  }
 
-    const prevFinalizedAt = String(submission.studentRelease?.operatorFinalizedAt ?? "").trim();
-    const nextFinalizedAt = String(release.operatorFinalizedAt ?? "").trim();
-    const finalizedNow = Boolean(nextFinalizedAt) && nextFinalizedAt !== prevFinalizedAt;
-    if (finalizedNow) {
-      const sections = splitExplanationIntoContentGrammarSections(release.explanation || "");
-      const analysisOk = await postAnalysisPhase1ToAppsScript({
-        taskId: submission.taskId,
-        submissionId: sid,
-        problemMemo: (submission.problemMemo ?? "").trim(),
-        evaluation: release.evaluation,
-        explanationContent: sections.contentComment,
-        explanationGrammar: sections.grammarComment,
-        contentDeduction: release.contentDeduction,
-        grammarDeduction: release.grammarDeduction,
-        scoreTotal: release.scoreTotal,
-        wordCount: countEnglishWords(release.finalText || ""),
-        source: "ops",
-      });
-      if (!analysisOk) {
-        console.warn("[student-release] analysis_phase1 post failed:", sid);
-      }
+  const prevFinalizedAt = String(submission.studentRelease?.operatorFinalizedAt ?? "").trim();
+  const nextFinalizedAt = String(release.operatorFinalizedAt ?? "").trim();
+  const finalizedNow = Boolean(nextFinalizedAt) && nextFinalizedAt !== prevFinalizedAt;
+  if (finalizedNow) {
+    const sections = splitExplanationIntoContentGrammarSections(release.explanation || "");
+    const analysisOk = await postAnalysisPhase1ToAppsScript({
+      taskId: submission.taskId,
+      submissionId: sid,
+      problemMemo: (submission.problemMemo ?? "").trim(),
+      evaluation: release.evaluation,
+      explanationContent: sections.contentComment,
+      explanationGrammar: sections.grammarComment,
+      contentDeduction: release.contentDeduction,
+      grammarDeduction: release.grammarDeduction,
+      scoreTotal: release.scoreTotal,
+      wordCount: countEnglishWords(release.finalText || ""),
+      source: "ops",
+    });
+    if (!analysisOk) {
+      console.warn("[student-release] analysis_phase1 post failed:", sid);
     }
   }
 
-  return NextResponse.json({ ok: true, studentRelease: updated?.studentRelease ?? release });
+  return NextResponse.json({ ok: true, studentRelease: updated.studentRelease ?? release });
 }

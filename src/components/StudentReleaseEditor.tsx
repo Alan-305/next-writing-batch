@@ -54,6 +54,36 @@ function clampInt(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
+/** HTML エラーページ等で `res.json()` が投げるのを防ぐ */
+async function parseFetchJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    const head = text.slice(0, 180).replace(/\s+/g, " ").trim();
+    throw new Error(
+      `HTTP ${res.status}（JSON 以外: ${head}${text.length > 180 ? "…" : ""}）。タイムアウトやプロキシ障害の可能性があります。`,
+    );
+  }
+}
+
+/** 502 などで本文が空のときも HTTP ステータスを出す */
+function pickApiErrorMessage(json: unknown, res: Response, fallback: string): string {
+  if (json && typeof json === "object") {
+    const o = json as Record<string, unknown>;
+    const msg = o.message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+    const err = o.error;
+    if (typeof err === "string" && err.trim()) return err.trim();
+    const code = o.code;
+    if (typeof code === "string" && code.trim())
+      return `${fallback}（${code.trim()} / HTTP ${res.status}）`;
+  }
+  const st = res.statusText?.trim();
+  return st ? `${fallback}（HTTP ${res.status} ${st}）` : `${fallback}（HTTP ${res.status}）`;
+}
+
 function findRubricItem(master: TaskProblemsMaster, kind: "content" | "grammar") {
   if (kind === "content") {
     return master.rubric.items.find((it) => it.id === "content") ?? master.rubric.items.find((it) => /内容/.test(it.label));
@@ -277,12 +307,18 @@ export function StudentReleaseEditor({
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify(body),
       });
-      const json = await res.json();
+      const json = (await parseFetchJson(res)) as {
+        ok?: boolean;
+        message?: string;
+        fields?: Record<string, string>;
+      };
       if (!res.ok) {
         const fields = json?.fields as Record<string, string> | undefined;
-        setError(json?.message ?? "保存に失敗しました。");
+        const baseMsg = pickApiErrorMessage(json, res, "保存に失敗しました。");
         if (fields && Object.keys(fields).length > 0) {
-          setError(`${json?.message ?? ""} ${Object.values(fields).join(" ")}`.trim());
+          setError(`${baseMsg} ${Object.values(fields).join(" ")}`.trim());
+        } else {
+          setError(baseMsg);
         }
         return;
       }
@@ -295,14 +331,25 @@ export function StudentReleaseEditor({
             taskId,
             submissionId,
             force: Boolean(opts.day4Force),
+            chargeStudentTicket: true,
           }),
         });
-        const d4json = await d4.json();
+        const d4json = (await parseFetchJson(d4)) as {
+          ok?: boolean;
+          message?: string;
+          ticketChargeWarning?: string;
+        };
         if (!d4.ok) {
+          const d4detail = pickApiErrorMessage(d4json, d4, "Day4 の生成に失敗しました");
           setError(
-            `運用は確定しましたが、Day4 の生成に失敗しました: ${d4json?.message ?? d4.statusText}。` +
+            `運用は確定しましたが、Day4 の生成に失敗しました: ${d4detail}。` +
               ` ターミナルから batch/run_day4_tts_qr_pdf.py を実行することもできます。`,
           );
+          window.location.reload();
+          return;
+        }
+        if (typeof d4json?.ticketChargeWarning === "string" && d4json.ticketChargeWarning.trim()) {
+          setError(String(d4json.ticketChargeWarning));
           window.location.reload();
           return;
         }
@@ -310,8 +357,10 @@ export function StudentReleaseEditor({
 
       setMessage(opts.successMessage);
       window.location.reload();
-    } catch {
-      setError("通信エラーが発生しました。");
+    } catch (e) {
+      console.error("[StudentReleaseEditor] patchRelease", e);
+      const detail = e instanceof Error ? e.message : String(e);
+      setError(`処理に失敗しました: ${detail}`);
     } finally {
       setBusy(false);
     }

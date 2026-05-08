@@ -34,12 +34,15 @@ async function postRunProofread(
   });
   const json = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
+    code?: string;
     message?: string;
     stderr?: string;
     stdout?: string;
   };
   if (!res.ok) {
-    let msg = json?.message ?? "添削の実行に失敗しました。";
+    const hint =
+      typeof json.code === "string" && json.code.trim() ? `【${json.code.trim()}】` : "";
+    let msg = (hint ? `${hint} ` : "") + (json?.message ?? "添削の実行に失敗しました。");
     const errTail = (json.stderr ?? "").trim();
     if (errTail) {
       const short = errTail.length > 1500 ? `${errTail.slice(0, 1500)}…` : errTail;

@@ -1,3 +1,5 @@
+import { FieldValue } from "firebase-admin/firestore";
+
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
 import { describeOrganizationIdForUid, getAdminFirestore, resolveOrganizationIdForUid } from "@/lib/firebase/admin-firestore";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
@@ -66,7 +68,11 @@ async function ensureTeacherOrganizationId(uid: string): Promise<string> {
     }
     const current = String(snap.get("organizationId") ?? "").trim();
     if (current) return;
-    tx.set(userRef, { organizationId: generated }, { merge: true });
+    tx.set(
+      userRef,
+      { organizationId: generated, roles: FieldValue.arrayUnion("teacher") },
+      { merge: true },
+    );
   });
 
   return generated;

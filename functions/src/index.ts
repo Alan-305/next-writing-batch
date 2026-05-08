@@ -527,6 +527,58 @@ async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Pr
   logger.info("ウェルカムメール送信済み", { uid });
 }
 
+/**
+ * ログイン済みユーザー本人がウェルカムメール送信を再試行する。
+ * onCreate 時に RESEND が無かった場合でも、Functions に設定後や Resend のドメイン検証後に届けられるようにする。
+ */
+export const welcomeEmailRetry = functions.https.onCall(async (_data: unknown, context) => {
+  if (!context.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "ログインが必要です。");
+  }
+
+  const uid = context.auth.uid;
+  let email = "";
+  const tokenEmail = context.auth.token?.email as string | undefined;
+  if (typeof tokenEmail === "string" && tokenEmail.trim()) {
+    email = tokenEmail.trim();
+  } else {
+    try {
+      const rec = await admin.auth().getUser(uid);
+      email = (rec.email ?? "").trim();
+    } catch (e) {
+      logger.warn("welcomeEmailRetry: Auth ユーザー取得に失敗", { uid, e });
+    }
+  }
+
+  if (!email) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "メールアドレスが取得できません。Google ログインのメールを確認してください。",
+    );
+  }
+
+  const userRef = db.doc(`users/${uid}`);
+  const snap = await userRef.get();
+  if (!snap.exists) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "ユーザープロフィールがまだありません。数秒後にもう一度お試しください。",
+    );
+  }
+  if (snap.get("welcomeEmailSentAt") != null) {
+    return { ok: true as const, skipped: "already_sent" as const };
+  }
+
+  await maybeSendWelcomeEmail(uid, email);
+
+  const after = await userRef.get();
+  const sent = after.get("welcomeEmailSentAt") != null;
+  if (sent) {
+    return { ok: true as const, sent: true as const };
+  }
+  return { ok: true as const, sent: false as const, reason: "skipped_or_resend_failed" as const };
+});
+
 function paymentIntentIdFromSession(session: {
   payment_intent?: string | { id?: string } | null;
 }): string | null {

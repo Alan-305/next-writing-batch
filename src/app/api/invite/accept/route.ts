@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { FieldValue } from "firebase-admin/firestore";
+
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
       t.set(
         userRef,
         {
-          roles: [],
+          roles: FieldValue.arrayUnion("student"),
           organizationId,
           billing: {},
           createdAt: new Date().toISOString(),
@@ -68,9 +70,14 @@ export async function POST(request: Request) {
     }
 
     if (current !== organizationId) {
-      t.set(userRef, { organizationId }, { merge: true });
+      t.set(
+        userRef,
+        { organizationId, roles: FieldValue.arrayUnion("student") },
+        { merge: true },
+      );
       return { changed: true, organizationId };
     }
+    t.set(userRef, { roles: FieldValue.arrayUnion("student") }, { merge: true });
     return { changed: false, organizationId };
   });
 

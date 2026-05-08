@@ -134,10 +134,19 @@ export function OpsSubmissionDetailBody({
         ) : null}
         {submission.studentRelease?.operatorFinalizedAt &&
         !submission.studentRelease?.operatorApprovedAt ? (
-          <p style={{ marginTop: 0, marginBottom: 12, color: "#a16207" }}>
-            運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
-            ）— Day4 用の文面が固定されています。PDF ができたら「生徒に公開する」が押せます。
-          </p>
+          day4Error ? (
+            <p style={{ marginTop: 0, marginBottom: 12, color: "#b45309" }}>
+              運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
+              ）— 文面は固定済みですが、<strong>下の「成果物（Day4）」でエラー</strong>のため PDF
+              がありません。公開には Day4 の成功が必要です。「確定（Day4
+              生成）」の再実行やログ確認後に失敗分のみ再実行してください。
+            </p>
+          ) : (
+            <p style={{ marginTop: 0, marginBottom: 12, color: "#a16207" }}>
+              運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
+              ）— Day4 用の文面が固定されています。PDF ができたら「生徒に公開する」が押せます。
+            </p>
+          )
         ) : null}
         {master ? (
           <StudentReleaseEditor

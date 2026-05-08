@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 
 import {
-  consumeProofreadTicketsFromOrganization,
-  getTicketBalanceForOrganization,
+  assertStudentsHaveTicketsForProofreadRows,
 } from "@/lib/billing/proofread-ticket-firestore";
+import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
-import { estimateProofreadTicketCost } from "@/lib/proofread-ticket-cost";
+import { classifyProofreadBatchFailure } from "@/lib/proofread-batch-error-code";
+import { estimateProofreadTicketCost, listSubmissionsForProofreadTicketScope } from "@/lib/proofread-ticket-cost";
 import { runProofreadBatch } from "@/lib/run-proofread-batch";
-import { getSubmissions, syncSubmissionsFileMirrorFromFirestore } from "@/lib/submissions-store";
+import { getSubmissions, syncSubmissionsDiskMirrorToFirestore, syncSubmissionsFileMirrorFromFirestore } from "@/lib/submissions-store";
+import { syncTaskProblemsFileMirrorFromFirestore } from "@/lib/task-problems-firestore";
 
 /** 1 件でも Gemini が遅いと 5 分を超えることがある。exec の TIMEOUT_MS（14 分）に近づける。 */
 export const maxDuration = 900;
@@ -59,15 +61,18 @@ export async function POST(request: Request) {
       ? 0
       : Math.min(500, Math.max(0, Math.floor(Number(body.limit))));
 
-  const ticketCost = estimateProofreadTicketCost({
+  const scope = {
     submissions,
     taskId,
     submissionIds: submissionIds.length ? submissionIds : undefined,
     retryFailed: Boolean(body.retryFailed),
     limit,
-  });
+  };
 
-  if (ticketCost <= 0) {
+  const targetRowCount = estimateProofreadTicketCost(scope);
+  const targetRows = listSubmissionsForProofreadTicketScope(scope);
+
+  if (targetRowCount <= 0) {
     return NextResponse.json(
       {
         ok: false,
@@ -79,25 +84,34 @@ export async function POST(request: Request) {
     );
   }
 
+  /** ローカル試験用。true 時は生徒チケット検査もスキップ */
   const skipTicketGate = (process.env.NWB_SKIP_PROOFREAD_TICKET_GATE ?? "").trim() === "true";
   if (!skipTicketGate) {
-    const balance = await getTicketBalanceForOrganization(auth.organizationId);
-    if (balance < ticketCost) {
+    const canStart = await assertStudentsHaveTicketsForProofreadRows(targetRows);
+    if (!canStart.ok) {
       return NextResponse.json(
-        {
-          ok: false,
-          code: "INSUFFICIENT_TICKETS",
-          message: `チケットが不足しています（必要: ${ticketCost} / テナント残り合計: ${balance}）。購入または管理者による調整が必要です。`,
-          requiredTickets: ticketCost,
-          balance,
-        },
-        { status: 402 },
+        { ok: false, code: canStart.code, message: canStart.message },
+        { status: canStart.code === "INSUFFICIENT_STUDENT_TICKETS" ? 402 : 422 },
       );
     }
   }
 
-  // Day3 バッチはローカル submissions.json を読むため、実行直前に Firestore 正本から同期する。
+  const anthropic = (resolveEffectiveAnthropicApiKey() ?? "").trim();
+  if (!anthropic) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "ANTHROPIC_API_KEY_MISSING",
+        message:
+          "Claude API キーがありません。このサーバー（Cloud Run）の環境変数 ANTHROPIC_API_KEY に Secret を紐付けているか確認してください（ローカルなら data/anthropic_api_key.txt または .env）。",
+      },
+      { status: 503 },
+    );
+  }
+
+  // Day3 バッチはローカル submissions.json / task-problems/*.json を読むため、実行直前に Firestore 正から同期する。
   await syncSubmissionsFileMirrorFromFirestore(auth.organizationId);
+  await syncTaskProblemsFileMirrorFromFirestore(auth.organizationId);
 
   const result = await runProofreadBatch({
     organizationId: auth.organizationId,
@@ -109,51 +123,28 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
+    const stderr = result.stderr ?? "";
+    const failureCode = classifyProofreadBatchFailure(stderr, result.error ?? "");
     return NextResponse.json(
       {
         ok: false,
+        code: failureCode,
         message: result.error,
         stdout: result.stdout ?? "",
-        stderr: result.stderr ?? "",
+        stderr,
       },
       { status: 500 },
     );
   }
 
-  let ticketsAfter: number | undefined;
-  let ticketConsumedFrom: Array<{ uid: string; amount: number }> | undefined;
-  let ticketWarning: string | undefined;
-  if (!skipTicketGate) {
-    const consumed = await consumeProofreadTicketsFromOrganization(
-      auth.organizationId,
-      ticketCost,
-      auth.uid,
-    );
-    if (!consumed.ok) {
-      ticketWarning =
-        consumed.code === "INSUFFICIENT"
-          ? "添削は完了しましたが、減算時にテナント残高不足が検出されました（同時実行など）。管理者に billing を確認してください。"
-          : "添削は完了しましたが、減算対象ユーザーが見つからずチケットを減算できませんでした。";
-      console.error("[run-proofread] ticket consume failed after successful batch", {
-        uid: auth.uid,
-        organizationId: auth.organizationId,
-        ticketCost,
-        code: consumed.code,
-      });
-    } else {
-      ticketsAfter = consumed.remainingTotal;
-      ticketConsumedFrom = consumed.consumedFrom;
-    }
-  }
+  await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
 
   return NextResponse.json({
     ok: true,
-    message: "添削バッチが完了しました。一覧を再読み込みしてください。",
+    message: "添削バッチが完了しました。一覧を再読み込みしてください。チケットは Day4 確定時に生徒から 1 枚消費されます。",
+    targetRows: targetRowCount,
+    ticketsDeducted: 0,
     durationMs: result.durationMs,
-    ticketsConsumed: skipTicketGate ? 0 : ticketCost,
-    ticketsRemaining: ticketsAfter,
-    ticketConsumedFrom,
-    ticketWarning,
     stdout: result.stdout,
     stderr: result.stderr,
   });

@@ -2,7 +2,6 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { unstable_noStore as noStore } from "next/cache";
-import { FieldPath } from "firebase-admin/firestore";
 
 import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
 import { defaultOrganizationId } from "@/lib/organization-id";
@@ -47,6 +46,8 @@ export type Submission = SubmissionInput & {
     error?: string;
     operator_message?: string;
   };
+  /** Day4 確定フローで生徒から 1 枚消費済み（再生成で二重課金しない） */
+  day4TicketChargedAt?: string;
   day4?: {
     audio_path?: string;
     audio_url?: string;
@@ -87,6 +88,50 @@ export async function syncSubmissionsFileMirrorFromFirestore(organizationId: str
   const snap = await orgSubmissionsCol(organizationId).orderBy("submittedAt", "desc").get();
   const rows = snap.docs.map((d) => d.data() as Submission);
   await writeJsonFileAtomic(organizationSubmissionsFilePath(organizationId), rows);
+}
+
+/**
+ * Python バッチ（Day3/Day4）が書き込んだ `data/orgs/{org}/submissions.json` を Firestore 正へ反映する。
+ * 運用一覧は Firestore を読むため、バッチ成功後にこれを呼ばないと UI が更新されない。
+ */
+export async function syncSubmissionsDiskMirrorToFirestore(organizationId: string): Promise<void> {
+  await migrateLegacyOrgLayoutOnce();
+  const fp = organizationSubmissionsFilePath(organizationId);
+  let raw: string;
+  try {
+    raw = await fs.readFile(fp, "utf8");
+  } catch {
+    return;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(parsed)) return;
+
+  const oid = (organizationId ?? "").trim();
+  if (!oid) return;
+
+  const db = getAdminFirestore();
+  const col = orgSubmissionsCol(oid);
+
+  for (let start = 0; start < parsed.length; start += 200) {
+    const chunk = parsed.slice(start, start + 200) as Submission[];
+    const batch = db.batch();
+    for (const row of chunk) {
+      const sid = String(row?.submissionId ?? "").trim();
+      if (!sid) continue;
+      const normalized: Submission = {
+        ...row,
+        submissionId: sid,
+        organizationId: oid,
+      };
+      batch.set(col.doc(sid), normalized, { merge: true });
+    }
+    await batch.commit();
+  }
 }
 
 async function backfillFromFileToFirestoreIfEmpty(organizationId: string): Promise<void> {
@@ -132,8 +177,13 @@ export async function getSubmissionByIdInOrganization(
   organizationId: string,
   submissionId: string,
 ): Promise<Submission | null> {
-  const submissions = await getSubmissions(organizationId);
-  return submissions.find((s) => s.submissionId === submissionId) ?? null;
+  noStore();
+  const sid = (submissionId ?? "").trim();
+  if (!sid) return null;
+  await backfillFromFileToFirestoreIfEmpty(organizationId);
+  const snap = await orgSubmissionsCol(organizationId).doc(sid).get();
+  if (!snap.exists) return null;
+  return snap.data() as Submission;
 }
 
 export type SubmissionWithOrganization = { submission: Submission; organizationId: string };
@@ -147,11 +197,8 @@ export async function findSubmissionAcrossOrganizations(
   if (!sid) return null;
 
   const db = getAdminFirestore();
-  const byId = await db
-    .collectionGroup("submissions")
-    .where(FieldPath.documentId(), "==", sid)
-    .limit(1)
-    .get();
+  /** コレクション group で `documentId()` に UUID だけを渡すと「奇数セグメント」で無効。フィールドで一意検索する。 */
+  const byId = await db.collectionGroup("submissions").where("submissionId", "==", sid).limit(1).get();
   if (!byId.empty) {
     const doc = byId.docs[0]!;
     const organizationId = doc.ref.parent.parent?.id ?? defaultOrganizationId();

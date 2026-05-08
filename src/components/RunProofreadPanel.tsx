@@ -70,12 +70,15 @@ export function RunProofreadPanel({
       });
       const json = (await res.json()) as {
         ok?: boolean;
+        code?: string;
         message?: string;
         stdout?: string;
         stderr?: string;
       };
       if (!res.ok) {
-        setError(json?.message ?? "実行に失敗しました。");
+        const hint =
+          typeof json.code === "string" && json.code.trim() ? `【${json.code.trim()}】` : "";
+        setError((hint ? `${hint} ` : "") + (json?.message ?? "実行に失敗しました。"));
         const tail = [json.stdout, json.stderr].filter(Boolean).join("\n---\n");
         if (tail) setLog(tail);
         return;
