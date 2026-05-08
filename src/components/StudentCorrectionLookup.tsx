@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
@@ -27,16 +27,6 @@ type LookupResult =
     };
 
 const emptyLookup = { taskId: "", studentId: "", studentName: "" };
-const blueButtonLinkStyle = {
-  display: "inline-block",
-  border: 0,
-  borderRadius: 8,
-  background: "#2563eb",
-  color: "#fff",
-  padding: "10px 14px",
-  textDecoration: "none",
-};
-
 function buildDownloadBody(
   meta: { taskId: string; studentId: string; studentName: string; submissionId: string; publishedAt?: string },
   r: NonNullable<Extract<LookupResult, { found: true }>["resultSummary"]>,
@@ -79,6 +69,7 @@ function downloadTextFile(filename: string, body: string) {
 }
 
 export function StudentCorrectionLookup() {
+  const router = useRouter();
   const { user } = useFirebaseAuthContext();
   const getAccessToken = useCallback(async () => {
     if (!user) return null;
@@ -207,9 +198,13 @@ export function StudentCorrectionLookup() {
 
           {result.phase === "published" ? (
             <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-              <Link href={`/result/${result.submissionId}`} style={blueButtonLinkStyle}>
+              <button
+                type="button"
+                className="student-result-open-button"
+                onClick={() => router.push(`/result/${result.submissionId}`)}
+              >
                 添削結果を見る
-              </Link>
+              </button>
               {canDownloadText && result.resultSummary && metaAtLookup ? (
                 <button
                   type="button"

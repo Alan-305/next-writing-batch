@@ -7,6 +7,13 @@ import re
 from typing import Final
 
 
+def _orgs_base_dir(project_root: str) -> str:
+    base = (os.environ.get("NWB_DATA_ROOT") or "").strip()
+    if not base:
+        return os.path.join(project_root, "data", "orgs")
+    return os.path.join(base, "orgs")
+
+
 def nwb_organization_id() -> str:
     raw = (os.environ.get("NWB_ORGANIZATION_ID") or "default").strip()
     if not raw:
@@ -17,9 +24,9 @@ def nwb_organization_id() -> str:
 
 def submissions_json(project_root: str) -> str:
     oid = nwb_organization_id()
-    return os.path.join(project_root, "data", "orgs", oid, "submissions.json")
+    return os.path.join(_orgs_base_dir(project_root), oid, "submissions.json")
 
 
 def task_problems_dir(project_root: str) -> str:
     oid = nwb_organization_id()
-    return os.path.join(project_root, "data", "orgs", oid, "task-problems")
+    return os.path.join(_orgs_base_dir(project_root), oid, "task-problems")

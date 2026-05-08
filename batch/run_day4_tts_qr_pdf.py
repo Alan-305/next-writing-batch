@@ -58,8 +58,15 @@ def _signed_url_or_local(*, local_audio_url: str) -> str:
     return local_audio_url
 
 
+def _public_output_rel(kind: str, task_id: str, filename: str) -> str:
+    return f"output/{kind}/{task_id}/{filename}"
+
+
 def _gcs_bucket_from_env() -> str:
-    for key in ("GCS_BUCKET_NAME", "FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"):
+    explicit = os.environ.get("GCS_BUCKET_NAME", "").strip()
+    if explicit:
+        return explicit
+    for key in ("FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"):
         val = os.environ.get(key, "").strip()
         if val:
             return val
@@ -233,8 +240,16 @@ def main() -> None:
                 raise RuntimeError("tts_failed")
 
             gcs_bucket = _gcs_bucket_from_env()
+            # QR オフ時は GCS 署名URLを作らず、常にローカル/相対URLで返す。
+            # （公開ボタンの可否は PDF 有無で判定しており、QR 無し運用を最短復旧パスにする）
+            if not args.qr:
+                base = (args.audio_base_url or "").rstrip("/")
+                if not base:
+                    audio_url = f"/output/audio/{task_id}/{mp3_filename}"
+                else:
+                    audio_url = f"{base}/output/audio/{task_id}/{mp3_filename}"
             # 明示的に --allow-local-qr が付いている場合は、GCS設定が見えていてもローカルURLを優先する。
-            if gcs_bucket and not args.allow_local_qr:
+            elif gcs_bucket and not args.allow_local_qr:
                 expires_days = int(os.environ.get("GCS_SIGNED_URL_EXPIRE_DAYS", "180").strip() or "180")
                 object_name = f"audio/{task_id}/{mp3_filename}"
                 audio_url = upload_mp3_and_get_signed_url(
@@ -242,8 +257,8 @@ def main() -> None:
                     object_name=object_name,
                     expires_days=expires_days,
                 )
-            elif args.allow_local_qr or not args.qr:
-                # QR オフ（既定）またはローカルQR: GCS なしで音声 URL を /output/ または AUDIO_BASE_URL 下に
+            elif args.allow_local_qr:
+                # ローカルQR: GCS なしで音声 URL を /output/ または AUDIO_BASE_URL 下に
                 base = (args.audio_base_url or "").rstrip("/")
                 if not base:
                     audio_url = f"/output/audio/{task_id}/{mp3_filename}"
@@ -261,11 +276,12 @@ def main() -> None:
                 qr = make_qr_png(url=audio_url, out_path=qr_path)
                 if not qr:
                     raise RuntimeError("qr_failed")
-                qr_rel = os.path.relpath(qr_path, paths.project_root)
+                qr_rel = _public_output_rel("qr", task_id, f"{student_id}.png")
                 qr_arg = qr
 
+            pdf_filename = f"{student_id}_{student_name}.pdf".replace(" ", "_")
             pdf_path = os.path.join(
-                paths.pdf_dir, task_id, f"{student_id}_{student_name}.pdf".replace(" ", "_")
+                paths.pdf_dir, task_id, pdf_filename
             )
             fb1, fb2, fb3 = pdf_feedback_lines_for_day4(paths.project_root, s)
 
@@ -284,10 +300,12 @@ def main() -> None:
             with store_lock:
                 data = _load_submissions_unlocked(paths.project_root)
                 s = data[idx]
+                mp3_rel = _public_output_rel("audio", task_id, mp3_filename)
+                pdf_rel = _public_output_rel("pdf", task_id, pdf_filename)
                 s["day4"] = {
-                    "audio_path": os.path.relpath(mp3_path, paths.project_root),
+                    "audio_path": mp3_rel,
                     "audio_url": audio_url,
-                    "pdf_path": os.path.relpath(pdf_path, paths.project_root),
+                    "pdf_path": pdf_rel,
                     "generatedAt": _now_iso(),
                 }
                 if qr_rel:

@@ -3,10 +3,16 @@ import path from "path";
 
 import { defaultOrganizationId, sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
+function orgDataBaseDir(): string {
+  const fromEnv = (process.env.NWB_DATA_ROOT ?? "").trim();
+  if (!fromEnv) return path.join(process.cwd(), "data", "orgs");
+  return path.join(fromEnv, "orgs");
+}
+
 /** 1 テナントのデータルート: `data/orgs/{orgId}/` */
 export function organizationDataRoot(organizationId: string): string {
   const safe = sanitizeOrganizationIdForPath(organizationId) || defaultOrganizationId();
-  return path.join(process.cwd(), "data", "orgs", safe);
+  return path.join(orgDataBaseDir(), safe);
 }
 
 export function organizationSubmissionsFilePath(organizationId: string): string {
@@ -109,7 +115,7 @@ export async function migrateLegacyOrgLayoutOnce(): Promise<void> {
 
 /** ディスク上の `data/orgs/*` ディレクトリ一覧（提出検索用） */
 export async function listOrganizationIdsOnDisk(): Promise<string[]> {
-  const base = path.join(process.cwd(), "data", "orgs");
+  const base = orgDataBaseDir();
   let names: string[] = [];
   try {
     names = await fs.readdir(base);

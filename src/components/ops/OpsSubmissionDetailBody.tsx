@@ -26,6 +26,10 @@ export function OpsSubmissionDetailBody({
 
   const qrPath = submission.day4?.qr_path ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
+  const audioUrl = String(submission.day4?.audio_url ?? "").trim();
+  const fallbackQrSrc = audioUrl
+    ? `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(audioUrl)}`
+    : "";
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
   const taskMismatch = submissionProofreadTaskMismatch(submission);
@@ -174,9 +178,16 @@ export function OpsSubmissionDetailBody({
       <div className="card">
         <h2>成果物（Day4）</h2>
         {submission.day4?.error ? (
-          <p className="error">
-            Day4でエラー: {submission.day4.operator_message ?? submission.day4.error}
-          </p>
+          <div className="error" style={{ marginBottom: 12 }}>
+            <p style={{ marginTop: 0 }}>
+              Day4でエラー: {submission.day4.operator_message ?? submission.day4.error}
+            </p>
+            {submission.day4.operator_message && submission.day4.error ? (
+              <p className="muted" style={{ marginBottom: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                詳細: {submission.day4.error}
+              </p>
+            ) : null}
+          </div>
         ) : null}
         {submission.day4?.pdf_path ? (
           <>
@@ -202,18 +213,35 @@ export function OpsSubmissionDetailBody({
                 </p>
               </div>
             ) : null}
-            {submission.day4?.audio_url ? (
+            {fallbackQrSrc ? (
+              <div style={{ marginBottom: 12 }}>
+                <p>
+                  <b>予備QR（音声URLから生成）</b>
+                </p>
+                <img
+                  src={fallbackQrSrc}
+                  alt="音声URLから生成した予備QR"
+                  width={220}
+                  height={220}
+                  style={{ border: "1px solid #e2e8f0", borderRadius: 8 }}
+                />
+                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+                  もし上のQR画像が出ない場合は、この予備QRを使ってください。
+                </p>
+              </div>
+            ) : null}
+            {audioUrl ? (
               <p style={{ wordBreak: "break-all" }}>
-                <b>音声URL（QRに埋め込んだ文字列）</b>: {submission.day4.audio_url}
-                {submission.day4.audio_url.startsWith("/") ? (
+                <b>音声URL（QRに埋め込んだ文字列）</b>: {audioUrl}
+                {audioUrl.startsWith("/") ? (
                   <>
                     {" "}
-                    <a href={submission.day4.audio_url}>PCで開いて試聴</a>
+                    <a href={audioUrl}>PCで開いて試聴</a>
                   </>
                 ) : (
                   <>
                     {" "}
-                    <a href={submission.day4.audio_url}>音声URLを開く</a>
+                    <a href={audioUrl}>音声URLを開く</a>
                   </>
                 )}
               </p>

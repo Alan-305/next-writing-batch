@@ -1058,6 +1058,14 @@ td {
   background: #94a3b8;
 }
 
+.app-shell--student .student-result-open-button {
+  min-height: 48px;
+  min-width: 170px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  touch-action: manipulation;
+}
+
 /* 添削結果 /result：ブラウザ印刷・「PDFに保存」用 */
 @media print {
   .no-print {

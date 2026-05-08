@@ -13,7 +13,8 @@ class Day4Paths:
 
 def resolve_paths() -> Day4Paths:
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    out_dir = os.path.join(project_root, "output")
+    out_root_env = (os.environ.get("NWB_OUTPUT_ROOT") or "").strip()
+    out_dir = out_root_env if out_root_env else os.path.join(project_root, "output")
     audio_dir = os.path.join(out_dir, "audio")
     qr_dir = os.path.join(out_dir, "qr")
     pdf_dir = os.path.join(out_dir, "pdf")

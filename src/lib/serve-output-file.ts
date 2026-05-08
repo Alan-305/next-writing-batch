@@ -56,7 +56,8 @@ export async function getOutputFileResponse(
     }
   }
 
-  const outputRoot = path.join(process.cwd(), "output");
+  const configuredOutputRoot = (process.env.NWB_OUTPUT_ROOT ?? "").trim();
+  const outputRoot = configuredOutputRoot || path.join(process.cwd(), "output");
   let candidate: string;
   try {
     candidate = path.join(outputRoot, ...segments);

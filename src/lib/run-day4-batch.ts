@@ -114,10 +114,22 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
       maxBuffer: MAX_BUFFER,
       timeout: TIMEOUT_MS,
     });
+    const out = String(stdout ?? "");
+    const err = String(stderr ?? "");
+    const noTargets = /\[day4\]\s+targets=0\b/.test(`${out}\n${err}`);
+    if (noTargets) {
+      return {
+        ok: false,
+        error:
+          "Day4 の対象が 0 件でした。提出が status=done か、課題ID/受付ID が一致しているか、読み上げ用英文（finalText または添削結果）があるかを確認してください。",
+        stdout: out,
+        stderr: err,
+      };
+    }
     return {
       ok: true,
-      stdout: String(stdout ?? ""),
-      stderr: String(stderr ?? ""),
+      stdout: out,
+      stderr: err,
       durationMs: Date.now() - t0,
     };
   } catch (e: unknown) {

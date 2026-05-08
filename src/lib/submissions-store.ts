@@ -128,7 +128,8 @@ export async function syncSubmissionsDiskMirrorToFirestore(organizationId: strin
         submissionId: sid,
         organizationId: oid,
       };
-      batch.set(col.doc(sid), normalized, { merge: true });
+      // ディスク mirror を Firestore 正へ反映するときは、古い day4.error などの残留を防ぐため全置換する。
+      batch.set(col.doc(sid), normalized, { merge: false });
     }
     await batch.commit();
   }
