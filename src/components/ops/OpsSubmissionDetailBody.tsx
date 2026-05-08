@@ -138,8 +138,9 @@ export function OpsSubmissionDetailBody({
             <p style={{ marginTop: 0, marginBottom: 12, color: "#b45309" }}>
               運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
               ）— 文面は固定済みですが、<strong>下の「成果物（Day4）」でエラー</strong>のため PDF
-              がありません。公開には Day4 の成功が必要です。「確定（Day4
-              生成）」の再実行やログ確認後に失敗分のみ再実行してください。
+              がありません。公開には Day4 の成功が必要です。修正入力の{" "}
+              <strong>Day4 だけ再生成</strong>（確定日時は変えません）か「確定（Day4
+              生成）」の再実行、ログ確認のうえ失敗分のみ再実行してください。
             </p>
           ) : (
             <p style={{ marginTop: 0, marginBottom: 12, color: "#a16207" }}>

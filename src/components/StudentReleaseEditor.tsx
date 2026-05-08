@@ -268,8 +268,81 @@ export function StudentReleaseEditor({
   const scoreTotal = useMemo(() => computeScoreTotal(master, effectiveScores), [effectiveScores, master]);
 
   const finalizedAt = String(initialRelease?.operatorFinalizedAt ?? "").trim();
+  const publishedAt = String(initialRelease?.operatorApprovedAt ?? "").trim();
   const canPublish =
     Boolean(finalizedAt) && hasDay4Pdf && !(day4Error && String(day4Error).trim());
+  /** 確定済み・未公開で Day4 未完了またはエラー */
+  const needsDay4Retry = Boolean(finalizedAt) && !publishedAt && !canPublish;
+
+  const invokeRunDay4Api = async (idToken: string, day4Force: boolean) => {
+    const d4 = await fetch("/api/ops/run-day4", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
+        taskId,
+        submissionId,
+        force: day4Force,
+        chargeStudentTicket: true,
+      }),
+    });
+    const d4json = (await parseFetchJson(d4)) as {
+      ok?: boolean;
+      message?: string;
+      ticketChargeWarning?: string;
+      stdout?: string;
+      stderr?: string;
+    };
+    if (!d4.ok) {
+      const d4detail = pickApiErrorMessage(d4json, d4, "Day4 の生成に失敗しました");
+      const tail = (s: string, n: number) => {
+        const t = (s ?? "").trim();
+        if (!t) return "";
+        return t.length > n ? ` …${t.slice(-n)}` : ` ${t}`;
+      };
+      const extra =
+        typeof d4json.stdout === "string" && d4json.stdout.trim()
+          ? `\n（ログ末尾:${tail(d4json.stdout, 400)}）`
+          : typeof d4json.stderr === "string" && d4json.stderr.trim()
+            ? `\n（stderr末尾:${tail(d4json.stderr, 400)}）`
+            : "";
+      setError(
+        `${d4detail}${extra}。ターミナルから batch/run_day4_tts_qr_pdf.py を実行することもできます。`.trim(),
+      );
+      return false;
+    }
+    if (typeof d4json?.ticketChargeWarning === "string" && d4json.ticketChargeWarning.trim()) {
+      setError(String(d4json.ticketChargeWarning));
+      return false;
+    }
+    return true;
+  };
+
+  const runDay4Only = async () => {
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      if (!user) {
+        setError("ログインしてください。");
+        return;
+      }
+      if (!finalizedAt) {
+        setError("先に「確定（Day4 生成）」で運用文面を確定してください。");
+        return;
+      }
+      const idToken = await user.getIdToken();
+      const ok = await invokeRunDay4Api(idToken, hasDay4Pdf);
+      if (!ok) return;
+      setMessage("Day4 を再生成しました。画面を再読み込みします。");
+      window.location.reload();
+    } catch (e) {
+      console.error("[StudentReleaseEditor] runDay4Only", e);
+      const detail = e instanceof Error ? e.message : String(e);
+      setError(`Day4 の再生成に失敗しました: ${detail}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const patchRelease = async (opts: {
     operatorApproved?: boolean;
@@ -324,35 +397,8 @@ export function StudentReleaseEditor({
       }
 
       if (opts.runDay4After) {
-        const d4 = await fetch("/api/ops/run-day4", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-          body: JSON.stringify({
-            taskId,
-            submissionId,
-            force: Boolean(opts.day4Force),
-            chargeStudentTicket: true,
-          }),
-        });
-        const d4json = (await parseFetchJson(d4)) as {
-          ok?: boolean;
-          message?: string;
-          ticketChargeWarning?: string;
-        };
-        if (!d4.ok) {
-          const d4detail = pickApiErrorMessage(d4json, d4, "Day4 の生成に失敗しました");
-          setError(
-            `運用は確定しましたが、Day4 の生成に失敗しました: ${d4detail}。` +
-              ` ターミナルから batch/run_day4_tts_qr_pdf.py を実行することもできます。`,
-          );
-          window.location.reload();
-          return;
-        }
-        if (typeof d4json?.ticketChargeWarning === "string" && d4json.ticketChargeWarning.trim()) {
-          setError(String(d4json.ticketChargeWarning));
-          window.location.reload();
-          return;
-        }
+        const d4Ok = await invokeRunDay4Api(idToken, Boolean(opts.day4Force));
+        if (!d4Ok) return;
       }
 
       setMessage(opts.successMessage);
@@ -565,6 +611,22 @@ export function StudentReleaseEditor({
         >
           確定（Day4 生成）
         </button>
+        {needsDay4Retry ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runDay4Only()}
+            style={{
+              padding: "10px 14px",
+              fontSize: "0.95rem",
+              background: busy ? "#94a3b8" : "#0d9488",
+              color: "#fff",
+            }}
+            title="運用確定の日時は変えずに Day4 バッチだけ再実行します（タイムアウト・GCS 失敗後の再試行向け）"
+          >
+            {busy ? "実行中…" : "Day4 だけ再生成"}
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={busy || !canPublish}

@@ -107,6 +107,16 @@ export async function POST(request: Request) {
     submissionIds: submissionIds.length ? submissionIds : undefined,
   });
 
+  // Day4 が失敗終了でも、バッチが submissions.json に書いた error/operator_message を画面へ反映させる。
+  // （ここを飛ばすと「成果物（Day4）」が古いままになり、運用で原因が見えづらい）
+  let syncWarning: string | undefined;
+  try {
+    await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
+  } catch (syncErr) {
+    console.error("[run-day4] syncSubmissionsDiskMirrorToFirestore failed", syncErr);
+    syncWarning = "Day4 実行後の Firestore 同期に失敗しました。画面反映が遅れる可能性があります。";
+  }
+
   if (!result.ok) {
     return NextResponse.json(
       {
@@ -114,12 +124,11 @@ export async function POST(request: Request) {
         message: result.error,
         stdout: result.stdout ?? "",
         stderr: result.stderr ?? "",
+        syncWarning,
       },
       { status: 500 },
     );
   }
-
-  await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
 
   let ticketChargeWarning: string | undefined;
   const ticketsCharged: Array<{ submissionId: string; uid: string; remainingAfter: number }> = [];
@@ -161,6 +170,7 @@ export async function POST(request: Request) {
     durationMs: result.durationMs,
     stdout: result.stdout,
     stderr: result.stderr,
+    syncWarning,
     ticketChargeWarning,
     day4TicketsCharged: ticketsCharged,
   });

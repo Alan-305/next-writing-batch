@@ -519,7 +519,9 @@ export function buildStudentReleaseFromPatch(
 
   if (body.operatorApproved !== false) {
     if (body.operatorFinalized === true) {
-      operatorFinalizedAt = now;
+      const prevFin = String(prev?.operatorFinalizedAt ?? "").trim();
+      // 試験運用: Day4 失敗後に「確定（Day4 生成）」を再押ししても、確定日時と分析送信を二重にしない
+      operatorFinalizedAt = prevFin || now;
     } else if (body.operatorFinalized === false) {
       operatorFinalizedAt = undefined;
     }
