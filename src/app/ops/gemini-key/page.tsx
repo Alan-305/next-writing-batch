@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+
 type Status = {
   configured: boolean;
   source: "env" | "file" | "none";
@@ -10,6 +12,7 @@ type Status = {
 };
 
 export default function OpsGeminiKeyPage() {
+  const { user, authLoading } = useFirebaseAuthContext();
   const [status, setStatus] = useState<Status | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [message, setMessage] = useState("");
@@ -17,8 +20,13 @@ export default function OpsGeminiKeyPage() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    if (!user) {
+      setStatus(null);
+      return;
+    }
     try {
-      const res = await fetch("/api/ops/gemini-key");
+      const token = await user.getIdToken();
+      const res = await fetch("/api/ops/gemini-key", { headers: { Authorization: `Bearer ${token}` } });
       const j = (await res.json()) as Status & { ok?: boolean };
       if (res.ok && j.source) {
         setStatus({ configured: j.configured, source: j.source, filePath: j.filePath });
@@ -26,11 +34,12 @@ export default function OpsGeminiKeyPage() {
     } catch {
       setStatus(null);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (authLoading) return;
     void load();
-  }, [load]);
+  }, [load, authLoading]);
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,9 +47,14 @@ export default function OpsGeminiKeyPage() {
     setMessage("");
     setError("");
     try {
+      if (!user) {
+        setError("ログインが必要です。");
+        return;
+      }
+      const token = await user.getIdToken();
       const res = await fetch("/api/ops/gemini-key", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ apiKey }),
       });
       const j = (await res.json()) as { ok?: boolean; message?: string };
@@ -64,7 +78,15 @@ export default function OpsGeminiKeyPage() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch("/api/ops/gemini-key", { method: "DELETE" });
+      if (!user) {
+        setError("ログインが必要です。");
+        return;
+      }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/ops/gemini-key", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const j = (await res.json()) as { ok?: boolean; message?: string };
       if (!res.ok) {
         setError(j?.message ?? "削除に失敗しました。");
@@ -92,6 +114,10 @@ export default function OpsGeminiKeyPage() {
       <p>
         <Link href="/ops">運用ハブ</Link> · <Link href="/ops/submissions">提出一覧</Link>
       </p>
+
+      {!authLoading && !user ? (
+        <p className="error">教員または管理者としてログインしてください。</p>
+      ) : null}
 
       <div className="card">
         <p className="muted" style={{ marginTop: 0 }}>

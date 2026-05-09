@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { TwoStepDeleteConfirm, type TwoStepDeletePhase } from "@/components/TwoStepDeleteConfirm";
 
 type Props = { fileName: string };
@@ -18,6 +19,7 @@ const downloadBtn: CSSProperties = {
   fontSize: "0.9rem",
   fontWeight: 600,
   border: "none",
+  cursor: "pointer",
 };
 
 const deleteBtn: CSSProperties = {
@@ -33,15 +35,22 @@ const deleteBtn: CSSProperties = {
 
 export function DeliverablesZipRowActions({ fileName }: Props) {
   const router = useRouter();
+  const { user, authLoading } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<TwoStepDeletePhase>(null);
 
   async function executeDelete() {
+    if (!user) {
+      window.alert("ログインが必要です。");
+      return;
+    }
     setDialog(null);
     setBusy(true);
     try {
+      const token = await user.getIdToken();
       const res = await fetch(`/api/deliverables/${encodeURIComponent(fileName)}`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -55,17 +64,49 @@ export function DeliverablesZipRowActions({ fileName }: Props) {
     }
   }
 
+  async function downloadZip() {
+    if (!user) {
+      window.alert("ログインが必要です。");
+      return;
+    }
+    setBusy(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/deliverables/${encodeURIComponent(fileName)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = typeof body?.message === "string" ? body.message : `ダウンロードに失敗しました (${res.status})`;
+        window.alert(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.alert("通信エラーでダウンロードできませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        <a
-          href={`/api/deliverables/${encodeURIComponent(fileName)}`}
+        <button
+          type="button"
           style={downloadBtn}
-          download={fileName}
+          disabled={busy || authLoading || !user}
+          onClick={() => void downloadZip()}
         >
           ダウンロード
-        </a>
-        <button type="button" style={deleteBtn} disabled={busy} onClick={() => setDialog("warning")}>
+        </button>
+        <button type="button" style={deleteBtn} disabled={busy || authLoading || !user} onClick={() => setDialog("warning")}>
           {busy ? "削除中…" : "削除"}
         </button>
       </div>

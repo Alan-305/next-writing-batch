@@ -1,6 +1,8 @@
 import { readFile } from "fs/promises";
 import { NextResponse } from "next/server";
 
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
+import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import {
   deleteDeliverableZip,
   deliverableZipAbsolutePath,
@@ -9,7 +11,12 @@ import {
 
 type RouteContext = { params: Promise<{ file: string }> };
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
+
   const { file: raw } = await context.params;
   const file = decodeURIComponent(raw || "");
   if (!isSafeDeliverableZipName(file)) {
@@ -34,7 +41,12 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
+
   const { file: raw } = await context.params;
   const file = decodeURIComponent(raw || "");
   const result = await deleteDeliverableZip(file);

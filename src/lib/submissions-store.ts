@@ -250,6 +250,27 @@ export async function findLatestSubmissionByStudentLookup(
   return matches[0] ?? null;
 }
 
+/**
+ * ログイン提出: 同一テナント内で taskId と submittedByUid が一致する最新の1件。
+ */
+export async function findLatestSubmissionByUidAndTask(
+  organizationId: string,
+  uid: string,
+  taskId: string,
+): Promise<Submission | null> {
+  const tid = normalizeLookupToken(taskId);
+  const u = uid.trim();
+  if (!tid || !u) return null;
+
+  const submissions = await getSubmissions(organizationId);
+  const matches = submissions.filter(
+    (s) => normalizeLookupToken(s.taskId) === tid && String(s.submittedByUid ?? "").trim() === u,
+  );
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  return matches[0] ?? null;
+}
+
 export async function deleteSubmissionByIdInOrganization(
   organizationId: string,
   submissionId: string,

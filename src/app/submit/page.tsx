@@ -1,8 +1,12 @@
 "use client";
 
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { isTeacherByRoles } from "@/lib/auth/user-roles";
+import { shouldRedirectStudentToOnboarding } from "@/lib/student-profile-gate";
 import { joinEssayMultipartBlocks } from "@/lib/essay-multipart";
 import {
   countEnglishWords,
@@ -31,7 +35,8 @@ type AnswerMode = "single" | "multipart";
 type ImportHint = { text: string; variant: "success" | "error" | "info" };
 
 export default function SubmitPage() {
-  const { user } = useFirebaseAuthContext();
+  const router = useRouter();
+  const { user, profile, profileLoading, roles, authLoading } = useFirebaseAuthContext();
   const [form, setForm] = useState({ ...initialMeta, essayText: "" });
   const [answerMode, setAnswerMode] = useState<AnswerMode>("single");
   const [essayParts, setEssayParts] = useState<string[]>(["", ""]);
@@ -66,6 +71,18 @@ export default function SubmitPage() {
     return user.getIdToken();
   }, [user]);
 
+  useEffect(() => {
+    if (authLoading || profileLoading) return;
+    if (!user) return;
+    if (isTeacherByRoles(roles)) return;
+    if (shouldRedirectStudentToOnboarding(roles, profile, profileLoading)) {
+      router.replace(`/onboarding?next=${encodeURIComponent("/submit")}`);
+    }
+  }, [authLoading, profileLoading, user, roles, profile, router]);
+
+  /** ログイン時は学籍・氏名をプロフィールから使うためフォームでは入力しない */
+  const hideStudentFields = Boolean(user);
+
   const onFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting || wordCountBlocksSubmit) return;
@@ -83,8 +100,8 @@ export default function SubmitPage() {
       answerMode === "multipart"
         ? {
             taskId: form.taskId,
-            studentId: form.studentId,
-            studentName: form.studentName,
+            studentId: hideStudentFields ? "" : form.studentId,
+            studentName: hideStudentFields ? "" : form.studentName,
             problemMemo: form.problemMemo,
             ...(pid ? { problemId: pid } : {}),
             essayMultipart: true,
@@ -92,8 +109,8 @@ export default function SubmitPage() {
           }
         : {
             taskId: form.taskId,
-            studentId: form.studentId,
-            studentName: form.studentName,
+            studentId: hideStudentFields ? "" : form.studentId,
+            studentName: hideStudentFields ? "" : form.studentName,
             problemMemo: form.problemMemo,
             ...(pid ? { problemId: pid } : {}),
             essayText: form.essayText,
@@ -146,14 +163,60 @@ export default function SubmitPage() {
 
   return (
     <main>
-      <h1>解答提出フォーム</h1>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <h1 style={{ margin: 0 }}>解答提出フォーム</h1>
+        {user && (profile?.studentNumber || profile?.nickname || isTeacherByRoles(roles)) ? (
+          <div
+            className="muted"
+            style={{ textAlign: "right", fontSize: "0.92rem", maxWidth: 320, lineHeight: 1.5 }}
+          >
+            {!isTeacherByRoles(roles) && profile?.studentNumber ? (
+              <div>
+                学籍番号: <strong>{profile.studentNumber}</strong>
+              </div>
+            ) : null}
+            {!isTeacherByRoles(roles) && profile?.nickname ? (
+              <div>
+                ニックネーム: <strong>{profile.nickname}</strong>
+              </div>
+            ) : null}
+            {isTeacherByRoles(roles) ? (
+              <div>
+                {profile?.nickname ? (
+                  <>
+                    表示名: <strong>{profile.nickname}</strong>
+                  </>
+                ) : (
+                  <>教員アカウント</>
+                )}
+              </div>
+            ) : null}
+            <Link href="/settings/profile" style={{ display: "inline-block", marginTop: 4 }}>
+              プロフィールを編集
+            </Link>
+          </div>
+        ) : null}
+      </div>
       <p className="student-page-lead">
-        課題を選んで、学籍番号・氏名・英文を入力し、内容を確認してから送信してください。
+        ログイン後は<strong>プロフィールに登録した学籍番号・ニックネーム</strong>が使われます。英文を入力し、内容を確認してから送信してください。
       </p>
       <p>
-        <b>課題</b>はリストから選び、<b>学籍番号</b>・<b>氏名</b>を入力し、必要なら<b>問題メモ（任意）</b>も入力してから、<b>英文の解答</b>を記入して提出します。課題文の手入力は不要です（先生が登録した課題文が自動で使われます）。
+        <b>課題</b>はリストから選び、必要なら<b>問題メモ（任意）</b>も入力してから、<b>英文の解答</b>を記入して提出します。課題文の手入力は不要です（先生が登録した課題文が自動で使われます）。
         <b>解答欄</b>では写真・PDF・テキストをドロップして取り込めます。誤読やレイアウト崩れがある場合は、必ず手で直してから送信してください。
       </p>
+      {!user ? (
+        <p className="warning">
+          提出には <Link href="/sign-in?next=/submit">ログイン</Link> が必要です。
+        </p>
+      ) : null}
 
       <form className="card" onSubmit={onFormSubmit}>
         <RegisteredTaskIdField
@@ -170,25 +233,29 @@ export default function SubmitPage() {
         />
         {errors.problemId ? <p className="error">{errors.problemId}</p> : null}
 
-        <label className="field">
-          <span>学籍番号</span>
-          <input
-            value={form.studentId}
-            onChange={(e) => setForm((p) => ({ ...p, studentId: e.target.value }))}
-            placeholder="例: A1023"
-          />
-          {errors.studentId ? <span className="error">{errors.studentId}</span> : null}
-        </label>
+        {!hideStudentFields ? (
+          <>
+            <label className="field">
+              <span>学籍番号</span>
+              <input
+                value={form.studentId}
+                onChange={(e) => setForm((p) => ({ ...p, studentId: e.target.value }))}
+                placeholder="例: A1023"
+              />
+              {errors.studentId ? <span className="error">{errors.studentId}</span> : null}
+            </label>
 
-        <label className="field">
-          <span>氏名</span>
-          <input
-            value={form.studentName}
-            onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
-            placeholder="例: 山田 太郎"
-          />
-          {errors.studentName ? <span className="error">{errors.studentName}</span> : null}
-        </label>
+            <label className="field">
+              <span>氏名</span>
+              <input
+                value={form.studentName}
+                onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
+                placeholder="例: 山田 太郎"
+              />
+              {errors.studentName ? <span className="error">{errors.studentName}</span> : null}
+            </label>
+          </>
+        ) : null}
 
         <label className="field">
           <span>問題メモ（任意・目安20字）</span>
@@ -230,6 +297,13 @@ export default function SubmitPage() {
             設問ごとに分ける（設問が複数ある場合）
           </label>
         </fieldset>
+
+        {hideStudentFields ? (
+          <p className="warning" style={{ margin: "0 0 12px" }}>
+            <strong>注意:</strong> 英文の本文に<strong>学籍番号・氏名・連絡先などの個人情報を書かないでください</strong>
+            （採点・添削の対象テキストにそのまま含まれます）。
+          </p>
+        ) : null}
 
         {answerMode === "single" ? (
           <>

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
+import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import {
   clearAnthropicApiKeyFile,
   describeAnthropicKeySource,
@@ -19,7 +21,12 @@ function allowKeyFileWrite(): boolean {
   return process.env.OPS_ALLOW_ANTHROPIC_KEY_FILE === "true";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
+
   const { configured, source } = describeAnthropicKeySource();
   return NextResponse.json({
     ok: true,
@@ -30,6 +37,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
+
   if (!allowKeyFileWrite()) {
     return NextResponse.json(
       {
@@ -66,7 +78,12 @@ export async function POST(request: Request) {
   });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const auth = await verifyBearerUid(request);
+  if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
+
   if (!allowKeyFileWrite()) {
     return NextResponse.json({ ok: false, message: "本番では削除 API を無効にしています。" }, { status: 403 });
   }

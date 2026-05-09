@@ -29,6 +29,12 @@ export type BillingInfo = {
 export type FirestoreUserProfile = {
   roles?: string[];
   organizationId?: string | null;
+  /** 生徒の学籍番号（教員には通常未設定） */
+  studentNumber?: string | null;
+  /** 表示名・ニックネーム（生徒は必須、教員は任意） */
+  nickname?: string | null;
+  /** 生徒プロフィール初回登録完了（サーバーが設定） */
+  studentProfileCompletedAt?: Timestamp | null;
   /** Stripe 等。初期は {}。更新はサーバー（Webhook）のみ想定 */
   billing?: BillingInfo;
   /** Functions のウェルカムメール送信済み（任意） */

@@ -175,6 +175,12 @@ export function FirebaseAuthProvider({
               data.organizationId === undefined || data.organizationId === null
                 ? null
                 : String(data.organizationId),
+            studentNumber:
+              data.studentNumber === undefined || data.studentNumber === null
+                ? null
+                : String(data.studentNumber),
+            nickname: data.nickname === undefined || data.nickname === null ? null : String(data.nickname),
+            studentProfileCompletedAt: data.studentProfileCompletedAt ?? null,
             welcomeEmailSentAt: data.welcomeEmailSentAt,
           });
         }

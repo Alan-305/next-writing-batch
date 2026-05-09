@@ -50,6 +50,26 @@ def _save_submissions_unlocked(project_root: str, submissions: List[Dict[str, An
     _atomic_write_json(_data_file(project_root), submissions)
 
 
+def _day4_asset_basename(sub: Dict[str, Any]) -> str:
+    """studentId が空の提出向け: submittedByUid や submissionId で一意なファイル名ベースを作る。"""
+    raw_id = str(sub.get("studentId") or "").strip()
+    if raw_id:
+        safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in raw_id)[:80]
+        if safe:
+            return safe
+    uid = str(sub.get("submittedByUid") or "").strip()
+    if uid:
+        safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in uid)[:36]
+        if safe:
+            return safe
+    sid = str(sub.get("submissionId") or "").strip()
+    if sid:
+        safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in sid)[:36]
+        if safe:
+            return safe
+    return "submission"
+
+
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -226,7 +246,7 @@ def main() -> None:
             data = _load_submissions_unlocked(paths.project_root)
             s = data[idx]
             task_id = str(s.get("taskId") or "task")
-            student_id = str(s.get("studentId") or "student")
+            student_id = _day4_asset_basename(s)
             student_name = str(s.get("studentName") or "")
         read_aloud = read_aloud_essay_for_day4(s)
 
@@ -279,7 +299,10 @@ def main() -> None:
                 qr_rel = _public_output_rel("qr", task_id, f"{student_id}.png")
                 qr_arg = qr
 
-            pdf_filename = f"{student_id}_{student_name}.pdf".replace(" ", "_")
+            name_part = student_name.replace(" ", "_") if student_name else ""
+            pdf_filename = (
+                f"{student_id}_{name_part}.pdf" if name_part else f"{student_id}.pdf"
+            )
             pdf_path = os.path.join(
                 paths.pdf_dir, task_id, pdf_filename
             )
@@ -287,7 +310,7 @@ def main() -> None:
 
             render_return_pdf(
                 pdf_path=pdf_path,
-                student_name=student_name,
+                student_name=student_name or "Student",
                 task_id=task_id,
                 line1=fb1,
                 line2=fb2,

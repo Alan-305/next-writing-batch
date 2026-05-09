@@ -63,6 +63,80 @@ export function normalizeSubmissionFromBody(body: unknown): SubmissionInput {
   };
 }
 
+/** ログイン提出: 学籍・氏名は users/{uid} 側のため本文では検証しない */
+export function validateAuthenticatedSubmissionInput(input: SubmissionInput): ValidationErrors {
+  const errors: ValidationErrors = {};
+
+  if (!input.taskId.trim()) {
+    errors.taskId = "taskId is required";
+  }
+
+  if (input.essayMultipart) {
+    const parts = input.essayParts ?? [];
+    if (parts.length < 2) {
+      errors.essayText = "複数設問では、設問ごとの英文欄を2つ以上用意してください（「設問を追加」）";
+    } else {
+      let total = 0;
+      for (let i = 0; i < parts.length; i += 1) {
+        const t = parts[i]!.trim();
+        if (!t) {
+          errors.essayText = `Question ${i + 1} の英文を入力してください`;
+          break;
+        }
+        if (t.length < PART_MIN) {
+          errors.essayText = `Question ${i + 1} は少なくとも ${PART_MIN} 文字以上にしてください`;
+          break;
+        }
+        if (t.length > PART_MAX) {
+          errors.essayText = `Question ${i + 1} は ${PART_MAX} 文字以内にしてください`;
+          break;
+        }
+        total += t.length;
+      }
+      const joined = input.essayText.trim();
+      if (!errors.essayText) {
+        if (total < MULTI_TOTAL_MIN) {
+          errors.essayText = `全体で少なくとも ${MULTI_TOTAL_MIN} 文字以上にしてください`;
+        } else if (joined.length > MULTI_TOTAL_MAX) {
+          errors.essayText = `全体で ${MULTI_TOTAL_MAX} 文字以内にしてください`;
+        }
+      }
+    }
+  } else {
+    const essay = input.essayText.trim();
+    if (!essay) {
+      errors.essayText = "essayText is required";
+    } else if (essay.length < SINGLE_MIN || essay.length > SINGLE_MAX) {
+      errors.essayText = `essayText must be between ${SINGLE_MIN} and ${SINGLE_MAX} characters`;
+    }
+  }
+
+  const question = (input.question ?? "").trim();
+  if (question.length > QUESTION_MAX) {
+    errors.question = `question must be at most ${QUESTION_MAX} characters`;
+  }
+
+  const memo = (input.problemMemo ?? "").trim();
+  if (memo.length > PROBLEM_MEMO_MAX) {
+    errors.problemMemo = `問題メモは ${PROBLEM_MEMO_MAX} 文字以内にしてください`;
+  }
+
+  const pid = (input.problemId ?? "").trim();
+  if (pid.length > PROBLEM_ID_MAX) {
+    errors.problemId = `problemId は ${PROBLEM_ID_MAX} 文字以内にしてください`;
+  }
+
+  const essayForWords = input.essayText.trim();
+  if (!errors.essayText && essayForWords) {
+    const wc = countEnglishWords(essayForWords);
+    if (wc > MAX_SYSTEM_ESSAY_WORDS) {
+      errors.essayText = `現在 ${wc} 語です。${MAX_SYSTEM_ESSAY_WORDS}語を超えているため、短く調整してください。`;
+    }
+  }
+
+  return errors;
+}
+
 export function validateSubmissionInput(input: SubmissionInput): ValidationErrors {
   const errors: ValidationErrors = {};
 

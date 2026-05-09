@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { deleteTaskProblemsMasterFile } from "@/lib/load-task-problems-master";
 import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
 import { deleteTaskProblemsMasterFromFirestore } from "@/lib/task-problems-firestore";
@@ -17,6 +18,8 @@ export const runtime = "nodejs";
 export async function DELETE(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   const u = new URL(request.url);
   const taskId = (u.searchParams.get("taskId") || "").trim();

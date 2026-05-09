@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
 import { runProblemIngestGemini } from "@/lib/problem-ingest-gemini";
 import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
@@ -36,6 +38,11 @@ function isMediaFile(file: File): boolean {
  * - mode=structured → 複数パート（problem_structured プロンプト）
  */
 export async function POST(request: Request) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
+
   const apiKey = resolveEffectiveGeminiApiKey();
   if (!apiKey) {
     return NextResponse.json(

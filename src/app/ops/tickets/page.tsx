@@ -71,6 +71,7 @@ export default function OpsTicketsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [teacherInviteCopied, setTeacherInviteCopied] = useState(false);
   const currentUid = getFirebaseAuth()?.currentUser?.uid ?? "";
 
   const selectedPlanInfo = useMemo(
@@ -90,6 +91,20 @@ export default function OpsTicketsPage() {
     : "";
   const inviteQrUrl = inviteUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
+    : "";
+  const teacherInviteUrl =
+    typeof window !== "undefined" && data?.organizationId
+      ? `${window.location.origin}/sign-in?next=${encodeURIComponent("/ops")}&teacherOrg=${encodeURIComponent(
+          data.organizationId,
+        )}`
+      : "";
+  const teacherInviteMailTo = teacherInviteUrl
+    ? `mailto:?subject=${encodeURIComponent("添削革命 教員参加リンク")}&body=${encodeURIComponent(
+        `以下のリンクからログインすると、教員としてこのテナント（organizationId）に参加します。\n\n${teacherInviteUrl}\n\n※Googleアカウントでログインしてください。`,
+      )}`
+    : "";
+  const teacherInviteQrUrl = teacherInviteUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(teacherInviteUrl)}`
     : "";
   const tenantLabel = (data?.organizationId ?? "").trim() || "default";
   const selectableStudents = (data?.students ?? []).filter((s) => s.uid !== currentUid);
@@ -181,6 +196,17 @@ export default function OpsTicketsPage() {
       window.setTimeout(() => setInviteCopied(false), 1800);
     } catch {
       setInviteCopied(false);
+    }
+  };
+
+  const copyTeacherInvite = async () => {
+    if (!teacherInviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(teacherInviteUrl);
+      setTeacherInviteCopied(true);
+      window.setTimeout(() => setTeacherInviteCopied(false), 1800);
+    } catch {
+      setTeacherInviteCopied(false);
     }
   };
 
@@ -290,6 +316,39 @@ export default function OpsTicketsPage() {
             <img src={inviteQrUrl} alt="生徒招待リンクのQRコード" width={220} height={220} />
             <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
               生徒の端末でQRを読み取ってもらうと、同じ招待リンクを開けます。
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
+        <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
+          教員参加リンク（テナント参加・初回）
+        </h2>
+        <p className="muted admin-tenant-roster-lead">
+          同僚の教員に共有すると、ログイン時に <code>users/&lt;uid&gt;.roles</code> に <strong>teacher</strong>{" "}
+          が付き、現在のテナント（organizationId）へ紐づきます（生徒用の招待とは別リンクです）。
+        </p>
+        <p style={{ wordBreak: "break-all", marginTop: 0 }}>
+          <code>{teacherInviteUrl || "読み込み中..."}</code>
+        </p>
+        <p style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 0 }}>
+          <button type="button" onClick={() => void copyTeacherInvite()} disabled={!teacherInviteUrl}>
+            {teacherInviteCopied ? "コピーしました" : "リンクをコピー"}
+          </button>
+          <a
+            className="button secondary"
+            href={teacherInviteMailTo || "#"}
+            onClick={(e) => !teacherInviteMailTo && e.preventDefault()}
+          >
+            メールで共有
+          </a>
+        </p>
+        {teacherInviteQrUrl ? (
+          <div>
+            <img src={teacherInviteQrUrl} alt="教員参加リンクのQRコード" width={220} height={220} />
+            <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+              すでに<strong>生徒として参加済み</strong>のアカウントでは教員登録できません（別の Google アカウントを使うか、管理者に依頼してください）。
             </p>
           </div>
         ) : null}

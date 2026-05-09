@@ -88,6 +88,8 @@ export default function SettingsPage() {
       <div className="card student-settings-card">
         <nav className="student-settings-nav" aria-label="よく使う画面">
           <Link href="/submit">提出画面へ</Link>
+          {" · "}
+          <Link href="/settings/profile">プロフィール編集</Link>
         </nav>
         <p className="muted student-settings-hint">
           添削結果を PDF にしたいときは、結果ページで Mac は ⌘P、Windows は Ctrl+P から「PDF に保存」を選びます。

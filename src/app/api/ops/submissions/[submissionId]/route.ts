@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { defaultScoresFromTeacherSetup } from "@/lib/build-rubric-scores-for-editor";
+import { enrichSubmissionWithResolvedStudentFields } from "@/lib/submission-display-enrich";
 import { findSubmissionForTenant } from "@/lib/submission-tenant-assert";
 import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
@@ -17,6 +19,8 @@ export const runtime = "nodejs";
 export async function GET(request: Request, context: RouteContext) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   const { submissionId: raw } = await context.params;
   const sid = decodeURIComponent(raw || "").trim();
@@ -30,7 +34,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const orgId = hit.organizationId;
-  const submission = hit.submission;
+  const submission = await enrichSubmissionWithResolvedStudentFields(hit.submission);
 
   const [master, taskRubricDefaults, teacherSetupJson] = await Promise.all([
     loadTaskProblemsMaster(orgId, submission.taskId),

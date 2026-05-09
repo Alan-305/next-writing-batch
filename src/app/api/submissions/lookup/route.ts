@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
-import { findLatestSubmissionByStudentLookup } from "@/lib/submissions-store";
+import {
+  findLatestSubmissionByStudentLookup,
+  findLatestSubmissionByUidAndTask,
+} from "@/lib/submissions-store";
 import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-display";
 import { formatExplanationForPublicView } from "@/lib/student-release";
 
@@ -31,18 +34,35 @@ export async function POST(request: Request) {
   const studentId = typeof body.studentId === "string" ? body.studentId : "";
   const studentName = typeof body.studentName === "string" ? body.studentName : "";
 
-  if (!taskId.trim() || !studentId.trim() || !studentName.trim()) {
+  if (!taskId.trim()) {
     return NextResponse.json(
-      { ok: false, code: "VALIDATION_ERROR", message: "課題ID・学籍番号・氏名をすべて入力してください。" },
+      { ok: false, code: "VALIDATION_ERROR", message: "課題を選択してください。" },
       { status: 422 },
     );
   }
 
-  const submission = await findLatestSubmissionByStudentLookup(auth.organizationId, {
-    taskId,
-    studentId,
-    studentName,
-  });
+  const hasId = Boolean(studentId.trim());
+  const hasName = Boolean(studentName.trim());
+  if (hasId !== hasName) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message:
+          "学籍番号と氏名は両方入力するか、どちらも空にしてください（空のときはログイン中のアカウントで照会します）。",
+      },
+      { status: 422 },
+    );
+  }
+
+  const legacy = hasId && hasName;
+  const submission = legacy
+    ? await findLatestSubmissionByStudentLookup(auth.organizationId, {
+        taskId,
+        studentId,
+        studentName,
+      })
+    : await findLatestSubmissionByUidAndTask(auth.organizationId, auth.uid, taskId);
   if (!submission) {
     return NextResponse.json({
       ok: true,

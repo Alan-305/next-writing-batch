@@ -12,6 +12,7 @@ import {
   readFileAsText,
 } from "@/lib/file-ingest";
 import { ProcessingEyesIcon } from "@/components/ProcessingEyesIcon";
+import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import {
   extractQuestionFromTeacherJson,
   isProofreadingSetupJson,
@@ -89,13 +90,24 @@ async function normalizeGeminiMediaFiles(files: File[]): Promise<File[]> {
 
 async function fetchGeminiEssayImageIngest(
   mediaFiles: File[],
-): Promise<{ text: string; noApiKey: boolean; clientError: string | null }> {
+  idToken: string | null,
+): Promise<{ text: string; noApiKey: boolean; clientError: string | null; needLogin?: boolean }> {
   const fd = new FormData();
   for (const f of mediaFiles) {
     fd.append("files", f);
   }
-  const res = await fetch("/api/essay-image-ingest", { method: "POST", body: fd });
-  const data = (await res.json().catch(() => ({}))) as { error?: string; text?: string };
+  const headers: Record<string, string> = {};
+  if (idToken) headers.Authorization = `Bearer ${idToken}`;
+  const res = await fetch("/api/essay-image-ingest", { method: "POST", headers, body: fd });
+  const data = (await res.json().catch(() => ({}))) as { error?: string; text?: string; message?: string };
+  if (res.status === 401) {
+    return {
+      text: "",
+      noApiKey: false,
+      clientError: null,
+      needLogin: true,
+    };
+  }
   if (res.status === 503) {
     return { text: "", noApiKey: true, clientError: null };
   }
@@ -103,7 +115,12 @@ async function fetchGeminiEssayImageIngest(
     return {
       text: "",
       noApiKey: false,
-      clientError: typeof data.error === "string" ? data.error : "読み取りに失敗しました。",
+      clientError:
+        typeof data.error === "string"
+          ? data.error
+          : typeof data.message === "string"
+            ? data.message
+            : "読み取りに失敗しました。",
     };
   }
   return { text: String(data.text || ""), noApiKey: false, clientError: null };
@@ -112,16 +129,30 @@ async function fetchGeminiEssayImageIngest(
 async function fetchGeminiProblemIngest(
   mediaFiles: File[],
   structured: boolean,
+  idToken: string | null,
 ): Promise<{ text: string; usedFirstOnly: boolean }> {
   const fd = new FormData();
   fd.append("mode", structured ? "structured" : "plain");
   for (const f of mediaFiles) {
     fd.append("files", f);
   }
-  const res = await fetch("/api/problem-ingest", { method: "POST", body: fd });
-  const data = (await res.json().catch(() => ({}))) as { error?: string; text?: string; usedFirstOnly?: boolean };
+  const headers: Record<string, string> = {};
+  if (idToken) headers.Authorization = `Bearer ${idToken}`;
+  const res = await fetch("/api/problem-ingest", { method: "POST", headers, body: fd });
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    text?: string;
+    usedFirstOnly?: boolean;
+  };
   if (!res.ok) {
-    throw new Error(typeof data.error === "string" ? data.error : "読み取りに失敗しました。");
+    throw new Error(
+      typeof data.error === "string"
+        ? data.error
+        : typeof data.message === "string"
+          ? data.message
+          : "読み取りに失敗しました。",
+    );
   }
   return {
     text: String(data.text || ""),
@@ -150,6 +181,7 @@ export function TextareaWithFileDrop({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const { user } = useFirebaseAuthContext();
 
   const runImport = useCallback(
     async (files: File[]) => {
@@ -164,6 +196,8 @@ export function TextareaWithFileDrop({
 
       setBusy(true);
       setStatus("取り込み中…");
+
+      const idToken = user ? await user.getIdToken() : null;
 
       try {
         if (files.length === 1 && isJsonFile(files[0])) {
@@ -217,9 +251,15 @@ export function TextareaWithFileDrop({
           try {
             setStatus("手書き・画像を読み取り中…");
             const normalizedMedia = await normalizeGeminiMediaFiles(geminiMedia);
-            const { text: geminiText, noApiKey, clientError } = await fetchGeminiEssayImageIngest(
+            const { text: geminiText, noApiKey, clientError, needLogin } = await fetchGeminiEssayImageIngest(
               normalizedMedia,
+              idToken,
             );
+            if (needLogin) {
+              setStatus("");
+              onNotify?.("手書きの Claude 読み取りにはログインが必要です。ログインするか、下のファイル取り込み（ローカル）をご利用ください。", "error");
+              return;
+            }
             if (noApiKey) {
               setStatus("");
               onNotify?.("Claude API キーが未設定です。手書きOCRは Claude が必須です。", "error");
@@ -258,6 +298,7 @@ export function TextareaWithFileDrop({
             const { text: geminiText, usedFirstOnly } = await fetchGeminiProblemIngest(
               normalizedProblemMedia,
               structured,
+              idToken,
             );
             if (!geminiText.trim()) {
               setStatus("");
@@ -327,6 +368,7 @@ export function TextareaWithFileDrop({
       tesseractLang,
       geminiHandwritingOcr,
       value,
+      user,
     ],
   );
 

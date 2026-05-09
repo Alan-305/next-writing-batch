@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { countEnglishWords } from "@/lib/english-word-count";
 import { buildStudentReleaseFromPatch, type StudentReleasePatchBody } from "@/lib/student-release";
 import { splitExplanationIntoContentGrammarSections } from "@/lib/student-release";
@@ -16,6 +17,8 @@ type RouteContext = { params: Promise<{ submissionId: string }> };
 export async function PATCH(request: Request, context: RouteContext) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   const { submissionId } = await context.params;
   const sid = decodeURIComponent(submissionId || "").trim();

@@ -2,6 +2,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { sanitizeProofreadingSetup } from "@/lib/proofreading-setup-json";
 import { syncTaskProblemsFromProofreadingSetup } from "@/lib/sync-task-problems-from-teacher-setup";
 import {
@@ -19,6 +20,8 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   const u = new URL(request.url);
   const taskId = (u.searchParams.get("taskId") || "").trim();
@@ -43,6 +46,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   let body: unknown;
   try {

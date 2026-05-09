@@ -96,8 +96,8 @@ export async function GET(request: Request) {
     const rows: TicketRow[] = snap.docs.map((doc) => {
       const uid = doc.id;
       const roles = normalizeRoles(doc.get("roles"));
-      const isTeacherLike = uid === auth.uid || isAllowlistedAdminUid(uid) || isTeacherByRoles(roles);
-      const kind: "teacher" | "student" = isTeacherLike ? "teacher" : "student";
+      /** 管理者の /api/admin/tenant-ticket-roster と同じ: Firestore の roles のみで分類 */
+      const kind: "teacher" | "student" = isTeacherByRoles(roles) ? "teacher" : "student";
       const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
       const tickets = Math.max(0, Math.floor(numberOrZero(billing["tickets"])));
       const lastConsumeRaw = billing["lastProofreadTicketConsume"];

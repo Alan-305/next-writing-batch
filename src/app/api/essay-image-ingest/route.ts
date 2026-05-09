@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { runEssayHandwritingIngestClaude } from "@/lib/essay-handwriting-claude";
 import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
@@ -34,6 +35,9 @@ function isMediaFile(file: File): boolean {
  * 提出フォームの英文欄向け: 手書き写真・HEIC・PDF を Claude で転記（Tesseract より高精度）。
  */
 export async function POST(request: Request) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+
   const apiKey = resolveEffectiveAnthropicApiKey();
   if (!apiKey) {
     return NextResponse.json(

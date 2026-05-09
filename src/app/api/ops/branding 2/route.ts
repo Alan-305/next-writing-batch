@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
 import { mergeStudentBranding } from "@/lib/student-branding";
 import {
@@ -15,6 +16,8 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
   try {
     await migrateLegacyOrgLayoutOnce();
     const branding = await readStudentBrandingForOrganization(auth.organizationId);
@@ -34,6 +37,8 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   let body: unknown;
   try {

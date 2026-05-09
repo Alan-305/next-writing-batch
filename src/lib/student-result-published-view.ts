@@ -1,6 +1,7 @@
 import { studentExplanationToDisplayHtml } from "@/lib/explanation-display-html";
 import { finalEssayHtmlPlainBlack } from "@/lib/final-essay-diff-html";
 import { formatDateTimeIso } from "@/lib/format-date";
+import { enrichSubmissionWithResolvedStudentFields } from "@/lib/submission-display-enrich";
 import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-display";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
@@ -41,8 +42,9 @@ export async function loadStudentResultPublishedView(
   if (!sid) return { kind: "missing" };
 
   const hit = await findSubmissionAcrossOrganizations(sid);
-  const submission = hit?.submission ?? null;
-  if (!submission) return { kind: "missing" };
+  const raw = hit?.submission ?? null;
+  if (!raw) return { kind: "missing" };
+  const submission = await enrichSubmissionWithResolvedStudentFields(raw);
 
   const sr = submission.studentRelease;
   if (!sr?.operatorApprovedAt) {

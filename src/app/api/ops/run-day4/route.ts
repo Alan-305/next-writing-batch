@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { consumeProofreadTickets, getTicketBalanceForUid } from "@/lib/billing/proofread-ticket-firestore";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import {
   getSubmissionByIdInOrganization,
   getSubmissions,
@@ -32,6 +33,8 @@ type Body = {
 export async function POST(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   let body: Body = {};
   try {

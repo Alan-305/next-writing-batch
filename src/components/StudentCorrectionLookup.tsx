@@ -70,12 +70,14 @@ function downloadTextFile(filename: string, body: string) {
 
 export function StudentCorrectionLookup() {
   const router = useRouter();
-  const { user } = useFirebaseAuthContext();
+  const { user, profile } = useFirebaseAuthContext();
   const getAccessToken = useCallback(async () => {
     if (!user) return null;
     return user.getIdToken();
   }, [user]);
   const [form, setForm] = useState(emptyLookup);
+  /** ログイン提出以前のデータ用（課題＋学籍＋氏名） */
+  const [legacyMode, setLegacyMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<LookupResult | null>(null);
@@ -93,10 +95,13 @@ export function StudentCorrectionLookup() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       const token = await getAccessToken();
       if (token) headers.Authorization = `Bearer ${token}`;
+      const payload = legacyMode
+        ? form
+        : { taskId: form.taskId, studentId: "", studentName: "" };
       const response = await fetch("/api/submissions/lookup", {
         method: "POST",
         headers,
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const json = await response.json();
 
@@ -110,7 +115,14 @@ export function StudentCorrectionLookup() {
         return;
       }
 
-      setMetaAtLookup(snapshot);
+      const metaSnapshot = legacyMode
+        ? snapshot
+        : {
+            taskId: snapshot.taskId,
+            studentId: profile?.studentNumber?.trim() ?? "",
+            studentName: profile?.nickname?.trim() ?? "",
+          };
+      setMetaAtLookup(metaSnapshot);
       setResult({
         found: true,
         submissionId: json.submissionId,
@@ -134,7 +146,33 @@ export function StudentCorrectionLookup() {
     <section aria-labelledby="correction-lookup-heading">
       <h2 id="correction-lookup-heading">添削結果の確認</h2>
       <p className="muted" style={{ marginTop: 0 }}>
-        提出時と同じ<b>課題</b>・<b>学籍番号</b>・<b>氏名</b>で照会します。運用が公開するまで「添削中」と表示されます。公開後は「添削完了」と、詳細ページ・ダウンロードから結果を確認できます。
+        {legacyMode ? (
+          <>
+            <b>旧形式</b>の提出を照会する場合は、提出時と同じ<b>課題</b>・<b>学籍番号</b>・<b>氏名</b>を入力してください。
+          </>
+        ) : (
+          <>
+            ログイン中のアカウントで提出した答案を、<b>課題</b>だけ選んで照会します（学籍・氏名の入力は不要です）。
+          </>
+        )}
+        運用が公開するまで「添削中」と表示されます。公開後は「添削完了」と、詳細ページ・ダウンロードから結果を確認できます。
+      </p>
+
+      <p style={{ marginBottom: 12 }}>
+        <label style={{ cursor: "pointer", userSelect: "none" }}>
+          <input
+            type="checkbox"
+            checked={legacyMode}
+            disabled={loading}
+            onChange={(e) => {
+              setLegacyMode(e.target.checked);
+              setForm(emptyLookup);
+              setResult(null);
+              setMetaAtLookup(null);
+            }}
+          />{" "}
+          学籍番号・氏名で照会する（ログイン前の古い提出用）
+        </label>
       </p>
 
       <form className="card" onSubmit={onSubmit}>
@@ -146,26 +184,30 @@ export function StudentCorrectionLookup() {
           disabled={loading}
           getAccessToken={getAccessToken}
         />
-        <label className="field">
-          <span>学籍番号</span>
-          <input
-            value={form.studentId}
-            onChange={(e) => setForm((p) => ({ ...p, studentId: e.target.value }))}
-            placeholder="提出時と同じ学籍番号"
-            disabled={loading}
-            autoComplete="off"
-          />
-        </label>
-        <label className="field">
-          <span>氏名</span>
-          <input
-            value={form.studentName}
-            onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
-            placeholder="提出時と同じ氏名"
-            disabled={loading}
-            autoComplete="name"
-          />
-        </label>
+        {legacyMode ? (
+          <>
+            <label className="field">
+              <span>学籍番号</span>
+              <input
+                value={form.studentId}
+                onChange={(e) => setForm((p) => ({ ...p, studentId: e.target.value }))}
+                placeholder="提出時と同じ学籍番号"
+                disabled={loading}
+                autoComplete="off"
+              />
+            </label>
+            <label className="field">
+              <span>氏名</span>
+              <input
+                value={form.studentName}
+                onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
+                placeholder="提出時と同じ氏名"
+                disabled={loading}
+                autoComplete="name"
+              />
+            </label>
+          </>
+        ) : null}
         <button type="submit" disabled={loading}>
           {loading ? "照会中..." : "添削状況を照会"}
         </button>
