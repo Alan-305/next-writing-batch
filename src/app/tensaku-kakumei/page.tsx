@@ -82,7 +82,11 @@ export default async function TensakuKakumeiPage() {
 
           <article className="tensaku-value">
             <h3>教師よし</h3>
-            <p>添削を「苦行」から「楽しさ」へ。時間と体力を取り戻し、指導に集中できる余白をつくり,利用料は0円とします。</p>
+            <p>
+              添削を「苦行」から「楽しさ」へ。時間と体力を取り戻し、指導に集中できる余白をつくります。運用では
+              <strong>教員がチケットを購入・管理</strong>
+              し、生徒の答案ごとの公開・確定のたびに 1 枚ずつ消費されます（生徒による購入はありません）。
+            </p>
           </article>
 
           <article className="tensaku-value">

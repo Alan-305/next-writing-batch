@@ -27,23 +27,11 @@ type Payload = {
   message?: string;
 };
 
-type GrantHistoryRow = {
-  id: string;
-  targetUid: string;
-  targetDisplayLabel?: string;
-  targetEmail?: string | null;
-  amount: number;
-  note: string | null;
-  organizationId: string | null;
-  createdAt: string | null;
-  targetKind: string;
-};
-
 const PLAN_OPTIONS: Array<{ plan: BillingPlan; label: string; priceLabel: string; tickets: number }> = [
-  { plan: "1m", label: "1ヶ月", priceLabel: "2,000円", tickets: 5 },
-  { plan: "3m", label: "3ヶ月", priceLabel: "5,700円", tickets: 15 },
-  { plan: "6m", label: "6ヶ月", priceLabel: "10,000円", tickets: 30 },
-  { plan: "12m", label: "1年", priceLabel: "18,000円", tickets: 60 },
+  { plan: "t10", label: "10枚パック", priceLabel: "2,500円", tickets: 10 },
+  { plan: "t30", label: "30枚パック", priceLabel: "6,000円", tickets: 30 },
+  { plan: "t60", label: "60枚パック", priceLabel: "10,800円", tickets: 60 },
+  { plan: "t120", label: "120枚パック", priceLabel: "18,000円", tickets: 120 },
 ];
 
 function formatIso(iso: string | null): string {
@@ -59,23 +47,13 @@ function OpsTicketsPageInner() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState<BillingPlan>("1m");
+  const [selectedPlan, setSelectedPlan] = useState<BillingPlan>("t10");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [targetUid, setTargetUid] = useState("");
-  const [grantAmount, setGrantAmount] = useState("1");
-  const [grantNote, setGrantNote] = useState("");
-  const [grantBusy, setGrantBusy] = useState(false);
-  const [grantError, setGrantError] = useState("");
-  const [grantResult, setGrantResult] = useState("");
-  const [history, setHistory] = useState<GrantHistoryRow[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
   const [tenantIdCopied, setTenantIdCopied] = useState(false);
   const searchParams = useSearchParams();
   const tenantCreatedWelcome = searchParams.get("tenantCreated") === "1";
-  const currentUid = getFirebaseAuth()?.currentUser?.uid ?? "";
 
   const selectedPlanInfo = useMemo(
     () => PLAN_OPTIONS.find((item) => item.plan === selectedPlan) ?? PLAN_OPTIONS[0],
@@ -95,8 +73,6 @@ function OpsTicketsPageInner() {
   const inviteQrUrl = inviteUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
     : "";
-  const tenantLabel = (data?.organizationId ?? "").trim() || "default";
-  const selectableStudents = (data?.students ?? []).filter((s) => s.uid !== currentUid);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,39 +100,9 @@ function OpsTicketsPageInner() {
     }
   }, []);
 
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    setHistoryError("");
-    try {
-      const user = getFirebaseAuth()?.currentUser;
-      if (!user) {
-        setHistoryError("配布履歴の取得に失敗しました（未ログイン）。");
-        return;
-      }
-      const token = await user.getIdToken();
-      const res = await fetch("/api/ops/ticket-grants?limit=30", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const j = (await res.json()) as { ok?: boolean; message?: string; history?: GrantHistoryRow[] };
-      if (!res.ok || !j?.ok) {
-        setHistoryError(j?.message ?? "配布履歴の取得に失敗しました。");
-        return;
-      }
-      setHistory(Array.isArray(j.history) ? j.history : []);
-    } catch {
-      setHistoryError("通信エラーで配布履歴を取得できませんでした。");
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
 
   const handleCheckout = async () => {
     setCheckoutError("");
@@ -200,63 +146,7 @@ function OpsTicketsPageInner() {
     }
   };
 
-  const handleGrant = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    setGrantError("");
-    setGrantResult("");
-    const uid = targetUid.trim();
-    const amount = Number.parseInt(grantAmount.trim(), 10);
-    if (!uid) {
-      setGrantError("配布先の生徒を選択してください。");
-      return;
-    }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setGrantError("配布枚数は 1 以上の整数で入力してください。");
-      return;
-    }
-    setGrantBusy(true);
-    try {
-      const user = getFirebaseAuth()?.currentUser;
-      if (!user) throw new Error("ログイン情報を取得できませんでした。");
-      const token = await user.getIdToken();
-      const res = await fetch("/api/ops/ticket-grants", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          targetUid: uid,
-          amount,
-          note: grantNote.trim() || undefined,
-        }),
-      });
-      const j = (await res.json()) as {
-        ok?: boolean;
-        message?: string;
-        amount?: number;
-        fromTicketsAfter?: number;
-        targetTicketsAfter?: number;
-      };
-      if (!res.ok || !j?.ok) {
-        setGrantError(j?.message ?? "配布に失敗しました。");
-        return;
-      }
-      setGrantResult(
-        `${j.amount ?? amount}枚配布しました。配布元残り: ${j.fromTicketsAfter ?? "—"} / 生徒残り: ${j.targetTicketsAfter ?? "—"}`,
-      );
-      setGrantAmount("1");
-      setGrantNote("");
-      await load();
-      await loadHistory();
-    } catch (e) {
-      setGrantError(e instanceof Error ? e.message : "配布に失敗しました。");
-    } finally {
-      setGrantBusy(false);
-    }
-  };
-
-  const renderList = (items: TicketRow[]) => {
+  const renderList = (items: TicketRow[], role: "teacher" | "student") => {
     if (items.length === 0) return <p className="muted">該当ユーザーがいません。</p>;
     return (
       <ul className="admin-roster-list">
@@ -267,10 +157,16 @@ function OpsTicketsPageInner() {
               <span className="muted admin-roster-meta">
                 <code>{m.uid.slice(0, 8)}…</code>
                 {m.email ? ` · ${m.email}` : ""}
-                {" · "}
-                残り <strong>{m.tickets}</strong>
-                {m.lastProofreadTicketConsume != null ? ` · 直近消費 ${m.lastProofreadTicketConsume}` : ""}
-                {m.lastProofreadTicketAt ? ` · ${formatIso(m.lastProofreadTicketAt)}` : ""}
+                {role === "teacher" ? (
+                  <>
+                    {" · "}
+                    残り <strong>{m.tickets}</strong>
+                    {m.lastProofreadTicketConsume != null ? ` · 直近消費 ${m.lastProofreadTicketConsume}` : ""}
+                    {m.lastProofreadTicketAt ? ` · ${formatIso(m.lastProofreadTicketAt)}` : ""}
+                  </>
+                ) : (
+                  <span> · 添削の確定ごとに教員のチケットから消費されます</span>
+                )}
               </span>
             </span>
           </li>
@@ -339,7 +235,9 @@ function OpsTicketsPageInner() {
           教師チケット購入
         </h2>
         <p className="muted admin-tenant-roster-lead">
-          ここで購入したチケットは、ログイン中の教員アカウントに付与されます。
+          <strong>初回の教員登録時に 5 枚無料</strong>が付与されます。ここで購入したチケットは
+          <strong>ログイン中の教員アカウント</strong>
+          に付与されます。生徒の添削を公開・確定するたびに、この残数から 1 枚ずつ消費されます。
         </p>
         <div className="student-settings-plan-grid" role="radiogroup" aria-label="購入プラン">
           {PLAN_OPTIONS.map((option) => (
@@ -372,83 +270,6 @@ function OpsTicketsPageInner() {
         {checkoutError ? <p className="admin-tenant-roster-error">{checkoutError}</p> : null}
       </div>
 
-      <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
-        <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
-          生徒へチケット配布
-        </h2>
-        <p className="muted admin-tenant-roster-lead">
-          同一テナントの生徒にのみ配布できます。配布した分は教員の残チケットから減算されます。
-        </p>
-        <p className="muted" style={{ marginTop: 0 }}>
-          現在の配布テナント: <code>{tenantLabel}</code>
-        </p>
-        <form onSubmit={(e) => void handleGrant(e)}>
-          <div className="field">
-            <span>配布先（生徒）</span>
-            <select value={targetUid} onChange={(e) => setTargetUid(e.target.value)} disabled={grantBusy}>
-              <option value="">選択してください</option>
-              {selectableStudents.map((s) => (
-                <option key={s.uid} value={s.uid}>
-                  {s.displayLabel}（org: {tenantLabel} / 残り {s.tickets}）
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <span>配布枚数</span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={grantAmount}
-              onChange={(e) => setGrantAmount(e.target.value)}
-              disabled={grantBusy}
-            />
-          </div>
-          <div className="field">
-            <span>メモ（任意）</span>
-            <input value={grantNote} onChange={(e) => setGrantNote(e.target.value)} disabled={grantBusy} />
-          </div>
-          <p style={{ marginBottom: 0 }}>
-            <button type="submit" disabled={grantBusy}>
-              {grantBusy ? "配布中..." : "チケットを配布する"}
-            </button>
-          </p>
-          {grantError ? <p className="admin-tenant-roster-error">{grantError}</p> : null}
-          {grantResult ? <p className="success">{grantResult}</p> : null}
-        </form>
-      </div>
-
-      <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
-        <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
-          配布履歴（最新30件）
-        </h2>
-        {historyLoading ? <p className="muted">履歴を読み込み中…</p> : null}
-        {historyError ? <p className="admin-tenant-roster-error">{historyError}</p> : null}
-        {!historyLoading && !historyError ? (
-          history.length === 0 ? (
-            <p className="muted">履歴はまだありません。</p>
-          ) : (
-            <ul className="admin-roster-list">
-              {history.map((h) => (
-                <li key={h.id}>
-                  <span>
-                    {formatIso(h.createdAt)} · <strong>{h.amount}</strong> 枚 →{" "}
-                    <strong>{h.targetDisplayLabel ?? h.targetUid}</strong>{" "}
-                    <span className="muted admin-roster-meta">
-                      <code>{h.targetUid.slice(0, 8)}…</code>
-                      {h.targetEmail ? ` · ${h.targetEmail}` : ""}
-                    </span>
-                    {h.targetKind !== "unknown" ? ` (${h.targetKind})` : ""}
-                    {h.note ? ` · ${h.note}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )
-        ) : null}
-      </div>
-
       <div className="card admin-tenant-roster-card">
         {loading ? <p className="muted">読み込み中…</p> : null}
         {error ? (
@@ -459,7 +280,7 @@ function OpsTicketsPageInner() {
         {!loading && !error && data?.ok ? (
           <>
             <p className="muted admin-tenant-roster-lead">
-              テナント <code>{data.organizationId ?? "—"}</code> の教員・生徒の残チケットと直近消費です。
+              テナント <code>{data.organizationId ?? "—"}</code> の教員（チケット残高）と登録生徒です。
             </p>
             <div className="admin-roster-columns">
               <div>
@@ -467,14 +288,14 @@ function OpsTicketsPageInner() {
                   教員・運用{" "}
                   <span className="admin-roster-count">{data.teacherCount ?? data.teachers?.length ?? 0} 名</span>
                 </h2>
-                {renderList(data.teachers ?? [])}
+                {renderList(data.teachers ?? [], "teacher")}
               </div>
               <div>
                 <h2 className="admin-roster-subheading">
                   生徒（想定）{" "}
                   <span className="admin-roster-count">{data.studentCount ?? data.students?.length ?? 0} 名</span>
                 </h2>
-                {renderList(data.students ?? [])}
+                {renderList(data.students ?? [], "student")}
               </div>
             </div>
             {data.note ? (

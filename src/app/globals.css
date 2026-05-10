@@ -695,21 +695,6 @@ td {
   font-size: 0.96rem;
 }
 
-.ops-home-action--tenant {
-  background: linear-gradient(180deg, #f8fafc 0%, #ecfdf5 100%);
-  border-color: #a7f3d0;
-}
-
-.ops-home-action--tenant .ops-home-action-icon {
-  background: #d1fae5;
-  border-color: #6ee7b7;
-}
-
-.ops-home-action--tenant .ops-home-action-cta {
-  color: #065f46;
-  background: #d1fae5;
-}
-
 .ops-home-action--appearance {
   background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
   border-color: #ddd6fe;
@@ -768,6 +753,21 @@ td {
 .ops-home-action--deliverables .ops-home-action-cta {
   color: #92400e;
   background: #fef3c7;
+}
+
+.ops-home-action--tickets {
+  background: linear-gradient(180deg, #f8fafc 0%, #ecfdf5 100%);
+  border-color: #a7f3d0;
+}
+
+.ops-home-action--tickets .ops-home-action-icon {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.ops-home-action--tickets .ops-home-action-cta {
+  color: #065f46;
+  background: #d1fae5;
 }
 
 .ops-home-action--inquiry {

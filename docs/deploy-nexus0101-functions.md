@@ -39,7 +39,7 @@ npm run firebase:deploy-functions
 |------|------|
 | `STRIPE_SECRET_KEY` | Stripe API |
 | `STRIPE_WEBHOOK_SECRET` | Webhook 署名検証 |
-| `STRIPE_PRICE_1M` など | Checkout の price ID |
+| `STRIPE_PRICE_T10` など | Checkout の price ID（`STRIPE_PRICE_T10` / `T30` / `T60` / `T120`） |
 | `ADMIN_UIDS` | 管理者 Callable（カンマ区切り・**ルート `.env.local` の allowlist と同じ UID**） |
 | `RESEND_API_KEY` | 任意（ウェルカムメール） |
 
@@ -52,7 +52,7 @@ npm run firebase:deploy-functions
 
 ## 添削 API（Next.js）とチケット
 
-`/api/ops/run-proofread` は **ログイン中ユーザーの** `users/{uid}.billing.tickets` を参照します。検証／本番の Next を動かすプロセスに、**同じ Firebase プロジェクト**へ書き込める Admin 資格情報（`GOOGLE_APPLICATION_CREDENTIALS` 等）を渡してください。ローカルでゲートを外す場合のみ `NWB_SKIP_PROOFREAD_TICKET_GATE=true`（`.env.example` 参照）。
+`/api/ops/run-proofread` は **運用教員の** `users/{uid}.billing.tickets` がバッチ件数分あるかを参照します。検証／本番の Next を動かすプロセスに、**同じ Firebase プロジェクト**へ書き込める Admin 資格情報（`GOOGLE_APPLICATION_CREDENTIALS` 等）を渡してください。ローカルでゲートを外す場合のみ `NWB_SKIP_PROOFREAD_TICKET_GATE=true`（`.env.example` 参照）。
 
 ## 次の段階（本番 nexus0301）
 

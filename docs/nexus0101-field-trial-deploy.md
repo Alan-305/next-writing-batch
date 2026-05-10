@@ -42,7 +42,7 @@ Google Cloud Console → **Cloud Functions** → **各関数** → 編集 → **
 |------|------------------|------|
 | `STRIPE_SECRET_KEY` | `createStripeCheckoutSession`, `stripeWebhook`, `adminCreateStripeRefund` | Stripe API |
 | `STRIPE_WEBHOOK_SECRET` | **`stripeWebhook` のみ**（他関数には不要だが付いても可） | Webhook 署名 |
-| `STRIPE_PRICE_1M`, `STRIPE_PRICE_3M`, `STRIPE_PRICE_6M`, `STRIPE_PRICE_12M` | `createStripeCheckoutSession` | Price ID（値は **`price_...` のみ**。`KEY=value` を値欄に書かない） |
+| `STRIPE_PRICE_T10`, `STRIPE_PRICE_T30`, `STRIPE_PRICE_T60`, `STRIPE_PRICE_T120` | `createStripeCheckoutSession` | Price ID（値は **`price_...` のみ**。`KEY=value` を値欄に書かない） |
 | `ADMIN_UIDS` | `adminAdjustBillingTickets`, `adminCreateStripeRefund` | 管理者 UID（カンマ区切り。**ルート `.env.local` の `NEXT_PUBLIC_FIREBASE_ADMIN_UIDS` と同一**） |
 | `RESEND_API_KEY` | `onAuthUserCreate` | ウェルカムメール（未設定なら送信スキップ等の実装に依存） |
 | `RESEND_FROM` | `onAuthUserCreate` | 任意。送信元表示 |

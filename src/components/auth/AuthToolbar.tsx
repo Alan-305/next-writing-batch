@@ -8,7 +8,7 @@ type Props = Readonly<{ variant: Variant }>;
 
 /** ヘッダー内にログイン中ユーザーの簡易表示とログアウトを出す（認証済みルート向け） */
 export function AuthToolbar({ variant }: Props) {
-  const { configured, user, authLoading, signOutUser } = useFirebaseAuthContext();
+  const { configured, user, authLoading, profile, profileLoading, signOutUser } = useFirebaseAuthContext();
 
   if (!configured) return null;
   if (authLoading) {
@@ -21,6 +21,8 @@ export function AuthToolbar({ variant }: Props) {
   if (!user) return null;
 
   const muted = variant === "student";
+  const orgId = String(profile?.organizationId ?? "").trim();
+
   return (
     <div
       className={variant === "student" ? "auth-toolbar auth-toolbar--student" : "auth-toolbar auth-toolbar--teacher"}
@@ -33,9 +35,22 @@ export function AuthToolbar({ variant }: Props) {
         justifyContent: "flex-end",
       }}
     >
-      <span className={muted ? "muted" : undefined} style={{ fontSize: 13, maxWidth: 220 }} title={user.email ?? ""}>
-        {user.email ?? user.uid}
-      </span>
+      <div className="auth-toolbar-user-block" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, maxWidth: 380 }}>
+        <span className={muted ? "muted" : undefined} style={{ fontSize: 13, maxWidth: 320 }} title={user.email ?? ""}>
+          {user.email ?? user.uid}
+        </span>
+        {variant === "teacher" ? (
+          profileLoading ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              テナント ID を読み込み中…
+            </span>
+          ) : orgId ? (
+            <span className="muted auth-toolbar-tenant-id" style={{ fontSize: 12 }} title={`organizationId: ${orgId}`}>
+              テナント ID: <code style={{ fontSize: "inherit", wordBreak: "break-all" }}>{orgId}</code>
+            </span>
+          ) : null
+        ) : null}
+      </div>
       <button type="button" onClick={() => void signOutUser()}>
         ログアウト
       </button>

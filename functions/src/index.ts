@@ -17,16 +17,16 @@ const stripe = stripeSecretKey
     })
   : null;
 const STRIPE_PRICE_BY_PLAN = {
-  "1m": process.env.STRIPE_PRICE_1M?.trim() ?? "",
-  "3m": process.env.STRIPE_PRICE_3M?.trim() ?? "",
-  "6m": process.env.STRIPE_PRICE_6M?.trim() ?? "",
-  "12m": process.env.STRIPE_PRICE_12M?.trim() ?? "",
+  t10: process.env.STRIPE_PRICE_T10?.trim() ?? "",
+  t30: process.env.STRIPE_PRICE_T30?.trim() ?? "",
+  t60: process.env.STRIPE_PRICE_T60?.trim() ?? "",
+  t120: process.env.STRIPE_PRICE_T120?.trim() ?? "",
 } as const;
 const TICKETS_BY_PLAN = {
-  "1m": 5,
-  "3m": 15,
-  "6m": 30,
-  "12m": 60,
+  t10: 10,
+  t30: 30,
+  t60: 60,
+  t120: 120,
 } as const;
 
 function parseAdminUidSet(): Set<string> {
@@ -55,8 +55,7 @@ function isAdminUid(uid: string): boolean {
  * - billing は初期 {}（Stripe Webhook 等での更新のみ想定）
  * - RESEND_API_KEY が Functions の環境にあればウェルカムメール（冪等: welcomeEmailSentAt）
  *
- * リージョン未指定 = 既定の us-central1（初回デプロイで asia-northeast1 が失敗する事例の回避）。
- * 東京に固定したい場合は、一度成功後に .region("asia-northeast1") を検討。
+ * リージョン未指定 = 既定の us-central1（デプロイ済み第1世代と getFunctions のリージョンを一致させる）。
  */
 export const onAuthUserCreate = functions.auth.user().onCreate(async (user) => {
   const uid = user.uid;
@@ -873,21 +872,21 @@ function resolveTicketAmount(session: {
 
 function lookupTicketsByPriceId(priceId: string): number {
   const table: Record<string, number> = {
-    [STRIPE_PRICE_BY_PLAN["1m"]]: TICKETS_BY_PLAN["1m"],
-    [STRIPE_PRICE_BY_PLAN["3m"]]: TICKETS_BY_PLAN["3m"],
-    [STRIPE_PRICE_BY_PLAN["6m"]]: TICKETS_BY_PLAN["6m"],
-    [STRIPE_PRICE_BY_PLAN["12m"]]: TICKETS_BY_PLAN["12m"],
+    [STRIPE_PRICE_BY_PLAN.t10]: TICKETS_BY_PLAN.t10,
+    [STRIPE_PRICE_BY_PLAN.t30]: TICKETS_BY_PLAN.t30,
+    [STRIPE_PRICE_BY_PLAN.t60]: TICKETS_BY_PLAN.t60,
+    [STRIPE_PRICE_BY_PLAN.t120]: TICKETS_BY_PLAN.t120,
   };
   return table[priceId] ?? 0;
 }
 
 function parsePlan(value: unknown): keyof typeof STRIPE_PRICE_BY_PLAN {
-  if (value === "1m" || value === "3m" || value === "6m" || value === "12m") {
+  if (value === "t10" || value === "t30" || value === "t60" || value === "t120") {
     return value;
   }
   throw new functions.https.HttpsError(
     "invalid-argument",
-    "plan は 1m / 3m / 6m / 12m のいずれかを指定してください。",
+    "plan は t10 / t30 / t60 / t120 のいずれかを指定してください。",
   );
 }
 

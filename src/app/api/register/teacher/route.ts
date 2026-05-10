@@ -83,7 +83,10 @@ export async function POST(request: Request) {
         {
           roles: FieldValue.arrayUnion("teacher"),
           organizationId,
-          billing: {},
+          billing: {
+            tickets: 5,
+            welcomeTicketsGranted: true,
+          },
           createdAt: new Date().toISOString(),
         },
         { merge: true },
@@ -100,11 +103,23 @@ export async function POST(request: Request) {
       };
     }
 
+    const existingBilling = (snap.get("billing") ?? {}) as Record<string, unknown>;
+    const welcomeDone = existingBilling["welcomeTicketsGranted"] === true;
+    const curTickets =
+      typeof existingBilling["tickets"] === "number" && Number.isFinite(existingBilling["tickets"] as number)
+        ? Math.max(0, Math.floor(existingBilling["tickets"] as number))
+        : 0;
+
     t.set(
       userRef,
       {
         organizationId,
         roles: FieldValue.arrayUnion("teacher"),
+        billing: {
+          ...existingBilling,
+          tickets: welcomeDone ? curTickets : curTickets + 5,
+          welcomeTicketsGranted: true,
+        },
       },
       { merge: true },
     );

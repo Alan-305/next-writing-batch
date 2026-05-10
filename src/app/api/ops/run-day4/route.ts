@@ -25,8 +25,10 @@ type Body = {
   submissionId?: string;
   /**
    * 運用「確定（Day4 生成）」フローからのみ true。
-   * 成功後、その提出の提出者 UID から 1 枚消費（未消費分のみ）。
+   * 成功後、運用教員の billing.tickets から 1 提出あたり 1 枚消費（未請求分のみ）。
    */
+  chargeTicket?: boolean;
+  /** @deprecated chargeTicket と同じ（後方互換） */
   chargeStudentTicket?: boolean;
 };
 
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
       ? [String(body.submissionId).trim()]
       : [];
 
-  const chargeStudentTicket = Boolean(body.chargeStudentTicket);
+  const chargeTicket = Boolean(body.chargeTicket ?? body.chargeStudentTicket);
 
   try {
   if (submissionIds.length > 0) {
@@ -65,32 +67,27 @@ export async function POST(request: Request) {
     }
   }
 
-  if (chargeStudentTicket && submissionIds.length > 0) {
+  if (chargeTicket && submissionIds.length > 0) {
+    let needTickets = 0;
     for (const sid of submissionIds) {
       const row = await getSubmissionByIdInOrganization(auth.organizationId, sid);
       if (!row) {
         return NextResponse.json({ ok: false, message: "提出が見つかりません。" }, { status: 404 });
       }
       if (String(row.day4TicketChargedAt ?? "").trim()) continue;
-      const uid = String(row.submittedByUid ?? "").trim();
-      if (!uid) {
+      if (!String(row.submittedByUid ?? "").trim()) continue;
+      needTickets += 1;
+    }
+    if (needTickets > 0) {
+      const teacherBal = await getTicketBalanceForUid(auth.uid);
+      if (teacherBal < needTickets) {
         return NextResponse.json(
           {
             ok: false,
-            code: "SUBMITTER_UID_REQUIRED",
-            message: "ログイン提出でない受付にはチケットを紐付けられません。",
-          },
-          { status: 422 },
-        );
-      }
-      const bal = await getTicketBalanceForUid(uid);
-      if (bal < 1) {
-        return NextResponse.json(
-          {
-            ok: false,
-            code: "INSUFFICIENT_STUDENT_TICKETS",
-            message: `Day4 確定に必要な生徒のチケットが不足しています（残り ${bal}）。先に教員からチケットを配布してください。`,
-            balance: bal,
+            code: "INSUFFICIENT_TEACHER_TICKETS",
+            message: `Day4 確定に必要な教員のチケットが不足しています（必要: ${needTickets} 枚 / 残り: ${teacherBal}）。「招待QRとチケット状況」で購入してください。`,
+            balance: teacherBal,
+            required: needTickets,
           },
           { status: 402 },
         );
@@ -134,27 +131,28 @@ export async function POST(request: Request) {
   }
 
   let ticketChargeWarning: string | undefined;
-  const ticketsCharged: Array<{ submissionId: string; uid: string; remainingAfter: number }> = [];
+  const ticketsCharged: Array<{ submissionId: string; chargedFromUid: string; remainingAfter: number }> = [];
 
-  if (chargeStudentTicket && submissionIds.length > 0) {
+  if (chargeTicket && submissionIds.length > 0) {
+    const teacherUid = auth.uid;
     for (const sid of submissionIds) {
       const row = await getSubmissionByIdInOrganization(auth.organizationId, sid);
       if (!row) continue;
       if (String(row.day4TicketChargedAt ?? "").trim()) continue;
 
-      const uid = String(row.submittedByUid ?? "").trim();
-      if (!uid) {
+      const submitterUid = String(row.submittedByUid ?? "").trim();
+      if (!submitterUid) {
         ticketChargeWarning =
           (ticketChargeWarning ? `${ticketChargeWarning} ` : "") +
-          `${sid}: 提出者 UID が無くチケットを消費できませんでした。`;
+          `${sid}: ログイン提出ではないため請求記録のみスキップしました（教員チケットは消費していません）。`;
         continue;
       }
 
-      const consumed = await consumeProofreadTickets(uid, 1, "day4_finalize");
+      const consumed = await consumeProofreadTickets(teacherUid, 1, "day4_finalize");
       if (!consumed.ok) {
         ticketChargeWarning =
           (ticketChargeWarning ? `${ticketChargeWarning} ` : "") +
-          `${sid}: チケット減算に失敗しました（${consumed.code}）。Day4 は生成済みです。billing を確認してください。`;
+          `${sid}: 教員チケットの減算に失敗しました（${consumed.code}）。Day4 は生成済みです。billing を確認してください。`;
         continue;
       }
 
@@ -163,7 +161,7 @@ export async function POST(request: Request) {
         ...cur,
         day4TicketChargedAt: iso,
       }));
-      ticketsCharged.push({ submissionId: sid, uid, remainingAfter: consumed.tickets });
+      ticketsCharged.push({ submissionId: sid, chargedFromUid: teacherUid, remainingAfter: consumed.tickets });
     }
   }
 

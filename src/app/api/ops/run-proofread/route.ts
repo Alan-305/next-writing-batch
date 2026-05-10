@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   allProofreadTargetsAreSelfSubmitted,
-  assertStudentsHaveTicketsForProofreadRows,
+  assertTeacherHasTicketsForProofread,
 } from "@/lib/billing/proofread-ticket-firestore";
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
@@ -88,16 +88,16 @@ export async function POST(request: Request) {
     );
   }
 
-  /** ローカル試験用。true 時は生徒チケット検査もスキップ */
+  /** ローカル試験用。true 時は教員チケット検査もスキップ */
   const skipTicketGate = (process.env.NWB_SKIP_PROOFREAD_TICKET_GATE ?? "").trim() === "true";
   /** 教員が自分のアカウントで `/submit` した答案のみを対象にする試行（チケット検査不要・消費なし） */
   const teacherSelfServiceProofread = allProofreadTargetsAreSelfSubmitted(targetRows, auth.uid);
   if (!skipTicketGate && !teacherSelfServiceProofread) {
-    const canStart = await assertStudentsHaveTicketsForProofreadRows(targetRows);
+    const canStart = await assertTeacherHasTicketsForProofread(auth.uid, targetRowCount);
     if (!canStart.ok) {
       return NextResponse.json(
         { ok: false, code: canStart.code, message: canStart.message },
-        { status: canStart.code === "INSUFFICIENT_STUDENT_TICKETS" ? 402 : 422 },
+        { status: canStart.code === "INSUFFICIENT_TEACHER_TICKETS" ? 402 : 422 },
       );
     }
   }
@@ -146,8 +146,8 @@ export async function POST(request: Request) {
   await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
 
   const message = teacherSelfServiceProofread
-    ? "添削バッチが完了しました（教員本人名義の試行のため生徒チケット検査を省略しました）。一覧を再読み込みしてください。"
-    : "添削バッチが完了しました。一覧を再読み込みしてください。チケットは Day4 確定時に生徒から 1 枚消費されます。";
+    ? "添削バッチが完了しました（教員本人名義の試行のためチケット検査を省略しました）。一覧を再読み込みしてください。"
+    : "添削バッチが完了しました。一覧を再読み込みしてください。チケットは Day4 確定時に教員プールから 1 件あたり 1 枚消費されます。";
 
   return NextResponse.json({
     ok: true,

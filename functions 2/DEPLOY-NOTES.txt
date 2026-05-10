@@ -13,10 +13,10 @@ Cloud Functions（Gen1）デプロイでビルドが失敗するときのメモ
    変更後、再度: npm run firebase:deploy-functions
 
 2) 「イメージを何日保持するか」の対話プロンプト（Artifact Registry）
-   - npm run firebase:deploy-functions は、デプロイの前に us-central1（と過去に使った可能性のある asia-northeast1）へ
+   - npm run firebase:deploy-functions は、デプロイの前に us-central1 へ
      「1 日で削除」のポリシーを --force で当て直してから deploy します（対話を避ける）。
    - それでも聞かれる場合は、CLI が「ポリシーなし」を推奨しない状態にする:
        npm run firebase:functions:opt-out-artifact-cleanup
-     （古いイメージは溜まる可能性あり。必要なら後から Cloud Console で手動整理）
+     （古いイメージは溜まる可能性あり。必要なら後から Cloud Console で手動整理。過去に us-central1 にデプロイしていた場合は Console でそのリージョンの Artifact Registry も確認）
    - 手動だけの場合:
        npm run firebase:functions:set-artifact-cleanup

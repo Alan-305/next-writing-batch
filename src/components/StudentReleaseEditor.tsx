@@ -282,7 +282,7 @@ export function StudentReleaseEditor({
         taskId,
         submissionId,
         force: day4Force,
-        chargeStudentTicket: true,
+        chargeTicket: true,
       }),
     });
     const d4json = (await parseFetchJson(d4)) as {

@@ -98,34 +98,25 @@ export function allProofreadTargetsAreSelfSubmitted(rows: Submission[], operator
 }
 
 /**
- * Day3 添削を実行する前に、対象各行の提出者 UID ごとに残チケットが足りるかだけ検査する（減算はしない）。
- * 教員の残高は見ない。未ログイン提出（submittedByUid なし）は不可。
+ * Day3 添削を実行する前に、運用教員の残チケットがバッチ件数分あるか検査する（減算はしない）。
+ * チケットは教員が購入したプールから、Day4 確定時に消費される。
  */
-export async function assertStudentsHaveTicketsForProofreadRows(
-  rows: Submission[],
+export async function assertTeacherHasTicketsForProofread(
+  teacherUid: string,
+  requiredCount: number,
 ): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
-  const counts = new Map<string, number>();
-  for (const s of rows) {
-    const uid = String(s.submittedByUid ?? "").trim();
-    if (!uid) {
-      return {
-        ok: false,
-        code: "SUBMITTER_UID_REQUIRED",
-        message:
-          "添削対象に、ログイン提出でない行があります。生徒アカウントにチケットを配布し、ログインして提出したものだけ添削できます。",
-      };
-    }
-    counts.set(uid, (counts.get(uid) ?? 0) + 1);
+  const u = (teacherUid ?? "").trim();
+  const need = Math.floor(Number(requiredCount));
+  if (!u || !Number.isFinite(need) || need <= 0) {
+    return { ok: true };
   }
-  for (const [uid, need] of counts) {
-    const bal = await getTicketBalanceForUid(uid);
-    if (bal < need) {
-      return {
-        ok: false,
-        code: "INSUFFICIENT_STUDENT_TICKETS",
-        message: `生徒のチケットが不足しています（1 提出あたり必要枚数: ${need} / 対象 uid の残り: ${bal}）。教員から該当生徒へチケットを配布してください。`,
-      };
-    }
+  const bal = await getTicketBalanceForUid(u);
+  if (bal < need) {
+    return {
+      ok: false,
+      code: "INSUFFICIENT_TEACHER_TICKETS",
+      message: `教員のチケットが不足しています（この条件の添削対象: ${need} 件分 / 残り: ${bal} 枚）。「招待QRとチケット状況」で購入してください。`,
+    };
   }
   return { ok: true };
 }

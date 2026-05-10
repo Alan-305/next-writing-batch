@@ -6,10 +6,10 @@
 - Functions 側環境変数を設定する
   - `STRIPE_SECRET_KEY`
   - `STRIPE_WEBHOOK_SECRET`
-  - `STRIPE_PRICE_1M`
-  - `STRIPE_PRICE_3M`
-  - `STRIPE_PRICE_6M`
-  - `STRIPE_PRICE_12M`
+  - `STRIPE_PRICE_T10`
+  - `STRIPE_PRICE_T30`
+  - `STRIPE_PRICE_T60`
+  - `STRIPE_PRICE_T120`
 
 ## 2. 起動（ターミナルを3つ使用）
 
@@ -28,8 +28,8 @@
 
 ## 4. 動作確認
 
-1. Google ログイン後に `/settings` を開く
-2. 「チケット購入（テスト）」でプランを選択して Checkout へ遷移
+1. Google ログイン後に教員として `/ops/tickets` を開く
+2. 「教師チケット購入」でプランを選択して Checkout へ遷移
 3. Stripe テストカードで決済完了
    - 例: `4242 4242 4242 4242`
 4. Firestore Emulator で以下を確認

@@ -2,7 +2,8 @@ import { httpsCallable } from "firebase/functions";
 
 import { getFirebaseFunctions } from "@/lib/firebase/client";
 
-export type BillingPlan = "1m" | "3m" | "6m" | "12m";
+/** Stripe Price と対応（10 / 30 / 60 / 120 枚パック） */
+export type BillingPlan = "t10" | "t30" | "t60" | "t120";
 
 type CreateStripeCheckoutSessionInput = {
   plan: BillingPlan;
