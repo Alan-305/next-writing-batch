@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { createStripeCheckoutSession, type BillingPlan } from "@/lib/billing/create-checkout-session";
 import { getFirebaseAuth } from "@/lib/firebase/client";
@@ -54,7 +55,7 @@ function formatIso(iso: string | null): string {
   }
 }
 
-export default function OpsTicketsPage() {
+function OpsTicketsPageInner() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -71,7 +72,9 @@ export default function OpsTicketsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [teacherInviteCopied, setTeacherInviteCopied] = useState(false);
+  const [tenantIdCopied, setTenantIdCopied] = useState(false);
+  const searchParams = useSearchParams();
+  const tenantCreatedWelcome = searchParams.get("tenantCreated") === "1";
   const currentUid = getFirebaseAuth()?.currentUser?.uid ?? "";
 
   const selectedPlanInfo = useMemo(
@@ -91,20 +94,6 @@ export default function OpsTicketsPage() {
     : "";
   const inviteQrUrl = inviteUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
-    : "";
-  const teacherInviteUrl =
-    typeof window !== "undefined" && data?.organizationId
-      ? `${window.location.origin}/sign-in?next=${encodeURIComponent("/ops")}&teacherOrg=${encodeURIComponent(
-          data.organizationId,
-        )}`
-      : "";
-  const teacherInviteMailTo = teacherInviteUrl
-    ? `mailto:?subject=${encodeURIComponent("添削革命 教員参加リンク")}&body=${encodeURIComponent(
-        `以下のリンクからログインすると、教員としてこのテナント（organizationId）に参加します。\n\n${teacherInviteUrl}\n\n※Googleアカウントでログインしてください。`,
-      )}`
-    : "";
-  const teacherInviteQrUrl = teacherInviteUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(teacherInviteUrl)}`
     : "";
   const tenantLabel = (data?.organizationId ?? "").trim() || "default";
   const selectableStudents = (data?.students ?? []).filter((s) => s.uid !== currentUid);
@@ -199,14 +188,15 @@ export default function OpsTicketsPage() {
     }
   };
 
-  const copyTeacherInvite = async () => {
-    if (!teacherInviteUrl) return;
+  const copyTenantId = async () => {
+    const id = (data?.organizationId ?? "").trim();
+    if (!id) return;
     try {
-      await navigator.clipboard.writeText(teacherInviteUrl);
-      setTeacherInviteCopied(true);
-      window.setTimeout(() => setTeacherInviteCopied(false), 1800);
+      await navigator.clipboard.writeText(id);
+      setTenantIdCopied(true);
+      window.setTimeout(() => setTenantIdCopied(false), 1800);
     } catch {
-      setTeacherInviteCopied(false);
+      setTenantIdCopied(false);
     }
   };
 
@@ -293,6 +283,29 @@ export default function OpsTicketsPage() {
     <main>
       <h1>テナントのチケット状況</h1>
 
+      {tenantCreatedWelcome ? (
+        <p className="success" style={{ marginBottom: 16 }}>
+          テナントを作成しました。下記の「テナント ID」を控えてください（サポートや設定確認に使います）。
+        </p>
+      ) : null}
+
+      <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
+        <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
+          あなたのテナント ID
+        </h2>
+        <p className="muted admin-tenant-roster-lead">
+          提出・チケット・招待はこの ID（Firestore の <code>organizationId</code>）単位で分かれます。
+        </p>
+        <p style={{ wordBreak: "break-all", marginTop: 0 }}>
+          <code>{loading ? "読み込み中..." : data?.organizationId ?? "—"}</code>
+        </p>
+        <p style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 0 }}>
+          <button type="button" onClick={() => void copyTenantId()} disabled={loading || !data?.organizationId}>
+            {tenantIdCopied ? "コピーしました" : "テナント ID をコピー"}
+          </button>
+        </p>
+      </div>
+
       <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
         <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
           生徒招待リンク（テナント参加）
@@ -316,39 +329,6 @@ export default function OpsTicketsPage() {
             <img src={inviteQrUrl} alt="生徒招待リンクのQRコード" width={220} height={220} />
             <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
               生徒の端末でQRを読み取ってもらうと、同じ招待リンクを開けます。
-            </p>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
-        <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
-          教員参加リンク（テナント参加・初回）
-        </h2>
-        <p className="muted admin-tenant-roster-lead">
-          同僚の教員に共有すると、ログイン時に <code>users/&lt;uid&gt;.roles</code> に <strong>teacher</strong>{" "}
-          が付き、現在のテナント（organizationId）へ紐づきます（生徒用の招待とは別リンクです）。
-        </p>
-        <p style={{ wordBreak: "break-all", marginTop: 0 }}>
-          <code>{teacherInviteUrl || "読み込み中..."}</code>
-        </p>
-        <p style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 0 }}>
-          <button type="button" onClick={() => void copyTeacherInvite()} disabled={!teacherInviteUrl}>
-            {teacherInviteCopied ? "コピーしました" : "リンクをコピー"}
-          </button>
-          <a
-            className="button secondary"
-            href={teacherInviteMailTo || "#"}
-            onClick={(e) => !teacherInviteMailTo && e.preventDefault()}
-          >
-            メールで共有
-          </a>
-        </p>
-        {teacherInviteQrUrl ? (
-          <div>
-            <img src={teacherInviteQrUrl} alt="教員参加リンクのQRコード" width={220} height={220} />
-            <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
-              すでに<strong>生徒として参加済み</strong>のアカウントでは教員登録できません（別の Google アカウントを使うか、管理者に依頼してください）。
             </p>
           </div>
         ) : null}
@@ -509,3 +489,10 @@ export default function OpsTicketsPage() {
   );
 }
 
+export default function OpsTicketsPage() {
+  return (
+    <Suspense fallback={<main><p className="muted">読み込み中…</p></main>}>
+      <OpsTicketsPageInner />
+    </Suspense>
+  );
+}

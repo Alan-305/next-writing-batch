@@ -12,6 +12,9 @@ export default function AdminHomePage() {
         <p style={{ marginBottom: 12 }}>
           <Link href="/admin/billing">チケット手動調整（管理者・例外返金など）</Link>
         </p>
+        <p style={{ marginBottom: 12 }}>
+          <Link href="/admin/account-delete">退会・ユーザー削除（Auth・Firestore・提出の削除）</Link>
+        </p>
         <p className="muted" style={{ marginBottom: 0 }}>
           運用バッチは従来どおり{" "}
           <Link href="/ops">/ops</Link> を利用してください。ヘッダーの <strong>テナント</strong>{" "}

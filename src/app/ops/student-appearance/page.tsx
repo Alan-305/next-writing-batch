@@ -73,7 +73,7 @@ export default function OpsStudentAppearancePage() {
       }
       if (j.branding) setBranding(j.branding);
       setMessage(
-        "保存しました。同じ組織の生徒は、提出・結果のページを開き直すか再読み込みすると新しい見た目になります。",
+        "保存しました（Firestore に反映済み）。同じ組織の生徒は、提出・結果のページを開き直すか再読み込みすると新しい見た目になります。",
       );
     } catch {
       setError("通信エラーが発生しました。");
@@ -91,6 +91,10 @@ export default function OpsStudentAppearancePage() {
       <p className="muted">
         ここで変えた色や表示名は、<strong>あなたと同じ組織（学校）の生徒</strong>が使う提出・結果画面にもそのまま反映されます（課題や添削の仕組みは変わりません）。組織 ID の確認・切り替えは{" "}
         <Link href="/ops/tenant">テナント（検証）</Link> から行えます。
+      </p>
+      <p className="muted">
+        設定は <strong>Firestore</strong> に保存されます（再デプロイや別インスタンスでも維持されます）。ローカルの{" "}
+        <code>branding.json</code> は補助用です。
       </p>
 
       {loading ? (

@@ -1298,6 +1298,12 @@ td {
   gap: 16px;
 }
 
+.tensaku-quick-actions--solo {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .tensaku-quick-card {
   display: flex;
   flex-direction: column;
@@ -1315,11 +1321,6 @@ td {
   transform: translateY(-2px);
 }
 
-.tensaku-quick-card--student {
-  background: linear-gradient(145deg, #f0f9ff 0%, #ffffff 50%, #fffbeb 100%);
-  border-color: #7dd3fc;
-}
-
 .tensaku-quick-card--teacher {
   background: linear-gradient(145deg, #f8fafc 0%, #ffffff 55%, #e0e7ff 100%);
   border-color: #a5b4fc;
@@ -1330,10 +1331,6 @@ td {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-
-.tensaku-quick-card--student .tensaku-quick-card-label {
-  color: #0369a1;
 }
 
 .tensaku-quick-card--teacher .tensaku-quick-card-label {

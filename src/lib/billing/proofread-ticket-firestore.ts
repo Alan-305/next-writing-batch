@@ -88,6 +88,16 @@ export async function getTicketBalanceForUid(uid: string): Promise<number> {
 }
 
 /**
+ * 添削バッチの対象行が、すべて「実行した教員の uid」でログイン提出されたものか。
+ * この場合は生徒チケット検査を省略し、教員の試し添削として扱う。
+ */
+export function allProofreadTargetsAreSelfSubmitted(rows: Submission[], operatorUid: string): boolean {
+  const u = (operatorUid ?? "").trim();
+  if (!u || rows.length === 0) return false;
+  return rows.every((s) => String(s.submittedByUid ?? "").trim() === u);
+}
+
+/**
  * Day3 添削を実行する前に、対象各行の提出者 UID ごとに残チケットが足りるかだけ検査する（減算はしない）。
  * 教員の残高は見ない。未ログイン提出（submittedByUid なし）は不可。
  */

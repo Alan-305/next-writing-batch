@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  allProofreadTargetsAreSelfSubmitted,
   assertStudentsHaveTicketsForProofreadRows,
 } from "@/lib/billing/proofread-ticket-firestore";
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
@@ -89,7 +90,9 @@ export async function POST(request: Request) {
 
   /** ローカル試験用。true 時は生徒チケット検査もスキップ */
   const skipTicketGate = (process.env.NWB_SKIP_PROOFREAD_TICKET_GATE ?? "").trim() === "true";
-  if (!skipTicketGate) {
+  /** 教員が自分のアカウントで `/submit` した答案のみを対象にする試行（チケット検査不要・消費なし） */
+  const teacherSelfServiceProofread = allProofreadTargetsAreSelfSubmitted(targetRows, auth.uid);
+  if (!skipTicketGate && !teacherSelfServiceProofread) {
     const canStart = await assertStudentsHaveTicketsForProofreadRows(targetRows);
     if (!canStart.ok) {
       return NextResponse.json(
@@ -142,9 +145,14 @@ export async function POST(request: Request) {
 
   await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
 
+  const message = teacherSelfServiceProofread
+    ? "添削バッチが完了しました（教員本人名義の試行のため生徒チケット検査を省略しました）。一覧を再読み込みしてください。"
+    : "添削バッチが完了しました。一覧を再読み込みしてください。チケットは Day4 確定時に生徒から 1 枚消費されます。";
+
   return NextResponse.json({
     ok: true,
-    message: "添削バッチが完了しました。一覧を再読み込みしてください。チケットは Day4 確定時に生徒から 1 枚消費されます。",
+    message,
+    teacherSelfServiceProofread,
     targetRows: targetRowCount,
     ticketsDeducted: 0,
     durationMs: result.durationMs,

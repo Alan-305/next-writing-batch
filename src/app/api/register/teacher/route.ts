@@ -4,18 +4,20 @@ import { FieldValue } from "firebase-admin/firestore";
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
-import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
+import { generateUniqueTenantOrganizationId, sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type Body = {
   organizationId?: unknown;
+  createNewTenant?: unknown;
 };
 
 /**
  * 教員の初回テナント参加（生徒の /api/invite/accept と対）。
- * ログイン後に教員用リンクから呼び出し、users/{uid} に teacher と organizationId を付与する。
+ * - `createNewTenant: true` → サーバーが一意の organizationId（テナント ID）を生成
+ * - 従来: `organizationId`（招待・既存テナント参加）
  */
 export async function POST(request: Request) {
   const auth = await verifyBearerUid(request);
@@ -28,8 +30,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "JSON ボディが不正です。" }, { status: 400 });
   }
 
+  const wantsNew =
+    body.createNewTenant === true || body.createNewTenant === "true" || body.createNewTenant === 1;
   const orgRaw = String(body.organizationId ?? "").trim();
-  const organizationId = sanitizeOrganizationIdForPath(orgRaw);
+  const requestedOrg = sanitizeOrganizationIdForPath(orgRaw);
+
+  if (wantsNew && requestedOrg) {
+    return NextResponse.json(
+      { ok: false, message: "createNewTenant と organizationId は同時に指定できません。" },
+      { status: 400 },
+    );
+  }
+  if (!wantsNew && !requestedOrg) {
+    return NextResponse.json(
+      { ok: false, message: "organizationId を指定するか、createNewTenant: true を指定してください。" },
+      { status: 400 },
+    );
+  }
+
+  const organizationId = wantsNew ? generateUniqueTenantOrganizationId() : requestedOrg;
   if (!organizationId) {
     return NextResponse.json({ ok: false, message: "organizationId が不正です。" }, { status: 400 });
   }

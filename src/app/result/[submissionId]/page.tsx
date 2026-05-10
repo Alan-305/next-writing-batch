@@ -1,7 +1,15 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 
 import { StudentResultPublishedBody } from "@/components/StudentResultPublishedBody";
 import { loadStudentResultPublishedView } from "@/lib/student-result-published-view";
+
+function requestOriginFromHeaders(h: Headers): string {
+  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(",")[0]?.trim() ?? "";
+  if (!host) return "";
+  const proto = (h.get("x-forwarded-proto") ?? "https").split(",")[0]?.trim() ?? "https";
+  return `${proto}://${host}`;
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,7 +18,10 @@ type Props = { params: Promise<{ submissionId: string }> };
 
 export default async function StudentResultPage({ params }: Props) {
   const { submissionId } = await params;
-  const loaded = await loadStudentResultPublishedView(submissionId);
+  const h = await headers();
+  const loaded = await loadStudentResultPublishedView(submissionId, {
+    requestOrigin: requestOriginFromHeaders(h),
+  });
 
   if (loaded.kind === "missing") {
     return (

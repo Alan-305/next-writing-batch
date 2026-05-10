@@ -19,6 +19,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
             <nav className="app-shell-nav" aria-label="管理ナビ">
               <Link href="/admin">管理トップ</Link>
               <Link href="/admin/billing">チケット調整</Link>
+              <Link href="/admin/account-delete">退会・ユーザー削除</Link>
             </nav>
             <AdminTenantSwitcher />
             <AuthToolbar variant="teacher" />

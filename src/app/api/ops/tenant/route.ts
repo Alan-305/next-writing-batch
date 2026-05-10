@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { describeOrganizationIdForUid } from "@/lib/firebase/admin-firestore";
 import { listOrganizationIdsOnDisk } from "@/lib/org-data-layout";
@@ -17,6 +18,9 @@ function tenantDevSelfAssignAllowed(): boolean {
 export async function GET(_request: Request) {
   const auth = await verifyBearerUid(_request);
   if (!auth.ok) return auth.response;
+
+  const teacherGate = await requireTeacherOrAllowlistAdmin(auth.uid);
+  if (!teacherGate.ok) return teacherGate.response;
 
   try {
     const resolution = await describeOrganizationIdForUid(auth.uid);

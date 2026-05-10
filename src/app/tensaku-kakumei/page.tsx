@@ -47,14 +47,11 @@ export default async function TensakuKakumeiPage() {
       </section>
 
       <main className="tensaku-main">
-        <nav className="tensaku-quick" aria-label="運用サイトへの導線">
-          <p className="tensaku-quick-intro">日常の運用は次のページからお進みください。</p>
-          <div className="tensaku-quick-actions">
-            <Link href="/submit" className="tensaku-quick-card tensaku-quick-card--student">
-              <span className="tensaku-quick-card-label">生徒用</span>
-              <span className="tensaku-quick-card-title">答案の提出・テキスト確認</span>
-              <span className="tensaku-quick-card-hint">明るくわかりやすい画面で提出します。</span>
-            </Link>
+        <nav className="tensaku-quick" aria-label="教員・運用サイトへの導線">
+          <p className="tensaku-quick-intro">
+            教員・運用の入口です。生徒の方は、担当の先生からお送りした URL からお進みください。
+          </p>
+          <div className="tensaku-quick-actions tensaku-quick-actions--solo">
             <Link href="/ops" className="tensaku-quick-card tensaku-quick-card--teacher">
               <span className="tensaku-quick-card-label">教員・運用</span>
               <span className="tensaku-quick-card-title">運用ハブ・提出一覧・設定</span>
@@ -174,6 +171,56 @@ export default async function TensakuKakumeiPage() {
           </p>
           <p>
             長年の知見と最新のAI技術を組み合わせたこの仕組みを、ぜひ貴校の教室でも体感してください。
+          </p>
+        </section>
+
+        <section className="tensaku-section card" id="privacy" aria-labelledby="privacy-heading">
+          <h2 id="privacy-heading">個人情報の取り扱いと安心について</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            教員・生徒・保護者の皆さまに、<strong>同じ土俵で</strong>お伝えするための内容です。英作文の提出から添削まで、デジタル上に何が残るかを分かりやすくまとめました。
+          </p>
+
+          <h3>まず知っていただきたいこと（3点）</h3>
+          <ol className="tensaku-list">
+            <li>
+              <strong>蓄積の中心は「英作文のテキスト（文字データ）」と、そこに基づく添削の結果です。</strong>
+            </li>
+            <li>
+              <strong>手書きの答案を撮影する場合も、システムが長期の提出物として保持し続けるのは、読み取った内容に近い「テキスト」が中心です。</strong>
+              筆跡がそのまま残る画像を、提出履歴として溜め続ける設計にはしていません（撮影直後の文字認識のため、一時的に画像が扱われることはあり得ます）。
+            </li>
+            <li>
+              <strong>ログインは Google 等の認証を利用し、アプリ側でパスワードをお預かりする形にはしていません。</strong>
+            </li>
+          </ol>
+
+          <article className="tensaku-value">
+            <h3>生徒の方へ</h3>
+            <p>
+              学校の案内に沿って初回登録を済ませると、毎回、長い個人情報を打ち込む負担を減らし、学習に集中しやすくなります。あなたの答案は<strong>学習のための英作文</strong>として扱われ、表示や添削の手がかりに使われます。他の人の答案や、教員専用の管理画面に、不適切に触れられる作りにはしていません。
+            </p>
+          </article>
+
+          <article className="tensaku-value">
+            <h3>保護者の方へ</h3>
+            <p>
+              「手書きの紙の原本が、画像のままネット上に溜まり続けるのでは」という心配に対し、<strong>蓄積の中心は文字化された英作文であり、筆跡そのものの保管を目的とした設計ではない</strong>とお考えください。お子さまの学籍・表示名などの識別は、答案の本文とは分けて管理する考え方です。住所・電話番号など、学習に直接必要ない情報を取りにいく設計にはしていません。お支払いがある場合は専門の決済サービス（例：Stripe）を利用し、クレジット番号がこのアプリのサーバーを通る形にはしていません。
+            </p>
+          </article>
+
+          <article className="tensaku-value">
+            <h3>教員・学校の方へ</h3>
+            <p>
+              認証は Google 等の基盤に任せ、パスワード管理の負担をアプリ側に増やさない方針です。生徒向けと教員・運用の操作範囲を分け、生徒が誤って管理機能に入ることを想定に止めています。提出物はテキスト中心で説明しやすく、説明責任の範囲を明確にしやすくしています。
+            </p>
+            <p style={{ marginBottom: 0 }}>
+              いずれのシステムにも「リスクゼロ」はありません。アカウントの運用（卒業後の整理、端末の管理など）は、学校のルールとあわせて安全性を高めていくことが大切です。
+            </p>
+          </article>
+
+          <p className="tensaku-pullquote" style={{ marginTop: 20 }}>
+            <strong>一言でまとめると：</strong>
+            本アプリが学習の中心として扱うのは、主に英作文のテキストと添削結果です。手書きの画像を提出物として長期保管し続けることは意図していません。身元の情報はプロフィールとして分け、ログインは信頼できる認証に任せることで、学習と管理の役割をはっきり分けています。
           </p>
         </section>
 

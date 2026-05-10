@@ -6,6 +6,7 @@ import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-di
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
 import { findSubmissionAcrossOrganizations } from "@/lib/submissions-store";
+import { absoluteUrlForAudioQr, hrefForAudioUrl } from "@/lib/audio-url-href";
 
 export type StudentResultPublishedModel = {
   submissionId: string;
@@ -20,6 +21,8 @@ export type StudentResultPublishedModel = {
   audioSrc: string;
   audioUrl: string;
   qrSrc: string;
+  /** スマホ QR に埋め込む絶対 URL（相対 audioSrc を公開オリジンで解決したもの） */
+  audioQrEncodeUrl: string;
 };
 
 export type StudentResultPublishedLoadResult =
@@ -27,16 +30,9 @@ export type StudentResultPublishedLoadResult =
   | { kind: "unpublished"; submissionId: string }
   | { kind: "ok"; organizationId: string; model: StudentResultPublishedModel };
 
-function hrefForAudioUrl(url: string): string {
-  const u = url.trim();
-  if (!u) return "";
-  if (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("/")) return u;
-  return `/${u.replace(/^\/+/, "")}`;
-}
-
-/** 公開済み添削結果（/result）用データ。 */
 export async function loadStudentResultPublishedView(
   submissionId: string,
+  options?: { requestOrigin?: string },
 ): Promise<StudentResultPublishedLoadResult> {
   const sid = (submissionId ?? "").trim();
   if (!sid) return { kind: "missing" };
@@ -55,6 +51,8 @@ export async function loadStudentResultPublishedView(
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
   const audioSrc = audioUrl ? hrefForAudioUrl(audioUrl) : "";
+  const requestOrigin = (options?.requestOrigin ?? "").trim();
+  const audioQrEncodeUrl = audioSrc ? absoluteUrlForAudioQr(audioSrc, requestOrigin) : "";
 
   const explanationHtml = studentExplanationToDisplayHtml(sr.explanation ?? "");
   const { revised: finalRevised } = resolveFinalEssayForStudentDisplay({
@@ -83,6 +81,7 @@ export async function loadStudentResultPublishedView(
     audioSrc,
     audioUrl,
     qrSrc,
+    audioQrEncodeUrl,
   };
 
   return { kind: "ok", organizationId: orgForMaster, model };

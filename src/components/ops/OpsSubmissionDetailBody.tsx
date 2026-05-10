@@ -1,8 +1,10 @@
 import Link from "next/link";
 
 import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEditor";
+import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
 import { formatDateTimeIso } from "@/lib/format-date";
+import { hrefForAudioUrl } from "@/lib/audio-url-href";
 import { submissionProofreadTaskMismatch } from "@/lib/submission-proofread-task-mismatch";
 import type { Submission } from "@/lib/submissions-store";
 import type { TaskProblemsMaster } from "@/lib/task-problems-core";
@@ -27,9 +29,7 @@ export function OpsSubmissionDetailBody({
   const qrPath = submission.day4?.qr_path ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
-  const fallbackQrSrc = audioUrl
-    ? `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encodeURIComponent(audioUrl)}`
-    : "";
+  const audioHref = audioUrl ? hrefForAudioUrl(audioUrl) : "";
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
   const taskMismatch = submissionProofreadTaskMismatch(submission);
@@ -196,7 +196,17 @@ export function OpsSubmissionDetailBody({
               Chrome の「このページのURLをQRで共有」など<strong>別のQR</strong>だと、トップページ（
               <code>/</code>）だけが開き<strong>音声は鳴りません</strong>。
             </p>
-            {qrSrc ? (
+            {audioHref ? (
+              <div style={{ marginBottom: 12 }}>
+                <p>
+                  <b>QR（この画像をスキャン）</b>
+                </p>
+                <StudentResultAudioQr audioHref={audioHref} />
+                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+                  音声 URL からアプリ内で QR を生成しています（PNG ファイルが無くても表示されます）。
+                </p>
+              </div>
+            ) : qrSrc ? (
               <div style={{ marginBottom: 12 }}>
                 <p>
                   <b>QR（この画像をスキャン）</b>
@@ -210,23 +220,6 @@ export function OpsSubmissionDetailBody({
                 />
                 <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
                   ファイル: <code>{submission.day4.qr_path}</code>
-                </p>
-              </div>
-            ) : null}
-            {fallbackQrSrc ? (
-              <div style={{ marginBottom: 12 }}>
-                <p>
-                  <b>予備QR（音声URLから生成）</b>
-                </p>
-                <img
-                  src={fallbackQrSrc}
-                  alt="音声URLから生成した予備QR"
-                  width={220}
-                  height={220}
-                  style={{ border: "1px solid #e2e8f0", borderRadius: 8 }}
-                />
-                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
-                  もし上のQR画像が出ない場合は、この予備QRを使ってください。
                 </p>
               </div>
             ) : null}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { StudentResultAudioControls } from "@/components/StudentResultAudioControls";
+import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentResultViewBeacon } from "@/components/StudentResultViewBeacon";
 import type { StudentResultPublishedModel } from "@/lib/student-result-published-view";
 
@@ -57,21 +58,25 @@ export function StudentResultPublishedBody({
         {model.audioSrc ? <StudentResultAudioControls src={model.audioSrc} /> : null}
       </div>
 
-      {model.qrSrc ? (
+      {model.audioSrc || model.qrSrc ? (
         <div className="card student-result-card">
           <h2 className="student-result-section-title">音声（スマホ用 QR）</h2>
           <p className="muted student-result-qr-lead">
             音声には再生可能期限がありますのでダウンロードして保存してください。
           </p>
-          <div className="student-result-qr-img-wrap">
-            <img
-              src={model.qrSrc}
-              alt="音声への QR"
-              width={220}
-              height={220}
-              className="student-result-qr-img"
-            />
-          </div>
+          {model.audioSrc ? (
+            <StudentResultAudioQr audioHref={model.audioSrc} serverAbsolute={model.audioQrEncodeUrl} />
+          ) : model.qrSrc ? (
+            <div className="student-result-qr-img-wrap">
+              <img
+                src={model.qrSrc}
+                alt="音声への QR"
+                width={220}
+                height={220}
+                className="student-result-qr-img"
+              />
+            </div>
+          ) : null}
           {model.audioUrl ? (
             <p className="student-result-qr-audio-link">
               同じ音声を PC のブラウザで聞く場合:{" "}

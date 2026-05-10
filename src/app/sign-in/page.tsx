@@ -24,7 +24,7 @@ function SignInInner() {
   const nextRaw = (params.get("next") ?? "").trim();
   const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/hub";
   const inviteOrg = (params.get("org") ?? "").trim();
-  /** 教員のテナント参加（運用画面の「教員参加リンク」） */
+  /** 教員の既存テナント参加（URL の teacherOrg）。画面には特別な案内は出さない */
   const teacherOrg = (params.get("teacherOrg") ?? "").trim();
   const emulatorMode = useFirebaseEmulators();
   const { configured, user, authLoading, authRedirectHint, profile, profileLoading, roles } =
@@ -113,7 +113,7 @@ function SignInInner() {
           });
           if (!res.ok) {
             const j = (await res.json()) as { message?: string };
-            throw new Error(j?.message ?? "教員登録に失敗しました。");
+            throw new Error(j?.message ?? "設定の適用に失敗しました。");
           }
         } else if (inviteOrg) {
           const res = await fetch("/api/invite/accept", {
@@ -201,13 +201,9 @@ function SignInInner() {
           const j = (await res.json()) as { ok?: boolean; changed?: boolean; message?: string; organizationId?: string };
           if (!cancelled) {
             if (!res.ok || !j?.ok) {
-              setInviteResult(j?.message ?? "教員登録に失敗しました。");
+              setInviteResult(j?.message ?? "設定の適用に失敗しました。");
             } else {
-              setInviteResult(
-                j.changed
-                  ? `教員として参加しました（organizationId: ${j.organizationId ?? teacherOrg}）。`
-                  : `教員登録を確認しました（organizationId: ${j.organizationId ?? teacherOrg}）。`,
-              );
+              setInviteResult(j.changed ? "テナント設定を反映しました。" : "テナント設定を確認しました。");
             }
           }
         } else {
@@ -235,7 +231,7 @@ function SignInInner() {
           }
         }
       } catch {
-        if (!cancelled) setInviteResult(teacherOrg ? "教員登録に失敗しました。" : "招待リンクの適用に失敗しました。");
+        if (!cancelled) setInviteResult(teacherOrg ? "設定の適用に失敗しました。" : "招待リンクの適用に失敗しました。");
       } finally {
         if (!cancelled) setInviteApplying(false);
       }
@@ -341,24 +337,13 @@ function SignInInner() {
           </div>
         ) : null}
         {error ? <p className="error">{error}</p> : null}
-        {teacherOrg && inviteOrg ? (
-          <p className="warning" style={{ marginTop: 0 }}>
-            <code>teacherOrg</code> と <code>org</code> が両方あります。<strong>教員参加（teacherOrg）</strong>を優先し、生徒用の{" "}
-            <code>org</code> はこのログインでは適用しません。
-          </p>
-        ) : null}
-        {teacherOrg ? (
-          <p className="muted" style={{ marginTop: 0 }}>
-            教員参加リンクからアクセスしています（organizationId: <code>{teacherOrg}</code>）
-          </p>
-        ) : null}
         {!teacherOrg && inviteOrg ? (
           <p className="muted" style={{ marginTop: 0 }}>
             生徒招待リンクからアクセスしています（organizationId: <code>{inviteOrg}</code>）
           </p>
         ) : null}
         {inviteApplying ? (
-          <p className="muted">{teacherOrg ? "教員登録を適用中です…" : "招待リンクを適用中です…"}</p>
+          <p className="muted">{teacherOrg ? "設定を適用中です…" : "招待リンクを適用中です…"}</p>
         ) : null}
         {inviteResult ? <p className={inviteResult.includes("失敗") ? "error" : "success"}>{inviteResult}</p> : null}
         {authRedirectHint ? <p className="error">{authRedirectHint}</p> : null}

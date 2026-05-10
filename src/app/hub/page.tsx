@@ -23,6 +23,9 @@ export default function HubPage() {
         <p>提出・運用の導線です。</p>
         <ul>
           <li>
+            <Link href="/register/teacher">初めての教員：テナント作成（ログイン後）</Link>
+          </li>
+          <li>
             <Link href="/submit">生徒提出画面</Link>
           </li>
           <li>
