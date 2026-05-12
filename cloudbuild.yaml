@@ -5,6 +5,10 @@
 #
 # 初回: Secret Manager に firebase-build.env と同じ中身のシークレットを作成する。
 #   gcloud secrets create ${_NEXT_PUBLIC_ENV_SECRET} --data-file=firebase-build.env --project=YOUR_PROJECT_ID
+#
+# Claude 添削キー: Secret Manager のシークレット ID（既定 NEXT_WRITING_BATCH_KEY）を Cloud Run の
+# 環境変数 NEXT_WRITING_BATCH_KEY にマウントする。ビルド SA にそのシークレットの secretAccessor が必要。
+# シークレット名が違う場合: --substitutions=_NEXT_WRITING_BATCH_SECRET_SM_NAME=あなたのシークレットID
 # シークレット読み取り: gcloud builds submit はプロジェクト既定で
 #   PROJECT_NUMBER-compute@developer.gserviceaccount.com
 # として実行されることがある。PERMISSION_DENIED ならこの SA にも secretAccessor を付与する。
@@ -14,6 +18,8 @@ substitutions:
   _REGION: asia-northeast1
   _REPO: next-writing-batch
   _NEXT_PUBLIC_ENV_SECRET: next-writing-batch-next-public-env
+  # Secret Manager のシークレット ID（環境変数名 NEXT_WRITING_BATCH_KEY にマウント）
+  _NEXT_WRITING_BATCH_SECRET_SM_NAME: NEXT_WRITING_BATCH_KEY
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -75,6 +81,7 @@ steps:
           --min-instances=0 \
           --allow-unauthenticated \
           --update-env-vars="NWB_DATA_ROOT=/tmp/next-writing-batch-data,NWB_OUTPUT_ROOT=/tmp/next-writing-batch-output" \
+          --update-secrets="NEXT_WRITING_BATCH_KEY=${_NEXT_WRITING_BATCH_SECRET_SM_NAME}:latest" \
           --quiet
         # ADMIN_UIDS だけ値にカンマがある。他は「KEY=VAL,KEY2=VAL2」で1回、UID は ^|^ で1回（gcloud topic escaping）。
         batch=""

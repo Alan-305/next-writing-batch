@@ -19,7 +19,7 @@ cd /path/to/next-writing-batch
 **よくあるミス**: ターミナルで `python3` が `/usr/local/bin/python3` を指しているのに、`.venv` へ `pip install` だけした場合 — 実行も `./.venv/bin/python3` に揃えてください。
 
 3. 環境変数（`.env` ではなくシェルで export する想定）  
-   - **Day3**: `ANTHROPIC_API_KEY`  
+   - **Day3**: `NEXT_WRITING_BATCH_KEY`（Secret Manager のシークレット ID および Cloud Run の環境変数名）  
    - **Day4（GCS）**: `GCS_BUCKET_NAME`, `GOOGLE_APPLICATION_CREDENTIALS`（サービスアカウントJSONのパス）  
    - **署名URL**: `GCS_SIGNED_URL_EXPIRE_DAYS`（省略時 **180** 日）  
    - GCS を初めて使う場合のコンソール手順は **「0.5 GCS 初回セットアップ」** を参照してください。

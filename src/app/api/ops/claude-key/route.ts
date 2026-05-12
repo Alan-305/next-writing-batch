@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         message:
-          "本番環境では既定でキー保存を無効にしています。環境変数 ANTHROPIC_API_KEY を設定するか、OPS_ALLOW_ANTHROPIC_KEY_FILE=true のうえで運用してください。",
+          "本番環境では既定でキー保存を無効にしています。環境変数 NEXT_WRITING_BATCH_KEY を設定するか、OPS_ALLOW_ANTHROPIC_KEY_FILE=true のうえで運用してください。",
       },
       { status: 403 },
     );

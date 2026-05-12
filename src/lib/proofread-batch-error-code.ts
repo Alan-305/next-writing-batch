@@ -6,8 +6,7 @@ export function classifyProofreadBatchFailure(stderr: string, message: string): 
   if (bundle.includes("task_master_missing")) return "TASK_MASTER_MISSING";
   if (bundle.includes("problem_not_in_master")) return "PROBLEM_NOT_IN_MASTER";
   if (
-    bundle.includes("missing_env:anthropic_api_key") ||
-    bundle.includes("anthropic_api_key") ||
+    bundle.includes("missing_env:next_writing_batch_key") ||
     bundle.includes("no api_key or adc")
   )
     return "ANTHROPIC_OR_API_KEY_ISSUE";

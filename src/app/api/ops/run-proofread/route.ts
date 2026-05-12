@@ -107,9 +107,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        code: "ANTHROPIC_API_KEY_MISSING",
+        code: "NEXT_WRITING_BATCH_KEY_MISSING",
         message:
-          "Claude API キーがありません。このサーバー（Cloud Run）の環境変数 ANTHROPIC_API_KEY に Secret を紐付けているか確認してください（ローカルなら data/anthropic_api_key.txt または .env）。",
+          "Claude API キーがありません。このサーバー（Cloud Run）の環境変数 NEXT_WRITING_BATCH_KEY に Secret を紐付けているか確認してください（ローカルなら data/anthropic_api_key.txt または .env.local の NEXT_WRITING_BATCH_KEY）。",
       },
       { status: 503 },
     );

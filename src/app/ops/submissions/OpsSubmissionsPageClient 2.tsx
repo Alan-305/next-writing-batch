@@ -169,7 +169,7 @@ export function OpsSubmissionsPageClient() {
             <code>next-writing-batch</code> をカレントにし、仮想環境の Python で実行します。
           </p>
           <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
-            {`export ANTHROPIC_API_KEY='…'
+            {`export NEXT_WRITING_BATCH_KEY='…'
 export NWB_ORGANIZATION_ID=default   # Firestore users の organizationId と一致
 
 ./.venv/bin/python3 batch/run_day3_proofread.py --task-id 課題ID --workers 2 --limit 1

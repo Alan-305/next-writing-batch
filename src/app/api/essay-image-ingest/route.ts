@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Claude API キーがありません。環境変数 ANTHROPIC_API_KEY を設定するか、運用の「Claude API キー」画面で data/anthropic_api_key.txt に保存してください。",
+          "Claude API キーがありません。環境変数 NEXT_WRITING_BATCH_KEY を設定するか、運用の「Claude API キー」画面で data/anthropic_api_key.txt に保存してください。",
       },
       { status: 503 },
     );

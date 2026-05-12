@@ -46,7 +46,7 @@ def main() -> int:
     pip_mod("gtts")
     pip_mod("reportlab")
 
-    key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    key = (os.environ.get("NEXT_WRITING_BATCH_KEY") or "").strip()
     key_file = root / "data" / "anthropic_api_key.txt"
     if key:
         print("[OK] 環境変数に Claude 用の API キーがあります。")
@@ -54,9 +54,9 @@ def main() -> int:
         print("[OK] data/anthropic_api_key.txt にキーが保存されています。")
     else:
         print("[要対応] API キーがありません。次のいずれかを行ってください:")
-        print("  ・.env.local に ANTHROPIC_API_KEY=（あなたのキー）と書き、npm run dev を再起動")
+        print("  ・.env.local に NEXT_WRITING_BATCH_KEY=（あなたのキー）と書き、npm run dev を再起動")
         print("  ・運用画面「Claude API キー」から保存")
-        print("  ・このチェックの前に: export ANTHROPIC_API_KEY='…'")
+        print("  ・このチェックの前に: export NEXT_WRITING_BATCH_KEY='…'")
         ok = False
 
     batch_dir = root / "batch"

@@ -67,7 +67,7 @@ Google Cloud Console → **Cloud Functions** → **各関数** → 編集 → **
 - **`NEXT_PUBLIC_FIREBASE_USE_EMULATOR=false`**（実プロジェクトに接続するとき）
 - **Admin 検証**: `FIREBASE_SERVICE_ACCOUNT_JSON` または `GOOGLE_APPLICATION_CREDENTIALS`（**0101 プロジェクト**のサービスアカウント。Git に含めない）
 - **`NEXT_PUBLIC_FIREBASE_ADMIN_UIDS`**: Functions の `ADMIN_UIDS` と同じ UID
-- **添削 API**: `ANTHROPIC_API_KEY`（運用で添削を回すなら必須）
+- **添削 API**: `NEXT_WRITING_BATCH_KEY`（Secret Manager / Cloud Run。運用で添削を回すなら必須）
 - **チケットゲート**: 現場試験では **`NWB_SKIP_PROOFREAD_TICKET_GATE` を本番相当で false / 未設定**にし、`users/{uid}.billing.tickets` が Functions と同じ Firestore を見ること
 - **Resend（Next のお問い合わせ等）**: `RESEND_API_KEY` など、`.env.example` の「① Next.js」節
 

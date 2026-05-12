@@ -1,6 +1,11 @@
 import fs from "fs";
 import path from "path";
 
+/** Cloud Run / Secret Manager / `.env.local` では `NEXT_WRITING_BATCH_KEY` */
+export function anthropicApiKeyFromProcessEnv(): string {
+  return (process.env.NEXT_WRITING_BATCH_KEY || "").trim();
+}
+
 /** リポジトリ内に保存（.gitignore 対象）。環境変数が無いときのフォールバック */
 export function anthropicApiKeyFilePath(): string {
   return path.join(process.cwd(), "data", "anthropic_api_key.txt");
@@ -19,7 +24,7 @@ export function readAnthropicApiKeyFromDisk(): string {
 
 /** 環境変数を優先し、無ければ保存ファイルの1行目 */
 export function resolveEffectiveAnthropicApiKey(): string {
-  const fromEnv = (process.env.ANTHROPIC_API_KEY || "").trim();
+  const fromEnv = anthropicApiKeyFromProcessEnv();
   if (fromEnv) return fromEnv;
   return readAnthropicApiKeyFromDisk();
 }
@@ -27,7 +32,7 @@ export function resolveEffectiveAnthropicApiKey(): string {
 export type AnthropicKeySource = "env" | "file" | "none";
 
 export function describeAnthropicKeySource(): { configured: boolean; source: AnthropicKeySource } {
-  const env = (process.env.ANTHROPIC_API_KEY || "").trim();
+  const env = anthropicApiKeyFromProcessEnv();
   if (env) return { configured: true, source: "env" };
   const f = readAnthropicApiKeyFromDisk();
   if (f) return { configured: true, source: "file" };

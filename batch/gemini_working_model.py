@@ -23,9 +23,13 @@ def get_env_or_secret(key: str, default: str = "") -> str:
     return default
 
 
+def _anthropic_api_key_from_env() -> str:
+    return (get_env_or_secret("NEXT_WRITING_BATCH_KEY") or "").strip()
+
+
 _model_lock = threading.Lock()
 _cached_working_model = None
-_configured_api_key: Optional[str] = (get_env_or_secret("ANTHROPIC_API_KEY") or "").strip() or None
+_configured_api_key: Optional[str] = _anthropic_api_key_from_env() or None
 
 DEFAULT_CLAUDE_MODEL = "claude-3-5-sonnet-20240620"
 DEFAULT_CLAUDE_FALLBACKS = (
@@ -91,9 +95,9 @@ class _ClaudeModel:
 
 def _ensure_client_configured() -> str:
     global _configured_api_key
-    key = (get_env_or_secret("ANTHROPIC_API_KEY") or "").strip()
+    key = _anthropic_api_key_from_env()
     if not key:
-        raise RuntimeError("missing_env:ANTHROPIC_API_KEY")
+        raise RuntimeError("missing_env:NEXT_WRITING_BATCH_KEY")
     if key != _configured_api_key:
         _configured_api_key = key
         _reset_cached_model()

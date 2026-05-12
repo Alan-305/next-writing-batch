@@ -121,8 +121,8 @@ export default function OpsClaudeKeyPage() {
 
       <div className="card">
         <p className="muted" style={{ marginTop: 0 }}>
-          添削バッチで使います。<strong>環境変数</strong> <code>ANTHROPIC_API_KEY</code> が
-          <strong>優先</strong>され、無いときだけ <code>data/anthropic_api_key.txt</code> の
+          添削バッチで使います。<strong>環境変数</strong> <code>NEXT_WRITING_BATCH_KEY</code> が
+          設定されていればそれを使い、無いときだけ <code>data/anthropic_api_key.txt</code> の
           1行目を読みます。キーは<strong>平文</strong>なので Git にコミットしないでください（
           <code>.gitignore</code> に含めています）。
         </p>

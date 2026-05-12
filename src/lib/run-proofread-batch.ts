@@ -90,7 +90,7 @@ export async function runProofreadBatch(input: RunProofreadInput): Promise<RunPr
     childEnv.NWB_ORGANIZATION_ID = organizationId;
   }
   if (key) {
-    if (!(childEnv.ANTHROPIC_API_KEY ?? "").trim()) childEnv.ANTHROPIC_API_KEY = key;
+    if (!(childEnv.NEXT_WRITING_BATCH_KEY ?? "").trim()) childEnv.NEXT_WRITING_BATCH_KEY = key;
   }
 
   const t0 = Date.now();

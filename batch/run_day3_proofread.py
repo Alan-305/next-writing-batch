@@ -16,14 +16,14 @@ def _project_root() -> str:
 
 def _hydrate_claude_key_from_disk() -> None:
     """Next 運用画面で保存した data/anthropic_api_key.txt を、ターミナルバッチでも使えるようにする。"""
-    if (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
+    if (os.environ.get("NEXT_WRITING_BATCH_KEY") or "").strip():
         return
     fp = os.path.join(_project_root(), "data", "anthropic_api_key.txt")
     try:
         with open(fp, "r", encoding="utf-8") as f:
             key = (f.readline() or "").strip()
         if key:
-            os.environ["ANTHROPIC_API_KEY"] = key
+            os.environ["NEXT_WRITING_BATCH_KEY"] = key
     except OSError:
         pass
 
@@ -75,9 +75,9 @@ def _now_iso() -> str:
 def _friendly_proofread_error(err: str) -> str:
     """運用者向けに短く寄せる（詳細はログ用にそのまま残す）。"""
     e = (err or "").strip()
-    if "missing_env:ANTHROPIC_API_KEY" in e or "ANTHROPIC_API_KEY" in e:
+    if "missing_env:NEXT_WRITING_BATCH_KEY" in e:
         return (
-            "Claude API キーが未設定です。.env.local に ANTHROPIC_API_KEY を書き Next を再起動するか、"
+            "Claude API キーが未設定です。.env.local に NEXT_WRITING_BATCH_KEY を書き Next を再起動するか、"
             "バッチを実行するターミナルで export してから同じシェルで python を実行してください。"
         )
     if "json_parse_failed" in e:
@@ -94,10 +94,10 @@ def _friendly_proofread_error(err: str) -> str:
         return (
             "Claude の API キーが、この Python プロセスの環境変数にありません。"
             "【ターミナルで batch/run_day3_proofread.py を叩く場合】その同じシェルで先に "
-            "export ANTHROPIC_API_KEY='…' してから実行してください。"
+            "export NEXT_WRITING_BATCH_KEY='…' してから実行してください。"
             "【ブラウザの提出一覧から「添削」ボタン】キーは Next.js を起動したプロセスに渡る必要があります。"
             "別ターミナルで export しただけでは反映されません。next-writing-batch/.env.local に "
-            "ANTHROPIC_API_KEY=… と書き、npm run dev（または next start）を一度止めて再起動してください。"
+            "NEXT_WRITING_BATCH_KEY=… と書き、npm run dev（または next start）を一度止めて再起動してください。"
         )
     if "ai_proofread_failed" in e:
         tail = e.split("ai_proofread_failed:", 1)[-1].strip()
