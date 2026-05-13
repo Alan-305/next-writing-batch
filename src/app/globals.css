@@ -1099,6 +1099,19 @@ td {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  /* 音声 QR：印刷時のみ約半分に縮小（およそ 29mm 角）
+     SVG（react-qr-code）と <img>（フォールバック）の両方をカバー */
+  .app-shell--student .student-result-qr-img-wrap {
+    width: 110px;
+  }
+
+  .app-shell--student .student-result-qr-img-wrap svg,
+  .app-shell--student .student-result-qr-img {
+    width: 110px !important;
+    height: 110px !important;
+    max-width: 110px !important;
+  }
 }
 
 /* ─── 添削革命 特別サイト（試作） ─── */
