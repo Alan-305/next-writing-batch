@@ -101,11 +101,12 @@ def proofread_one(
     for attempt in range(max_retries):
         try:
             # 内容の指摘（①②③＋【ヒント】）と JSON が途中で切れないよう十分な出力長を確保（既定 1400 では不足しがち）
+            # Haiku 4.5 など長めに書くモデルでも切れないよう 16384 まで許容する。
             generation_config = {
                 "temperature": 0.25,
                 "top_p": 0.9,
                 "top_k": 20,
-                "max_output_tokens": 8192,
+                "max_output_tokens": 16384,
             }
             response = working_model.generate_content(
                 prompt,
