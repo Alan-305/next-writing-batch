@@ -101,36 +101,19 @@ export async function runProofreadBatch(input: RunProofreadInput): Promise<RunPr
       maxBuffer: MAX_BUFFER,
       timeout: TIMEOUT_MS,
     });
-    const stdoutStr = String(stdout ?? "");
-    const stderrStr = String(stderr ?? "");
-    // Python の診断ログ（[claude-call] 等）を Cloud Run のログにも流す。
-    if (stderrStr.trim()) {
-      console.error(`[run-proofread-batch][stderr]\n${stderrStr}`);
-    }
-    if (stdoutStr.trim()) {
-      console.log(`[run-proofread-batch][stdout]\n${stdoutStr}`);
-    }
     return {
       ok: true,
-      stdout: stdoutStr,
-      stderr: stderrStr,
+      stdout: String(stdout ?? ""),
+      stderr: String(stderr ?? ""),
       durationMs: Date.now() - t0,
     };
   } catch (e: unknown) {
     const err = e as { stdout?: Buffer; stderr?: Buffer; message?: string; code?: string };
-    const stdoutStr = err.stdout ? String(err.stdout) : undefined;
-    const stderrStr = err.stderr ? String(err.stderr) : undefined;
-    if (stderrStr?.trim()) {
-      console.error(`[run-proofread-batch][stderr][failed]\n${stderrStr}`);
-    }
-    if (stdoutStr?.trim()) {
-      console.log(`[run-proofread-batch][stdout][failed]\n${stdoutStr}`);
-    }
     return {
       ok: false,
       error: err.message ?? "添削バッチの実行に失敗しました。",
-      stdout: stdoutStr,
-      stderr: stderrStr,
+      stdout: err.stdout ? String(err.stdout) : undefined,
+      stderr: err.stderr ? String(err.stderr) : undefined,
     };
   }
 }

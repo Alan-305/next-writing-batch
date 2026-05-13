@@ -64,8 +64,6 @@ class _ClaudeModel:
         self._client = Anthropic(api_key=api_key)
 
     def generate_content(self, prompt: str, generation_config=None):
-        import sys as _sys
-
         generation_config = generation_config or {}
         temperature = float(generation_config.get("temperature", 0.25))
         max_tokens = int(generation_config.get("max_output_tokens", 1400))
@@ -83,37 +81,11 @@ class _ClaudeModel:
                 for blk in res.content:
                     if getattr(blk, "type", None) == "text":
                         parts.append(getattr(blk, "text", ""))
-                text_out = "".join(parts).strip()
-                # 添削が「途中で切れる」現象の調査用ログ（stderr）。本番でも問題ないように軽量にする。
-                stop_reason = getattr(res, "stop_reason", None)
-                usage = getattr(res, "usage", None)
-                in_tok = getattr(usage, "input_tokens", None) if usage else None
-                out_tok = getattr(usage, "output_tokens", None) if usage else None
-                try:
-                    _sys.stderr.write(
-                        f"[claude-call] model={model_name} stop_reason={stop_reason} "
-                        f"max_tokens={max_tokens} input_tokens={in_tok} output_tokens={out_tok} "
-                        f"text_chars={len(text_out)}\n"
-                    )
-                    _sys.stderr.flush()
-                except Exception:
-                    pass
-                # max_tokens で打ち切られている場合は、上位のリトライで気付けるよう例外化する。
-                if stop_reason == "max_tokens":
-                    raise RuntimeError(
-                        f"claude_stop_reason_max_tokens: model={model_name} "
-                        f"max_tokens={max_tokens} output_tokens={out_tok}"
-                    )
-                return _SimpleResponse(text=text_out)
+                return _SimpleResponse(text="".join(parts).strip())
             except Exception as e:
                 last_err = e
                 # モデル名が無効な場合は次候補へフォールバックする。
                 if "not_found_error" in str(e) or "model:" in str(e):
-                    try:
-                        _sys.stderr.write(f"[claude-call] fallback_from={model_name} reason={e}\n")
-                        _sys.stderr.flush()
-                    except Exception:
-                        pass
                     continue
                 raise
         if last_err is not None:
