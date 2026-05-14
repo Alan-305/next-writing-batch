@@ -35,8 +35,8 @@ MAX_LINES_PER_BLOCK = 28
 EXPLAIN_BODY_FONT_PT = 10.2
 # 解説見出し（誤→正）を本文より少し強調
 EXPLAIN_HEAD_FONT_PT = 10.8
-# 完成版下の QR（A4 1枚に収めやすくするためやや小さめ）
-QR_SIZE_MM = 24
+# 完成版下の QR（A4 1枚に収めやすくするため、スマホで読み取れる最小目安まで縮小）
+QR_SIZE_MM = 12
 
 # student-release.ts の buildExplanationFromSections と同一。旧データの【文法】は PDF 側で下位互換。
 _GRAMMAR_HEAD = "【文法・語法・表現】"
