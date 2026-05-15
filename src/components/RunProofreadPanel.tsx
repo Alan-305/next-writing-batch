@@ -31,7 +31,6 @@ export function RunProofreadPanel({
 
   const [taskId, setTaskId] = useState(() => taskChoices[0] ?? "");
   const [retryFailed, setRetryFailed] = useState(false);
-  const [workers, setWorkers] = useState(2);
   const [limit, setLimit] = useState<number | "">("");
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string | null>(null);
@@ -63,7 +62,6 @@ export function RunProofreadPanel({
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           taskId: tid,
-          workers,
           limit: limit === "" ? 0 : limit,
           retryFailed,
         }),
@@ -143,18 +141,6 @@ export function RunProofreadPanel({
       </label>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 20px", alignItems: "center" }}>
-        <label>
-          並列数{" "}
-          <input
-            type="number"
-            min={1}
-            max={16}
-            value={workers}
-            onChange={(e) => setWorkers(parseInt(e.target.value, 10) || 1)}
-            disabled={busy}
-            style={{ width: "4.5rem", padding: 8 }}
-          />
-        </label>
         <label>
           最大件数（空欄＝制限なし）{" "}
           <input

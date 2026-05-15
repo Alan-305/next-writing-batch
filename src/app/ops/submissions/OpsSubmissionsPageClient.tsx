@@ -172,7 +172,7 @@ export function OpsSubmissionsPageClient() {
             {`export NEXT_WRITING_BATCH_KEY='…'
 export NWB_ORGANIZATION_ID=default   # Firestore users の organizationId と一致
 
-./.venv/bin/python3 batch/run_day3_proofread.py --task-id 課題ID --workers 2 --limit 1
+./.venv/bin/python3 batch/run_day3_proofread.py --task-id 課題ID --workers 1 --limit 1
 
 # 全件: --limit を外す。失敗分のみ: --retry-failed`}
           </pre>

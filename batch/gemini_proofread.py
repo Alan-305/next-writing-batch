@@ -126,6 +126,18 @@ def proofread_one(
                 grammar_deduction,
             ) = parse_free_writing_feedback(raw_text)
 
+            # 内容の指摘の完全性チェック: ①②③【ヒント】が揃っていなければリトライさせる。
+            # 単発・複数設問とも同じ要素を要求しているため共通で検査する。
+            _required_markers = ("①", "②", "③", "【ヒント】")
+            _cc = content_comment or ""
+            _missing = [m for m in _required_markers if m not in _cc]
+            if _missing:
+                raise RuntimeError(
+                    "content_comment_incomplete: missing="
+                    + ",".join(_missing)
+                    + f" chars={len(_cc)}"
+                )
+
             if not (final_version or "").strip() and "採点エラー" in (evaluation or ""):
                 final_version = finalize_final_version_for_display(original_essay, append_word_count=False)
 
@@ -174,6 +186,15 @@ def proofread_one(
             )
         except Exception as e:
             last_err = str(e)
+            try:
+                import sys as _sys
+
+                _sys.stderr.write(
+                    f"[proofread-retry] attempt={attempt + 1}/{max_retries} err={last_err}\n"
+                )
+                _sys.stderr.flush()
+            except Exception:
+                pass
             if attempt < max_retries - 1:
                 time.sleep(initial_backoff_s * (2**attempt))
 

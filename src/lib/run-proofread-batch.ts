@@ -52,7 +52,9 @@ export async function runProofreadBatch(input: RunProofreadInput): Promise<RunPr
     return { ok: false, error: "課題ID（taskId）または submissionIds のどちらかが必要です。" };
   }
 
-  const workers = Math.min(16, Math.max(1, Math.floor(Number(input.workers) || 2)));
+  // 内容指摘の途中切れ抑止のため、並列実行は無効化して常に 1 件ずつ処理する。
+  // input.workers が渡されても無視する（UI からは並列数選択を撤去済み）。
+  const workers = 1;
   const limitRaw = input.limit;
   const limit =
     limitRaw === undefined || limitRaw === null || Number.isNaN(Number(limitRaw))
