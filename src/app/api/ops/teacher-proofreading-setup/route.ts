@@ -3,15 +3,20 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
+import { loadTaskProblemsMaster, taskProblemsFilePath } from "@/lib/load-task-problems-master";
+import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
 import { sanitizeProofreadingSetup } from "@/lib/proofreading-setup-json";
-import { syncTaskProblemsFromProofreadingSetup } from "@/lib/sync-task-problems-from-teacher-setup";
+import {
+  proofreadingSetupFromTaskProblemsMaster,
+  syncTaskProblemsFromProofreadingSetup,
+  TEACHER_SYNC_DEFAULT_PROBLEM_ID,
+} from "@/lib/sync-task-problems-from-teacher-setup";
 import {
   loadTeacherProofreadingSetup,
   saveTeacherProofreadingSetup,
   teacherProofreadingSetupFilePath,
 } from "@/lib/teacher-proofreading-setup-store";
-import { taskProblemsFilePath } from "@/lib/load-task-problems-master";
-import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
+import { pickQuestion } from "@/lib/task-problems-core";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 
 export const dynamic = "force-dynamic";
@@ -33,14 +38,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, message: taskErr }, { status: 422 });
   }
   await migrateLegacyOrgLayoutOnce();
-  const setup = await loadTeacherProofreadingSetup(auth.organizationId, taskId);
-  if (!setup) {
-    return NextResponse.json(
-      { ok: false, message: `課題ID「${taskId}」の保存済み設定が見つかりません。` },
-      { status: 404 },
-    );
+  let merged = await loadTeacherProofreadingSetup(auth.organizationId, taskId);
+
+  if (!merged) {
+    const master = await loadTaskProblemsMaster(auth.organizationId, taskId);
+    if (!master) {
+      return NextResponse.json(
+        { ok: false, message: `課題ID「${taskId}」の保存済み設定が見つかりません。` },
+        { status: 404 },
+      );
+    }
+    merged = proofreadingSetupFromTaskProblemsMaster(master);
+  } else if (!(merged.question ?? "").trim()) {
+    const master = await loadTaskProblemsMaster(auth.organizationId, taskId);
+    if (master) {
+      const fromDefault = pickQuestion(master, TEACHER_SYNC_DEFAULT_PROBLEM_ID);
+      const fromAny =
+        master.problems.find((p) => (p.question ?? "").trim())?.question.trim() ?? "";
+      const q = (fromDefault && fromDefault.trim()) || fromAny;
+      if (q) {
+        merged = sanitizeProofreadingSetup({ ...merged, question: q });
+      }
+    }
   }
-  return NextResponse.json({ ok: true, setup });
+  return NextResponse.json({ ok: true, setup: merged });
 }
 
 export async function POST(request: Request) {

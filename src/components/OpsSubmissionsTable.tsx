@@ -323,7 +323,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
         className="field"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
           gap: "10px 14px",
           alignItems: "end",
           marginBottom: 14,

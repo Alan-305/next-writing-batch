@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { TextareaWithFileDrop } from "@/components/TextareaWithFileDrop";
@@ -39,6 +39,13 @@ export default function ProofreadingSetupPage() {
   const jsonFileRef = useRef<HTMLInputElement>(null);
 
   const totalPoints = setup.content_max + setup.grammar_max;
+
+  const registryTaskIdSet = useMemo(
+    () => new Set(registryTasks.map((t) => t.taskId)),
+    [registryTasks],
+  );
+  const loadTaskSelectValue =
+    registryTaskIdSet.has((setup.task_id ?? "").trim()) ? (setup.task_id ?? "").trim() : "";
 
   const authHeader = useCallback(async (): Promise<Record<string, string> | null> => {
     if (!user) return null;
@@ -356,6 +363,29 @@ export default function ProofreadingSetupPage() {
         </label>
 
         <label className="field">
+          <span>登録済み課題から課題IDを選ぶ（任意）</span>
+          <select
+            value={loadTaskSelectValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) patchSetup({ task_id: v });
+            }}
+            disabled={registryLoading}
+          >
+            <option value="">（一覧から選ばず、上の入力欄の課題IDを使う）</option>
+            {registryTasks.map((t) => (
+              <option key={t.taskId} value={t.taskId}>
+                {t.displayLabel} — {t.taskId}
+              </option>
+            ))}
+          </select>
+          <span className="muted" style={{ fontSize: "0.9em", display: "block", marginTop: 4 }}>
+            選ぶと上の「課題ID（taskId）」が上書きされます。続けて「サーバー保存済みJSONを読み込む」で取得できます。
+            {registryLoading && registryTasks.length === 0 ? " 一覧を取得中…" : null}
+          </span>
+        </label>
+
+        <label className="field">
           <span>問題メモ（任意）</span>
           <input
             type="text"
@@ -430,7 +460,7 @@ export default function ProofreadingSetupPage() {
             {savingServer ? "サーバーに保存中…" : "サーバーに保存（課題ID）"}
           </button>
           <button type="button" onClick={onLoadFromServer} disabled={loadingServer}>
-            {loadingServer ? "サーバーから読込中…" : "サーバー保存済みJSONを読み込む（課題ID）"}
+            {loadingServer ? "サーバーから読込中…" : "サーバー保存済みJSONを読み込む"}
           </button>
           <button type="button" onClick={onSaveJson}>
             JSON をダウンロード

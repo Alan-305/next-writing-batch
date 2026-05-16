@@ -28,10 +28,10 @@ type Payload = {
 };
 
 const PLAN_OPTIONS: Array<{ plan: BillingPlan; label: string; priceLabel: string; tickets: number }> = [
-  { plan: "t10", label: "10枚パック", priceLabel: "2,500円", tickets: 10 },
-  { plan: "t30", label: "30枚パック", priceLabel: "6,000円", tickets: 30 },
-  { plan: "t60", label: "60枚パック", priceLabel: "10,800円", tickets: 60 },
-  { plan: "t120", label: "120枚パック", priceLabel: "18,000円", tickets: 120 },
+  { plan: "t10", label: "10枚パック", priceLabel: "4,000円", tickets: 10 },
+  { plan: "t30", label: "30枚パック", priceLabel: "10,000円", tickets: 30 },
+  { plan: "t60", label: "60枚パック", priceLabel: "18,000円", tickets: 60 },
+  { plan: "t120", label: "120枚パック", priceLabel: "30,000円", tickets: 120 },
 ];
 
 function formatIso(iso: string | null): string {
