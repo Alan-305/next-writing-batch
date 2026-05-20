@@ -17,6 +17,17 @@ from nexus_prompts_for_batch import (
     PHYSICS_TRIAL_PROMPT,
 )
 
+# 自由英作文の接続表現（談話標識）— build_nl_essay_prompt で ESSAY 系に付与
+DISCOURSE_MARKER_RULES = """
+# 談話標識（on the other hand / in contrast / however 等）— 厳守
+- 接続表現は前後の文脈の論理関係を読んでから評価・提案すること。語彙の機械的な言い換えは禁止。
+- However は前文を打ち消す・限定する逆接（日本語の「しかし／だが」）。前文と両立しない内容を続けるときだけ適切。
+- On the other hand と In contrast は、2つの側面の対比（長所と短所、A面とB面など）を示すときに同様に用いられることが多い。文脈上適切なら誤りとせず、無理に●行・減点・完成版の書き換えをしない。
+- 欠点のあとに別の長所・別側面を足す流れ（「短所の一方で、長所は…」）は逆接ではない。この文脈で However を正解候補にしてはならない（「逆接ではない」と言いながら However を示す解説の自己矛盾は禁止）。
+- 上記の流れで候補にするなら On the other hand / In contrast（対比）や、論点の追加なら Furthermore / In addition など、論理関係に合う表現だけを提示する。
+- On the other hand を In contrast や However に直すよう迫る●行は、真に文脈不一致の誤用のときのみ（同等に自然な表現の差し替えを誤り扱いしない）。
+"""
+
 
 ESSAY_PROMPT = """あなたは受験英作文の指導経験が豊富な、温かく誠実な英語講師です。
 生徒の自由英作文を、以下の採点基準で厳密に採点しつつ、単なる減点ではなく

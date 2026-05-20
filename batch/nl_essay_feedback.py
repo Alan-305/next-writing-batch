@@ -17,7 +17,11 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
-from next_prompts_for_batch import ESSAY_PROMPT, ESSAY_PROMPT_MULTIPART  # noqa: E402
+from next_prompts_for_batch import (  # noqa: E402
+    DISCOURSE_MARKER_RULES,
+    ESSAY_PROMPT,
+    ESSAY_PROMPT_MULTIPART,
+)
 
 from task_problems import load_task_master  # noqa: E402
 
@@ -74,7 +78,7 @@ def build_nl_essay_prompt(*, question: str, user_answer: str, multipart: bool = 
         base = ESSAY_PROMPT_MULTIPART.format(question=q, user_answer=ans)
     else:
         base = ESSAY_PROMPT.format(question=q, user_answer=ans)
-    return f"{base.rstrip()}\n{SECTION_JSON_INSTRUCTION}"
+    return f"{base.rstrip()}\n{DISCOURSE_MARKER_RULES}\n{SECTION_JSON_INSTRUCTION}"
 
 
 def _clean_comment_line(line: str) -> str:
