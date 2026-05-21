@@ -24,29 +24,17 @@ export function AuthToolbar({ variant }: Props) {
   const orgId = String(profile?.organizationId ?? "").trim();
 
   return (
-    <div
-      className={variant === "student" ? "auth-toolbar auth-toolbar--student" : "auth-toolbar auth-toolbar--teacher"}
-      style={{
-        marginLeft: variant === "teacher" ? "auto" : undefined,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        flexWrap: "wrap",
-        justifyContent: "flex-end",
-      }}
-    >
-      <div className="auth-toolbar-user-block" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, maxWidth: 380 }}>
-        <span className={muted ? "muted" : undefined} style={{ fontSize: 13, maxWidth: 320 }} title={user.email ?? ""}>
+    <div className={variant === "student" ? "auth-toolbar auth-toolbar--student" : "auth-toolbar auth-toolbar--teacher"}>
+      <div className="auth-toolbar-user-block">
+        <span className={`auth-toolbar-email${muted ? " muted" : ""}`} title={user.email ?? ""}>
           {user.email ?? user.uid}
         </span>
         {variant === "teacher" ? (
           profileLoading ? (
-            <span className="muted" style={{ fontSize: 12 }}>
-              テナント ID を読み込み中…
-            </span>
+            <span className="muted auth-toolbar-meta">テナント ID を読み込み中…</span>
           ) : orgId ? (
-            <span className="muted auth-toolbar-tenant-id" style={{ fontSize: 12 }} title={`organizationId: ${orgId}`}>
-              テナント ID: <code style={{ fontSize: "inherit", wordBreak: "break-all" }}>{orgId}</code>
+            <span className="muted auth-toolbar-tenant-id auth-toolbar-meta" title={`organizationId: ${orgId}`}>
+              テナント ID: <code>{orgId}</code>
             </span>
           ) : null
         ) : null}

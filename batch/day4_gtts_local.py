@@ -1,20 +1,25 @@
 """
-Day4 用 TTS（gTTS）。親リポの services/tts に依存しない。
+Day4 用 TTS（Google Cloud Text-to-Speech / WaveNet）。
+親リポの services/tts に依存しない。ADC または GOOGLE_APPLICATION_CREDENTIALS が必要。
 """
 
 from __future__ import annotations
 
+import os
 import re
 from io import BytesIO
+from typing import List
 
-from gtts import gTTS
+from google.cloud import texttospeech
 
-TTS_LANG = "en"
-TTS_TLD = "us"
-TTS_SLOW = False
+# 女性寄りの US 英語 WaveNet（環境変数 DAY4_TTS_VOICE_NAME で上書き可）
+TTS_VOICE_NAME = (os.environ.get("DAY4_TTS_VOICE_NAME") or "en-US-Wavenet-F").strip()
+TTS_LANGUAGE_CODE = "en-US"
+# Cloud TTS 同期 API の入力上限（5000 バイト）に余裕を持たせる
+TTS_CHUNK_MAX_BYTES = 4800
 
 
-def _normalize_tts_text(text):
+def _normalize_tts_text(text: str) -> str:
     clean_text = str(text or "").replace("```", "").strip()
     while True:
         n = re.sub(
@@ -30,12 +35,16 @@ def _normalize_tts_text(text):
     return clean_text
 
 
-def _split_for_tts(text, max_len=180):
-    if len(text) <= max_len:
+def _utf8_len(s: str) -> int:
+    return len(s.encode("utf-8"))
+
+
+def _split_for_tts(text: str, max_bytes: int = TTS_CHUNK_MAX_BYTES) -> List[str]:
+    if _utf8_len(text) <= max_bytes:
         return [text]
-    chunks = []
-    current = []
-    current_len = 0
+    chunks: List[str] = []
+    current: List[str] = []
+    current_bytes = 0
     pieces = re.split(r"([.!?;:,])", text)
     for i in range(0, len(pieces), 2):
         body = (pieces[i] or "").strip()
@@ -43,30 +52,52 @@ def _split_for_tts(text, max_len=180):
         part = (body + punct).strip()
         if not part:
             continue
-        part_len = len(part) + (1 if current else 0)
-        if current and current_len + part_len > max_len:
+        part_bytes = _utf8_len(part)
+        gap = 1 if current else 0
+        if current and current_bytes + gap + part_bytes > max_bytes:
             chunks.append(" ".join(current).strip())
             current = [part]
-            current_len = len(part)
+            current_bytes = part_bytes
         else:
             current.append(part)
-            current_len += part_len
+            current_bytes += gap + part_bytes
     if current:
         chunks.append(" ".join(current).strip())
     return [c for c in chunks if c]
 
 
-def generate_tts_bytes(text):
+def _get_tts_client() -> texttospeech.TextToSpeechClient:
+    return texttospeech.TextToSpeechClient()
+
+
+def _synthesize_chunk(client: texttospeech.TextToSpeechClient, chunk: str) -> bytes:
+    response = client.synthesize_speech(
+        input=texttospeech.SynthesisInput(text=chunk),
+        voice=texttospeech.VoiceSelectionParams(
+            language_code=TTS_LANGUAGE_CODE,
+            name=TTS_VOICE_NAME,
+        ),
+        audio_config=texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3,
+        ),
+    )
+    audio = response.audio_content
+    if not audio:
+        raise RuntimeError("empty_audio_content")
+    return audio
+
+
+def generate_tts_bytes(text: str) -> bytes | None:
     try:
-        fp = BytesIO()
         clean_text = _normalize_tts_text(text)
         if not clean_text:
             return None
-        chunks = _split_for_tts(clean_text, max_len=180)
+        chunks = _split_for_tts(clean_text, max_bytes=TTS_CHUNK_MAX_BYTES)
+        client = _get_tts_client()
+        fp = BytesIO()
         for chunk in chunks:
-            tts = gTTS(text=chunk, lang=TTS_LANG, tld=TTS_TLD, slow=TTS_SLOW)
-            tts.write_to_fp(fp)
+            fp.write(_synthesize_chunk(client, chunk))
         return fp.getvalue()
     except Exception as e:
-        print(f"gTTS生成エラー: {e}")
+        print(f"Cloud TTS（WaveNet）生成エラー: {e}")
         return None

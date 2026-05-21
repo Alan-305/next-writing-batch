@@ -54,7 +54,7 @@ export function RegisterTeacherClient() {
 
   if (authLoading || profileLoading) {
     return (
-      <main>
+      <main className="page-surface page-surface--auth">
         <p className="muted">読み込み中…</p>
       </main>
     );
@@ -63,7 +63,7 @@ export function RegisterTeacherClient() {
   if (!user) {
     const signInHref = `/sign-in?next=${encodeURIComponent(`/register/teacher?next=${encodeURIComponent(safeNext)}`)}`;
     return (
-      <main>
+      <main className="page-surface page-surface--auth">
         <h1>教員としてテナントを作成</h1>
         <p className="muted">続けるには Google でログインしてください。</p>
         <p>
@@ -78,7 +78,7 @@ export function RegisterTeacherClient() {
 
   if (isStudent && !isTeacher) {
     return (
-      <main>
+      <main className="page-surface page-surface--auth">
         <h1>教員としてテナントを作成</h1>
         <p className="error">
           このアカウントは生徒として登録されています。教員用に別の Google アカウントを使うか、管理者に依頼してください。
@@ -92,7 +92,7 @@ export function RegisterTeacherClient() {
 
   if (isTeacher) {
     return (
-      <main>
+      <main className="page-surface page-surface--auth">
         <h1>教員としてテナントを作成</h1>
         <p className="muted">すでに教員として登録されています。</p>
         <p>
@@ -103,7 +103,7 @@ export function RegisterTeacherClient() {
   }
 
   return (
-    <main>
+    <main className="page-surface page-surface--auth">
       <h1>教員としてテナントを作成</h1>
       <p className="student-page-lead">
         初回のみ、システムが<strong>テナント ID</strong>（organizationId）を自動で発行します。作成後、運用画面に表示される ID

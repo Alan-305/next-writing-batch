@@ -3,7 +3,7 @@ import Link from "next/link";
 /** 開発・運用向けの導線集（トップは /tensaku-kakumei へリダイレクト） */
 export default function HubPage() {
   return (
-    <main>
+    <main className="page-surface page-surface--neutral">
       <h1>Next Writing Batch</h1>
       <div className="card" style={{ marginBottom: 16 }}>
         <p style={{ marginTop: 0 }}>

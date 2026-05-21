@@ -17,6 +17,7 @@ from day4_gcs import upload_mp3_and_get_signed_url
 
 from nl_essay_feedback import pdf_feedback_lines_for_day4, read_aloud_essay_for_day4
 
+from env_local import load_env_local
 from org_paths import submissions_json
 
 
@@ -101,7 +102,10 @@ def _friendly_day4_error(err: str) -> str:
             "既定では QR は生成しません（音声のみ /output/audio/...）。"
         )
     if "tts_failed" in e:
-        return "音声合成（TTS）に失敗しました。ネットワークと gTTS、入力テキストを確認してください。"
+        return (
+            "音声合成（TTS）に失敗しました。Cloud Text-to-Speech API の有効化、"
+            "サービスアカウント権限（cloudtexttospeech.user）、認証、入力テキストを確認してください。"
+        )
     if "qr_failed" in e:
         return "QR画像の生成に失敗しました。"
     if "403" in e or "401" in e:
@@ -210,6 +214,7 @@ def main() -> None:
         id_filter = {x.strip() for x in args.submission_ids.split(",") if x.strip()}
 
     paths = resolve_paths()
+    load_env_local(paths.project_root)
     store_lock = threading.Lock()
     submissions = _load_submissions_unlocked(paths.project_root)
 

@@ -6,6 +6,7 @@
 ## 前提
 - **Python**: `next-writing-batch` 内の venv を推奨。依存は **`./.venv/bin/python3 -m pip install -r requirements.txt`** とし、バッチも **`./.venv/bin/python3 batch/...`** で実行してください。システムの `python3`（例: `/usr/local/bin/python3`）だと `reportlab` 未導入で落ちることがあります。
 - **まず動作確認**: ターミナルで `npm run check:setup`（または `./.venv/bin/python3 batch/check_setup.py`）。[OK] が並べば、このフォルダ単体で添削・音声の準備はできています（親フォルダの `nexus_project` は不要です）。
+- **Day4 音声**: Google Cloud Text-to-Speech（WaveNet、既定 `en-US-Wavenet-F`）。API 有効化と ADC / `GOOGLE_APPLICATION_CREDENTIALS` が必要です。
 - `NEXT_WRITING_BATCH_KEY` が環境変数として設定されていること（または運用画面で `data/anthropic_api_key.txt` に保存、または `.env.local` で Next と共有）
 - `next-writing-batch` 側で、生徒提出APIを使って `data/submissions.json` が作られていること（**試験だけ**なら `npm run seed:pending` または `batch/seed_pending_submission.py` で `pending` を1件追加可）
 

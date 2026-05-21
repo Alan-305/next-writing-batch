@@ -243,8 +243,8 @@ function SignInInner() {
 
   if (!configured) {
     return (
-      <main>
-        <div className="card">
+      <main className="page-surface page-surface--auth">
+        <div className="card page-surface-card">
           <p style={{ marginTop: 0 }}>
             Firebase の公開設定が未入力です。<code>.env.local</code> に <code>NEXT_PUBLIC_FIREBASE_*</code>{" "}
             を設定してください（検証用の Firebase プロジェクト ID は Console の値どおり）。
@@ -259,7 +259,7 @@ function SignInInner() {
 
   if (authLoading) {
     return (
-      <main>
+      <main className="page-surface page-surface--auth">
         <p className="muted">認証状態を読み込み中です…</p>
       </main>
     );
@@ -268,7 +268,7 @@ function SignInInner() {
   if (user) {
     const needOnboard = shouldRedirectStudentToOnboarding(roles, profile, profileLoading);
     return (
-      <main>
+      <main className="page-surface page-surface--auth">
         <div className="card">
           <p style={{ marginTop: 0 }}>すでにログインしています。</p>
           {needOnboard ? (

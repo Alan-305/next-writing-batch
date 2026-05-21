@@ -11,16 +11,33 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+from env_local import hydrate_claude_key_from_disk, load_env_local  # noqa: E402
+
+
+def _print_tts_setup_help(root: Path) -> None:
+    creds = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
+    print("[要対応] Cloud TTS（WaveNet）を使えません。次を確認してください:")
+    if creds:
+        print(f"  ・GOOGLE_APPLICATION_CREDENTIALS={creds}（.env.local から読込可）")
+    else:
+        print("  ・gcloud auth application-default login")
+        print("  ・または .env.local に GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json")
+    print("  ・GCP で Cloud Text-to-Speech API を有効化")
+    print("  ・サービスアカウントに roles/cloudtexttospeech.user（または Editor）")
+
 
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
     os.chdir(root)
+    load_env_local(root)
+    hydrate_claude_key_from_disk(root)
     print("=== 動作チェック（next-writing-batch） ===\n")
 
     ok = True
@@ -43,20 +60,23 @@ def main() -> int:
             return False
 
     pip_mod("anthropic")
-    pip_mod("gtts")
+    pip_mod("google.cloud.texttospeech", "google.cloud.texttospeech")
     pip_mod("reportlab")
 
     key = (os.environ.get("NEXT_WRITING_BATCH_KEY") or "").strip()
     key_file = root / "data" / "anthropic_api_key.txt"
+    env_local = root / ".env.local"
     if key:
-        print("[OK] 環境変数に Claude 用の API キーがあります。")
+        src = ".env.local" if env_local.is_file() else "環境変数"
+        print(f"[OK] Claude 用の API キーがあります（{src} または export）。")
     elif key_file.is_file() and key_file.read_text(encoding="utf-8").strip():
+        hydrate_claude_key_from_disk(root)
         print("[OK] data/anthropic_api_key.txt にキーが保存されています。")
     else:
         print("[要対応] API キーがありません。次のいずれかを行ってください:")
-        print("  ・.env.local に NEXT_WRITING_BATCH_KEY=（あなたのキー）と書き、npm run dev を再起動")
-        print("  ・運用画面「Claude API キー」から保存")
-        print("  ・このチェックの前に: export NEXT_WRITING_BATCH_KEY='…'")
+        print("  ・next-writing-batch/.env.local に NEXT_WRITING_BATCH_KEY=… を書く（このスクリプトは自動読込）")
+        print("  ・運用画面「Claude API キー」から data/anthropic_api_key.txt に保存")
+        print("  ・export NEXT_WRITING_BATCH_KEY='…'")
         ok = False
 
     batch_dir = root / "batch"
@@ -99,11 +119,25 @@ def main() -> int:
 
         b = generate_tts_bytes("Hello.")
         if b:
-            print("[OK] 音声合成（gTTS）のテストができました。")
+            print("[OK] 音声合成（Cloud TTS / WaveNet）のテストができました。")
         else:
-            print("[注意] gTTS は動きましたが音声データが空でした（ネットワークを確認）。")
+            _print_tts_setup_help(root)
+            ok = False
     except Exception as e:
-        print(f"[要対応] 音声合成に失敗: {e}")
+        err = str(e)
+        if "SERVICE_DISABLED" in err or "has not been used in project" in err:
+            print("[要対応] Cloud Text-to-Speech API が GCP プロジェクトで無効です。")
+            if "project=" in err:
+                m = re.search(r"project=(\d+)", err)
+                if m:
+                    pid = m.group(1)
+                    print(
+                        f"  ・有効化: https://console.developers.google.com/apis/api/texttospeech.googleapis.com/overview?project={pid}"
+                    )
+            print("  ・有効化後、数分待ってから check_setup を再実行してください。")
+        else:
+            print(f"[要対応] 音声合成に失敗: {e}")
+            _print_tts_setup_help(root)
         ok = False
 
     print("\n=== 結果 ===")
