@@ -134,3 +134,54 @@ export async function listOrganizationIdsOnDisk(): Promise<string[]> {
   }
   return out;
 }
+
+/**
+ * 新規テナント用の最小ディレクトリを用意する（教員登録・管理画面のテナント一覧用）。
+ */
+export async function ensureOrganizationDataDir(organizationId: string): Promise<void> {
+  const safe = sanitizeOrganizationIdForPath(organizationId);
+  if (!safe) return;
+  await fs.mkdir(organizationTaskProblemsDir(safe), { recursive: true });
+  await fs.mkdir(organizationTeacherSetupDir(safe), { recursive: true });
+  const subs = organizationSubmissionsFilePath(safe);
+  if (!(await pathExists(subs))) {
+    await fs.mkdir(organizationDataRoot(safe), { recursive: true });
+    await fs.writeFile(subs, "[]", "utf8");
+  }
+}
+
+/** Firestore `organizations` コレクションのドキュメント ID 一覧 */
+export async function listOrganizationIdsFromFirestore(): Promise<string[]> {
+  const { getAdminFirestore } = await import("@/lib/firebase/admin-firestore");
+  const snap = await getAdminFirestore().collection("organizations").get();
+  const out: string[] = [];
+  for (const doc of snap.docs) {
+    const id = sanitizeOrganizationIdForPath(doc.id);
+    if (id) out.push(id);
+  }
+  return out;
+}
+
+/** Firestore users の organizationId（手動設定・旧データのテナント拾い上げ用） */
+export async function listOrganizationIdsFromUserProfiles(): Promise<string[]> {
+  const { getAdminFirestore } = await import("@/lib/firebase/admin-firestore");
+  const snap = await getAdminFirestore().collection("users").get();
+  const out = new Set<string>();
+  for (const doc of snap.docs) {
+    const raw = doc.get("organizationId");
+    if (raw === undefined || raw === null) continue;
+    const id = sanitizeOrganizationIdForPath(String(raw).trim());
+    if (id) out.add(id);
+  }
+  return [...out];
+}
+
+/** 管理画面テナント切替: ディスク・organizations・users を統合 */
+export async function listOrganizationIdsForAdmin(): Promise<string[]> {
+  const [disk, fromFs, fromUsers] = await Promise.all([
+    listOrganizationIdsOnDisk(),
+    listOrganizationIdsFromFirestore(),
+    listOrganizationIdsFromUserProfiles(),
+  ]);
+  return [...new Set([...disk, ...fromFs, ...fromUsers])].sort((a, b) => a.localeCompare(b, "ja"));
+}

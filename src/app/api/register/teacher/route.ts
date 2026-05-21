@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import { ensureOrganizationDataDir } from "@/lib/org-data-layout";
 import { generateUniqueTenantOrganizationId, sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
 export const dynamic = "force-dynamic";
@@ -137,9 +138,33 @@ export async function POST(request: Request) {
     );
   }
 
+  const orgId = tx.organizationId;
+  try {
+    await ensureOrganizationDataDir(orgId);
+    await db.collection("organizations").doc(orgId).set(
+      {
+        primaryTeacherUid: auth.uid,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (e) {
+    console.error("[register/teacher] tenant bootstrap failed", e);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "教員情報は保存しましたが、テナントの初期化に失敗しました。しばらくしてから再度「テナントを作成」を押すか、管理者に連絡してください。",
+        organizationId: orgId,
+      },
+      { status: 500 },
+    );
+  }
+
   return NextResponse.json({
     ok: true,
-    organizationId: tx.organizationId,
+    organizationId: orgId,
     changed: tx.changed,
   });
 }

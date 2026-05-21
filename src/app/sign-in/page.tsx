@@ -265,7 +265,20 @@ function SignInInner() {
     );
   }
 
+  useEffect(() => {
+    if (!user || authLoading || profileLoading) return;
+    if (!safeNext.startsWith("/register/teacher")) return;
+    router.replace(safeNext);
+  }, [user, authLoading, profileLoading, safeNext, router]);
+
   if (user) {
+    if (safeNext.startsWith("/register/teacher")) {
+      return (
+        <main className="page-surface page-surface--auth">
+          <p className="muted">教員登録へ移動しています…</p>
+        </main>
+      );
+    }
     const needOnboard = shouldRedirectStudentToOnboarding(roles, profile, profileLoading);
     return (
       <main className="page-surface page-surface--auth">

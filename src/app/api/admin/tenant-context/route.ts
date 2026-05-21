@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth/resolve-effective-organization";
 import { describeOrganizationIdForUid } from "@/lib/firebase/admin-firestore";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
-import { listOrganizationIdsOnDisk } from "@/lib/org-data-layout";
+import { listOrganizationIdsForAdmin } from "@/lib/org-data-layout";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(_request: Request) {
   }
 
   try {
-    const orgsOnDisk = (await listOrganizationIdsOnDisk()).sort();
+    const orgsOnDisk = await listOrganizationIdsForAdmin();
     const actingOrganizationId = getAdminActingOrganizationIdFromRequest(_request);
     const effectiveOrganizationId = await resolveEffectiveOrganizationIdForApi(auth.uid, _request);
     const profile = await describeOrganizationIdForUid(auth.uid);

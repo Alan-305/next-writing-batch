@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { isTeacherByRoles } from "@/lib/auth/user-roles";
+
+function needsTeacherTenantSetup(
+  roles: string[],
+  organizationId: string | null | undefined,
+): boolean {
+  if (isTeacherByRoles(roles)) return false;
+  if (roles.some((r) => r.toLowerCase() === "student")) return false;
+  return !(organizationId ?? "").trim();
+}
 
 export function RegisterTeacherClient() {
   const router = useRouter();
@@ -14,16 +23,20 @@ export function RegisterTeacherClient() {
   const safeNext =
     nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/ops/tickets";
 
-  const { user, authLoading, profileLoading, roles } = useFirebaseAuthContext();
+  const { user, authLoading, profileLoading, roles, profile } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const autoAttemptedRef = useRef(false);
 
   const isTeacher = useMemo(() => isTeacherByRoles(roles), [roles]);
   const isStudent = useMemo(() => roles.some((r) => r.toLowerCase() === "student"), [roles]);
+  const needsSetup = useMemo(
+    () => needsTeacherTenantSetup(roles, profile?.organizationId),
+    [roles, profile?.organizationId],
+  );
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!user || busy) return;
+  const completeRegistration = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
     setBusy(true);
     setMessage("");
     try {
@@ -39,17 +52,35 @@ export function RegisterTeacherClient() {
       const j = (await res.json()) as { ok?: boolean; message?: string; organizationId?: string };
       if (!res.ok || !j.ok) {
         setMessage(j.message ?? "登録に失敗しました。");
-        return;
+        return false;
       }
       const q = new URLSearchParams();
       q.set("tenantCreated", "1");
       const sep = safeNext.includes("?") ? "&" : "?";
       router.replace(`${safeNext}${sep}${q.toString()}`);
+      return true;
     } catch {
       setMessage("通信エラーが発生しました。");
+      return false;
     } finally {
       setBusy(false);
     }
+  }, [router, safeNext, user]);
+
+  useEffect(() => {
+    if (authLoading || profileLoading || !user || !needsSetup || busy) return;
+    if (autoAttemptedRef.current) return;
+    autoAttemptedRef.current = true;
+    void completeRegistration().then((ok) => {
+      if (!ok) autoAttemptedRef.current = false;
+    });
+  }, [authLoading, profileLoading, user, needsSetup, busy, completeRegistration]);
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user || busy) return;
+    autoAttemptedRef.current = true;
+    await completeRegistration();
   };
 
   if (authLoading || profileLoading) {
@@ -109,6 +140,12 @@ export function RegisterTeacherClient() {
         初回のみ、システムが<strong>テナント ID</strong>（organizationId）を自動で発行します。作成後、運用画面に表示される ID
         を控えてください（生徒招待リンクはそのテナントに紐づきます）。
       </p>
+
+      {busy ? (
+        <p className="muted" role="status">
+          教員登録を完了しています…
+        </p>
+      ) : null}
 
       <form className="card" onSubmit={(ev) => void onSubmit(ev)}>
         <button type="submit" disabled={busy}>
