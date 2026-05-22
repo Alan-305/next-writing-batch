@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { countEnglishWords } from "@/lib/english-word-count";
+import {
+  normalizeEssayForCompare,
+  sanitizeFinalEssayArtifactText,
+} from "@/lib/student-final-essay-display";
 import { buildStudentReleaseFromPatch, type StudentReleasePatchBody } from "@/lib/student-release";
 import { splitExplanationIntoContentGrammarSections } from "@/lib/student-release";
 import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
@@ -95,12 +99,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  const prevFinal = sanitizeFinalEssayArtifactText(submission.studentRelease?.finalText ?? "");
+  const newFinal = sanitizeFinalEssayArtifactText(release.finalText ?? "");
+  const finalTextChanged =
+    normalizeEssayForCompare(prevFinal) !== normalizeEssayForCompare(newFinal);
+
   let updated: Awaited<ReturnType<typeof updateSubmissionById>>;
   try {
-    updated = await updateSubmissionById(sid, (row) => ({
-      ...row,
-      studentRelease: release,
-    }));
+    updated = await updateSubmissionById(sid, (row) => {
+      const next = { ...row, studentRelease: release };
+      if (finalTextChanged && row.day4 && Object.keys(row.day4).length > 0) {
+        delete next.day4;
+      }
+      return next;
+    });
   } catch (e) {
     console.error("[student-release] updateSubmissionById", e);
     return NextResponse.json(

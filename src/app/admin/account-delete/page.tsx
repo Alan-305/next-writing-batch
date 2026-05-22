@@ -14,6 +14,10 @@ type DeleteAccountApiJson = {
   userDocumentExisted?: boolean;
   authUserExisted?: boolean;
   authUserDeleted?: boolean;
+  deletedOrganizationId?: string | null;
+  organizationTenantDeleted?: boolean;
+  organizationSubcollectionsDeleted?: Record<string, number>;
+  organizationDiskRemoved?: boolean;
   message?: string;
   code?: string;
   detail?: string;
@@ -60,11 +64,18 @@ export default function AdminAccountDeletePage() {
       const sub = Object.entries(j.subcollectionsDeleted ?? {})
         .map(([k, v]) => `${k}: ${v}`)
         .join(", ");
+      const orgSub = Object.entries(j.organizationSubcollectionsDeleted ?? {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+      const tenantLine = j.organizationTenantDeleted
+        ? `テナント「${j.deletedOrganizationId ?? "—"}」を削除（Firestore organizations${orgSub ? `・${orgSub}` : ""}${j.organizationDiskRemoved ? "・ディスク data/orgs" : ""}）`
+        : "テナントは未削除（同じ organizationId の他ユーザーが残っているため）";
       setResult(
         `完了しました。対象 UID: ${j.targetUid ?? "—"} / 削除した提出ドキュメント: ${j.deletedSubmissionDocs ?? 0} / ` +
           `ユーザードキュメント: ${j.userDocumentExisted ? "削除" : "なし"} / ` +
           `サブコレクション: ${sub || "—"} / ` +
-          `Auth: ${j.authUserExisted ? (j.authUserDeleted ? "削除済み" : "削除できず") : "もともとなし"}`,
+          `Auth: ${j.authUserExisted ? (j.authUserDeleted ? "削除済み" : "削除できず") : "もともとなし"} / ` +
+          tenantLine,
       );
       setTargetUid("");
       setConfirmUid("");
@@ -79,9 +90,11 @@ export default function AdminAccountDeletePage() {
     <main>
       <h1>退会・ユーザー削除（管理者）</h1>
       <p className="muted" style={{ marginTop: 0 }}>
-        対象の <strong>Firebase Auth ユーザー</strong>と <code>users/{"{uid}"}</code> 配下を削除し、
-        <code>organizations</code> に登録があるテナントおよび対象ユーザーの <code>organizationId</code>・既定テナントについて{" "}
-        <code>submittedByUid</code> が一致する提出を削除します。
+        対象の <strong>Firebase Auth ユーザー</strong>と <code>users/{"{uid}"}</code> 配下を削除します。
+        削除後、その <code>organizationId</code> を参照するユーザーが<strong>誰もいなくなった</strong>場合は、
+        <code>organizations/{"{テナントID}"}</code> とサーバー上の <code>data/orgs/{"{テナントID}"}</code> もまとめて削除します（管理画面のテナントプルダウンからも消えます）。
+        同じテナントに他の教員・生徒が残っている場合はテナントは残し、当該ユーザーの提出のみ削除します。
+        過去に残った孤立テナントは <Link href="/admin/tenant-maintenance">テナントメンテナンス</Link> から一括削除できます。
         同じ Google アカウントで再登録すると<strong>新しい uid</strong>として扱われます。
       </p>
       <p className="muted">

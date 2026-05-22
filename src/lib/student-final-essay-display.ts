@@ -26,7 +26,8 @@ export function sanitizeFinalEssayArtifactText(s: string): string {
   return stripNexusSectionJsonFromEssayText(stripLeadingRuleDashesFromEssayText(s.trim()));
 }
 
-function normalizeForCompare(s: string): string {
+/** 原文と完成版が同一かどうかの比較用（空白・改行を正規化） */
+export function normalizeEssayForCompare(s: string): string {
   return (s ?? "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
@@ -46,9 +47,9 @@ export function resolveFinalEssayForStudentDisplay(args: {
   proofread?: ProofreadFinal | null;
 }): { original: string; revised: string } {
   const original = args.essayText ?? "";
-  const origN = normalizeForCompare(original);
+  const origN = normalizeEssayForCompare(original);
   const fromRelease = (args.studentReleaseFinalText ?? "").trim();
-  const relN = normalizeForCompare(fromRelease);
+  const relN = normalizeEssayForCompare(fromRelease);
   const pr = args.proofread;
   const fromProofread = sanitizeFinalEssayArtifactText(
     String(pr?.final_essay ?? pr?.final_version ?? "").trim(),

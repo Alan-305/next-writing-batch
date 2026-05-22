@@ -27,6 +27,7 @@
     "backup:submissions:csv": "node scripts/export-submissions-csv.mjs"
   },
   "dependencies": {
+    "@google-cloud/tasks": "^5.5.2",
     "@google/generative-ai": "^0.24.1",
     "diff": "^7.0.0",
     "firebase": "^11.10.0",

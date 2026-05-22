@@ -91,7 +91,14 @@ async function normalizeGeminiMediaFiles(files: File[]): Promise<File[]> {
 async function fetchGeminiEssayImageIngest(
   mediaFiles: File[],
   idToken: string | null,
-): Promise<{ text: string; noApiKey: boolean; clientError: string | null; needLogin?: boolean }> {
+): Promise<{
+  text: string;
+  noApiKey: boolean;
+  clientError: string | null;
+  needLogin?: boolean;
+  provider?: "claude" | "gemini";
+  usedFallback?: boolean;
+}> {
   const fd = new FormData();
   for (const f of mediaFiles) {
     fd.append("files", f);
@@ -99,7 +106,13 @@ async function fetchGeminiEssayImageIngest(
   const headers: Record<string, string> = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
   const res = await fetch("/api/essay-image-ingest", { method: "POST", headers, body: fd });
-  const data = (await res.json().catch(() => ({}))) as { error?: string; text?: string; message?: string };
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    text?: string;
+    message?: string;
+    provider?: "claude" | "gemini";
+    usedFallback?: boolean;
+  };
   if (res.status === 401) {
     return {
       text: "",
@@ -123,7 +136,13 @@ async function fetchGeminiEssayImageIngest(
             : "読み取りに失敗しました。",
     };
   }
-  return { text: String(data.text || ""), noApiKey: false, clientError: null };
+  return {
+    text: String(data.text || ""),
+    noApiKey: false,
+    clientError: null,
+    provider: data.provider,
+    usedFallback: Boolean(data.usedFallback),
+  };
 }
 
 async function fetchGeminiProblemIngest(
@@ -248,67 +267,57 @@ export function TextareaWithFileDrop({
           Boolean(geminiHandwritingOcr) && otherFiles.length === 0 && geminiMedia.length > 0;
 
         if (tryEssayGemini) {
-          let claudeOverloadedFallback = false;
           try {
             setStatus("手書き・画像を読み取り中…");
             const normalizedMedia = await normalizeGeminiMediaFiles(geminiMedia);
-            const { text: geminiText, noApiKey, clientError, needLogin } = await fetchGeminiEssayImageIngest(
-              normalizedMedia,
-              idToken,
-            );
+            const { text: ocrText, noApiKey, clientError, needLogin, provider, usedFallback } =
+              await fetchGeminiEssayImageIngest(normalizedMedia, idToken);
             if (needLogin) {
               setStatus("");
-              onNotify?.("手書きの Claude 読み取りにはログインが必要です。ログインするか、下のファイル取り込み（ローカル）をご利用ください。", "error");
+              onNotify?.("手書きの読み取りにはログインが必要です。ログインするか、下のファイル取り込み（ローカル）をご利用ください。", "error");
               return;
             }
             if (noApiKey) {
               setStatus("");
-              onNotify?.("Claude API キーが未設定です。手書きOCRは Claude が必須です。", "error");
-              return;
-            } else if (clientError) {
-              const overloaded = /overloaded|rate.?limit|529/i.test(clientError);
-              if (overloaded) {
-                claudeOverloadedFallback = true;
-                setStatus("Claude API が混雑のため、ブラウザ内の取り込みに切り替えます…");
-                onNotify?.(
-                  "Claude API が一時的に混雑しています。ブラウザ内 OCR（精度はやや下がります）で読み取りを試みます。しばらく待ってから Claude 読み取りを再試行することもできます。",
-                  "info",
-                );
-              } else {
-                setStatus("");
-                onNotify?.(`Claude OCR に失敗しました: ${clientError}`, "error");
-                return;
-              }
-            } else if (geminiText.trim()) {
-              let block = geminiText.trim();
-              if (textJoin) {
-                block = `${textJoin}\n\n${block}`;
-              }
-              onChange(mergeExtractedBlock(value ?? "", block, "画像・PDF（Claude）"));
-              setStatus("");
-              onNotify?.("取り込みが完了しました。内容を確認してください。", "success");
-              return;
-            } else if (!claudeOverloadedFallback) {
-              setStatus("");
-              onNotify?.("Claude OCR が空の結果を返しました。画像の鮮明さを確認して再実行してください。", "error");
+              onNotify?.(
+                "手書き OCR 用の GEMINI_API_KEY がありません。運用の「Gemini API キー」画面で設定してください。",
+                "error",
+              );
               return;
             }
+            if (clientError) {
+              setStatus("");
+              onNotify?.(`手書きの読み取りに失敗しました: ${clientError}`, "error");
+              return;
+            }
+            if (!ocrText.trim()) {
+              setStatus("");
+              onNotify?.("読み取り結果が空でした。画像の鮮明さを確認して再実行してください。", "error");
+              return;
+            }
+            let block = ocrText.trim();
+            if (textJoin) {
+              block = `${textJoin}\n\n${block}`;
+            }
+            const label =
+              provider === "gemini"
+                ? usedFallback
+                  ? "画像・PDF（Gemini・Claude 不可時）"
+                  : "画像・PDF（Gemini）"
+                : "画像・PDF（Claude）";
+            onChange(mergeExtractedBlock(value ?? "", block, label));
+            setStatus("");
+            onNotify?.(
+              usedFallback
+                ? "Claude が利用できないため Gemini で読み取りました。内容を確認してください。"
+                : "取り込みが完了しました。内容を確認してください。",
+              "success",
+            );
+            return;
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            if (/overloaded|rate.?limit|529/i.test(msg)) {
-              claudeOverloadedFallback = true;
-              setStatus("Claude API が混雑のため、ブラウザ内の取り込みに切り替えます…");
-              onNotify?.(
-                "Claude API が一時的に混雑しています。ブラウザ内 OCR で読み取りを試みます。",
-                "info",
-              );
-            } else {
-              setStatus("");
-              onNotify?.(`Claude OCR に失敗しました: ${msg}`, "error");
-              return;
-            }
-          }
-          if (!claudeOverloadedFallback) {
+            setStatus("");
+            onNotify?.(`手書きの読み取りに失敗しました: ${msg}`, "error");
             return;
           }
         }

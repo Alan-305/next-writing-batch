@@ -2,11 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { PROBLEM_PLAIN_PROMPT, PROBLEM_STRUCTURED_INTRO } from "@/lib/nl-problem-ocr-prompts";
 
-const DEFAULT_MODEL = "gemini-3.1-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_FALLBACK_MODELS = [
-  "models/gemini-flash-latest",
-  "gemini-2.5-flash",
   "models/gemini-2.5-flash",
+  "gemini-3.1-flash",
   "models/gemini-2.5-flash-lite",
 ] as const;
 

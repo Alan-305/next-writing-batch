@@ -101,6 +101,13 @@ def _friendly_proofread_error(err: str) -> str:
         )
     if "ai_proofread_failed" in e:
         tail = e.split("ai_proofread_failed:", 1)[-1].strip()
+        tail_l = tail.lower()
+        if "overloaded" in tail_l or "529" in tail_l:
+            return (
+                "Anthropic API が一時的に混雑しています（overloaded）。"
+                "1〜3分待ってから「失敗分のみ再実行」をお試しください。"
+                "混雑が続く場合は CLAUDE_MODEL を Haiku 系に変更するか、時間を空けて再実行してください。"
+            )
         base = "Claude 呼び出しが規定回数内に成功しませんでした。ネットワーク・API制限・CLAUDE_MODEL を確認し、失敗分のみ再実行してください。"
         if tail and tail != e and len(tail) <= 280:
             return f"{base}（詳細: {tail}）"
@@ -139,14 +146,14 @@ def _pick_indices(
         if id_filter is not None:
             # 運用画面から特定の submissionId だけ実行するときは、タイムアウト等で
             # processing のまま取り残した行や、設定変更後の再添削（done）も対象にする。
-            if st in ("pending", "processing", "failed", "done"):
+            if st in ("pending", "queued", "processing", "failed", "done"):
                 out.append(idx)
             continue
         if retry_failed:
             if st == "failed":
                 out.append(idx)
         else:
-            if st == "pending":
+            if st in ("pending", "queued"):
                 out.append(idx)
     return out
 
@@ -155,7 +162,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Day3: Gemini proofreading batch")
     parser.add_argument("--task-id", default="", help="Only process submissions matching this task_id")
     parser.add_argument("--limit", type=int, default=0, help="Process at most N records (0 = no limit)")
-    parser.add_argument("--max-retries", type=int, default=3, help="Gemini retry count per record")
+    parser.add_argument("--max-retries", type=int, default=6, help="Claude retry count per record (overloaded 対策)")
     parser.add_argument(
         "--workers",
         type=int,
@@ -196,7 +203,7 @@ def main() -> None:
         if id_filter is not None:
             print(
                 "[day3] hint: --submission-ids で指定した受付IDが data/submissions.json に無いか、"
-                "該当行の status が pending|processing|failed|done 以外です。"
+                "該当行の status が pending|queued|processing|failed|done 以外です。"
             )
         else:
             print(

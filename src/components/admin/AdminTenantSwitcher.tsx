@@ -58,6 +58,12 @@ export function AdminTenantSwitcher() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const onChange = () => void load();
+    window.addEventListener(ADMIN_TENANT_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(ADMIN_TENANT_CHANGED_EVENT, onChange);
+  }, [load]);
+
   const onSelectChange = async (ev: React.ChangeEvent<HTMLSelectElement>) => {
     const value = ev.target.value;
     setSaving(true);
@@ -114,11 +120,8 @@ export function AdminTenantSwitcher() {
     );
   }
 
-  const orgs = payload.orgsOnDisk ?? [];
+  const options = [...(payload.orgsOnDisk ?? [])].sort((a, b) => a.localeCompare(b, "ja"));
   const acting = payload.actingOrganizationId ?? null;
-  const optionSet = new Set<string>(orgs);
-  if (acting) optionSet.add(acting);
-  const options = [...optionSet].sort((a, b) => a.localeCompare(b));
   const selectValue = acting ?? "";
 
   return (

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
-import { runEssayHandwritingIngestClaude } from "@/lib/essay-handwriting-claude";
+import { essayOcrProviderMode, runEssayHandwritingIngest } from "@/lib/essay-handwriting-ingest";
+import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
 import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
 
 export const runtime = "nodejs";
@@ -32,18 +33,30 @@ function isMediaFile(file: File): boolean {
 }
 
 /**
- * 提出フォームの英文欄向け: 手書き写真・HEIC・PDF を Claude で転記（Tesseract より高精度）。
+ * 提出フォームの英文欄向け: 手書き写真・HEIC・PDF を転記。
+ * 既定は Gemini のみ（ESSAY_OCR_PROVIDER=gemini-only）。添削は Claude 専用。
  */
 export async function POST(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
   if (!auth.ok) return auth.response;
 
-  const apiKey = resolveEffectiveAnthropicApiKey();
-  if (!apiKey) {
+  const claudeKey = resolveEffectiveAnthropicApiKey();
+  const geminiKey = resolveEffectiveGeminiApiKey();
+  const ocrMode = essayOcrProviderMode();
+  if (ocrMode === "gemini-only" && !geminiKey) {
     return NextResponse.json(
       {
         error:
-          "Claude API キーがありません。環境変数 NEXT_WRITING_BATCH_KEY を設定するか、運用の「Claude API キー」画面で data/anthropic_api_key.txt に保存してください。",
+          "手書き OCR 用の GEMINI_API_KEY（または GOOGLE_API_KEY）がありません。運用の「Gemini API キー」画面で設定してください。",
+      },
+      { status: 503 },
+    );
+  }
+  if (!claudeKey && !geminiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "OCR 用 GEMINI_API_KEY または（claude-first 時）NEXT_WRITING_BATCH_KEY が必要です。",
       },
       { status: 503 },
     );
@@ -77,21 +90,17 @@ export async function POST(request: Request) {
     );
     const parts = await Promise.all(rawParts.map((p) => normalizeVisionImagePartForApi(p)));
 
-    const text = await runEssayHandwritingIngestClaude({
-      apiKey,
+    const result = await runEssayHandwritingIngest({
+      claudeApiKey: claudeKey,
+      geminiApiKey: geminiKey,
       parts,
     });
 
-    if (!text.trim()) {
-      return NextResponse.json(
-        { error: "モデルからテキストが返りませんでした。画像の解像度や内容を確認してください。" },
-        { status: 502 },
-      );
-    }
-
     return NextResponse.json({
       ok: true,
-      text,
+      text: result.text,
+      provider: result.provider,
+      usedFallback: result.usedFallback,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

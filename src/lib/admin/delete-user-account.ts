@@ -1,12 +1,15 @@
-import type { CollectionReference, DocumentSnapshot, Firestore } from "firebase-admin/firestore";
+import type { DocumentSnapshot, Firestore } from "firebase-admin/firestore";
 
+import { organizationIdQueryKeys, removeOrganizationIfUnreferenced } from "@/lib/org-tenant-lifecycle";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { defaultOrganizationId, sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
 const CHUNK = 400;
 
-async function deleteAllDocumentsInCollection(col: CollectionReference): Promise<number> {
+async function deleteAllDocumentsInCollection(
+  col: import("firebase-admin/firestore").CollectionReference,
+): Promise<number> {
   const db = col.firestore;
   let total = 0;
   while (true) {
@@ -54,7 +57,9 @@ async function deleteSubmissionsForUid(uid: string, userSnap: DocumentSnapshot):
     const raw = userSnap.get("organizationId");
     if (raw !== undefined && raw !== null) {
       const s = String(raw).trim();
-      if (s) orgIds.add(sanitizeOrganizationIdForPath(s) || s);
+      for (const key of organizationIdQueryKeys(s)) {
+        orgIds.add(sanitizeOrganizationIdForPath(key) || key);
+      }
     }
   }
 
@@ -76,6 +81,11 @@ export type UserAccountDeletionResult = {
   userDocumentExisted: boolean;
   authUserExisted: boolean;
   authUserDeleted: boolean;
+  /** 削除後に参照ユーザーが 0 人になった organizationId */
+  deletedOrganizationId: string | null;
+  organizationTenantDeleted: boolean;
+  organizationSubcollectionsDeleted: Record<string, number>;
+  organizationDiskRemoved: boolean;
 };
 
 export class UserAccountDeletionError extends Error {
@@ -90,6 +100,7 @@ export class UserAccountDeletionError extends Error {
 
 /**
  * 管理者専用: 対象ユーザーの Firestore データ・提出・Firebase Auth を削除する。
+ * 削除後、当該 organizationId を参照するユーザーがいなければテナント（organizations・data/orgs）も削除する。
  * GCS の Day4 オブジェクトや Stripe 顧客は削除しない（必要なら別途運用）。
  */
 export async function executeAdminUserAccountDeletion(params: {
@@ -125,6 +136,9 @@ export async function executeAdminUserAccountDeletion(params: {
 
   const userRef = db.collection("users").doc(targetUid);
   const userSnapEarly = await userRef.get();
+  const rawOrg = userSnapEarly.exists ? String(userSnapEarly.get("organizationId") ?? "").trim() : "";
+  const orgIdsToReconcile = rawOrg ? organizationIdQueryKeys(rawOrg) : [];
+
   const deletedSubmissionDocs = await deleteSubmissionsForUid(targetUid, userSnapEarly);
 
   const subcollectionsDeleted: Record<string, number> = {};
@@ -154,6 +168,25 @@ export async function executeAdminUserAccountDeletion(params: {
     }
   }
 
+  let organizationTenantDeleted = false;
+  let organizationSubcollectionsDeleted: Record<string, number> = {};
+  let organizationDiskRemoved = false;
+  let deletedOrganizationId: string | null = null;
+
+  const reconciled = new Set<string>();
+  for (const key of orgIdsToReconcile) {
+    const safe = sanitizeOrganizationIdForPath(key) || key;
+    if (!safe || reconciled.has(safe)) continue;
+    reconciled.add(safe);
+    const removed = await removeOrganizationIfUnreferenced(safe);
+    if (removed.removed) {
+      organizationTenantDeleted = true;
+      deletedOrganizationId = safe;
+      organizationSubcollectionsDeleted = removed.subcollectionsDeleted;
+      organizationDiskRemoved = removed.diskRemoved;
+    }
+  }
+
   return {
     ok: true,
     targetUid,
@@ -162,5 +195,9 @@ export async function executeAdminUserAccountDeletion(params: {
     userDocumentExisted,
     authUserExisted,
     authUserDeleted,
+    deletedOrganizationId,
+    organizationTenantDeleted,
+    organizationSubcollectionsDeleted,
+    organizationDiskRemoved,
   };
 }

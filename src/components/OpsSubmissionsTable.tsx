@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { DeleteSubmissionButton } from "@/components/DeleteSubmissionButton";
 import {
+  CancelProofreadButton,
   ProofreadSubmissionButton,
   RedoProofreadSubmissionButton,
 } from "@/components/ProofreadSubmissionButton";
@@ -19,6 +20,7 @@ export type SubmissionListRow = {
   studentId: string;
   studentName: string;
   status: string;
+  proofreadQueuedAt?: string;
   /** Day4 成果物（ZIP 対象）が1つ以上ある */
   hasDay4Assets?: boolean;
   /** 運用が生徒向け結果を公開済み（studentRelease.operatorApprovedAt あり） */
@@ -47,17 +49,19 @@ function hasStudentViewedPublishedResult(item: SubmissionListRow): boolean {
 function submissionListRank(item: SubmissionListRow): number {
   const st = item.status;
   if (st === "pending") return 0;
-  if (st === "processing") return 1;
-  if (st === "failed") return 2;
+  if (st === "queued") return 1;
+  if (st === "processing") return 2;
+  if (st === "failed") return 3;
   if (st === "done") {
-    if (hasStudentViewedPublishedResult(item)) return 4;
-    return 3;
+    if (hasStudentViewedPublishedResult(item)) return 5;
+    return 4;
   }
   return 99;
 }
 
 function submissionStatusSortLabel(item: SubmissionListRow): string {
   if (item.status === "pending") return "pending";
+  if (item.status === "queued") return "queued";
   if (item.status === "processing") return "processing";
   if (item.status === "failed") return "failed";
   if (hasStudentViewedPublishedResult(item)) return "viewed";
@@ -101,11 +105,12 @@ type Props = {
   rows: SubmissionListRow[];
   /** 受付IDを選んで ZIP（Day4 ファイル） */
   enableZipSelection?: boolean;
+  onReloadSubmissions?: () => void;
 };
 
 const PAGE_OPTIONS = [25, 50, 100, 200] as const;
 
-export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props) {
+export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReloadSubmissions }: Props) {
   const router = useRouter();
   const { user } = useFirebaseAuthContext();
   const total = rows.length;
@@ -184,21 +189,25 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
     const runningPending = item.status === "pending" && tid !== "" && item.taskId === tid;
     if (runningPending) {
       return (
-        <span className="status-running status-running--pending" title="一括添削実行中（pending）">
+        <span className="status-running status-running--pending" title="一括添削実行中">
           <span className="status-spinner" aria-hidden="true" />
-          添削中
+          processing
         </span>
       );
     }
-    /** DB 上の取り残し。スピナーは出さず、再実行可能であることを示す（再起動しても消えない）。 */
+    if (item.status === "queued") {
+      return (
+        <span className="status-running status-running--pending" title="queued（旧非同期キューの取り残し）">
+          <span className="status-spinner" aria-hidden="true" />
+          queued
+        </span>
+      );
+    }
     if (item.status === "processing") {
       return (
-        <span
-          className="status-processing-stale"
-          title="バッチが途中で止まるとこのまま残ることがあります。右の「添削」で再実行できます。"
-        >
+        <span className="status-running status-running--pending" title="Claude で添削実行中">
+          <span className="status-spinner" aria-hidden="true" />
           processing
-          <span className="status-processing-stale-hint">（再実行可）</span>
         </span>
       );
     }
@@ -353,6 +362,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
           >
             <option value="">すべて</option>
             <option value="pending">pending</option>
+            <option value="queued">queued</option>
             <option value="processing">processing</option>
             <option value="done">done</option>
             <option value="failed">failed</option>
@@ -505,12 +515,25 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false }: Props)
                         taskId={item.taskId}
                         studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
                         status={item.status}
+                        proofreadQueuedAt={item.proofreadQueuedAt}
+                        onEnqueued={onReloadSubmissions}
                       />
-                      {item.status === "done" ? (
+                      <CancelProofreadButton
+                        submissionId={item.submissionId}
+                        taskId={item.taskId}
+                        studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
+                        status={item.status}
+                        proofreadQueuedAt={item.proofreadQueuedAt}
+                        onCancelled={onReloadSubmissions}
+                      />
+                      {item.status === "done" || item.status === "failed" || item.status === "queued" ? (
                         <RedoProofreadSubmissionButton
                           submissionId={item.submissionId}
                           taskId={item.taskId}
                           studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
+                          status={item.status}
+                          proofreadQueuedAt={item.proofreadQueuedAt}
+                          onEnqueued={onReloadSubmissions}
                         />
                       ) : null}
                       <DeleteSubmissionButton

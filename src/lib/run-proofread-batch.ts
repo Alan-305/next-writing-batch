@@ -75,7 +75,8 @@ export async function runProofreadBatch(input: RunProofreadInput): Promise<RunPr
     };
   }
 
-  const args = [script, "--task-id", taskId, "--workers", String(workers)];
+  const maxRetries = Math.max(1, Math.min(10, Number(process.env.CLAUDE_PROOFREAD_MAX_RETRIES) || 6));
+  const args = [script, "--task-id", taskId, "--workers", String(workers), "--max-retries", String(maxRetries)];
   if (limit > 0) {
     args.push("--limit", String(limit));
   }

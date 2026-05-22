@@ -5,6 +5,7 @@ import { unstable_noStore as noStore } from "next/cache";
 
 import { writeJsonFileAtomic } from "@/lib/atomic-json-file";
 import { defaultOrganizationId } from "@/lib/organization-id";
+import { isStaleQueuedRow } from "@/lib/proofread/proofread-job-types";
 import { migrateLegacyOrgLayoutOnce, organizationSubmissionsFilePath, listOrganizationIdsOnDisk } from "@/lib/org-data-layout";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import type { StudentRelease } from "@/lib/student-release";
@@ -17,7 +18,11 @@ export type Submission = SubmissionInput & {
   organizationId?: string;
   /** 提出 API が検証した Firebase Auth uid（ログイン提出時） */
   submittedByUid?: string;
-  status: "pending" | "processing" | "done" | "failed";
+  status: "pending" | "queued" | "processing" | "done" | "failed";
+  /** 非同期添削キュー（Phase 1） */
+  proofreadJobId?: string;
+  proofreadQueuedAt?: string;
+  proofreadQueuedByUid?: string;
   /** 生徒が公開済み添削結果ページを初めて開いた日時（運用一覧の Viewed 表示用） */
   studentResultFirstViewedAt?: string;
   /** 運用が編集・公開した生徒向け確定データ（やり方A: ルーブリック得点＋合計＋テキスト） */
@@ -166,11 +171,39 @@ async function backfillFromFileToFirestoreIfEmpty(organizationId: string): Promi
   }
 }
 
+async function reclaimStaleQueuedSubmissions(organizationId: string, rows: Submission[]): Promise<number> {
+  let reclaimed = 0;
+  for (const row of rows) {
+    if (!isStaleQueuedRow(row)) continue;
+    const sid = String(row.submissionId ?? "").trim();
+    if (!sid) continue;
+    const finishedAt = new Date().toISOString();
+    const updated = await updateSubmissionByIdInOrganization(organizationId, sid, (s) => ({
+      ...s,
+      status: "failed",
+      proofread: {
+        ...(s.proofread ?? {}),
+        error: "proofread_queue_stale",
+        operator_message:
+          "キュー待ちが長時間続いたため中断しました。「添削」または「添削やり直し」でもう一度お試しください。",
+        finishedAt,
+      },
+    }));
+    if (updated) reclaimed += 1;
+  }
+  return reclaimed;
+}
+
 export async function getSubmissions(organizationId: string): Promise<Submission[]> {
   noStore();
   await backfillFromFileToFirestoreIfEmpty(organizationId);
   const snap = await orgSubmissionsCol(organizationId).orderBy("submittedAt", "desc").get();
-  const rows = snap.docs.map((d) => d.data() as Submission);
+  let rows = snap.docs.map((d) => d.data() as Submission);
+  const reclaimed = await reclaimStaleQueuedSubmissions(organizationId, rows);
+  if (reclaimed > 0) {
+    const snap2 = await orgSubmissionsCol(organizationId).orderBy("submittedAt", "desc").get();
+    rows = snap2.docs.map((d) => d.data() as Submission);
+  }
   return rows.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }
 

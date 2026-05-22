@@ -87,8 +87,8 @@ def proofread_one(
     original_essay: str,
     question: str = "",
     multipart: bool = False,
-    max_retries: int = 3,
-    initial_backoff_s: float = 2.0,
+    max_retries: int = 6,
+    initial_backoff_s: float = 3.0,
 ) -> NLEssayProofreadOutput:
     del task_id, student_id, student_name  # メタ情報は将来ログ用。プロンプトは NL と同形式のみ。
 

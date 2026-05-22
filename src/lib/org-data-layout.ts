@@ -176,12 +176,40 @@ export async function listOrganizationIdsFromUserProfiles(): Promise<string[]> {
   return [...out];
 }
 
-/** 管理画面テナント切替: ディスク・organizations・users を統合 */
+/** テナント用ディレクトリ `data/orgs/{orgId}/` を削除（存在しなくても成功） */
+export async function removeOrganizationDataDir(organizationId: string): Promise<boolean> {
+  const safe = sanitizeOrganizationIdForPath(organizationId);
+  if (!safe) return false;
+  const root = organizationDataRoot(safe);
+  try {
+    await fs.rm(root, { recursive: true, force: true });
+    return true;
+  } catch (e: unknown) {
+    const code =
+      typeof e === "object" && e !== null && "code" in e ? String((e as { code: string }).code) : "";
+    if (code === "ENOENT") return false;
+    throw e;
+  }
+}
+
+/**
+ * 管理画面テナント切替: 実際にユーザーが紐づいている organizationId のみ。
+ * （organizations だけ残った孤立テナントはプルダウンに出さない）
+ */
 export async function listOrganizationIdsForAdmin(): Promise<string[]> {
-  const [disk, fromFs, fromUsers] = await Promise.all([
-    listOrganizationIdsOnDisk(),
-    listOrganizationIdsFromFirestore(),
-    listOrganizationIdsFromUserProfiles(),
-  ]);
-  return [...new Set([...disk, ...fromFs, ...fromUsers])].sort((a, b) => a.localeCompare(b, "ja"));
+  const { getAdminFirestore } = await import("@/lib/firebase/admin-firestore");
+  const snap = await getAdminFirestore().collection("users").get();
+  const out = new Set<string>();
+  let hasUnset = false;
+  for (const doc of snap.docs) {
+    const raw = doc.get("organizationId");
+    if (raw === undefined || raw === null || String(raw).trim() === "") {
+      hasUnset = true;
+      continue;
+    }
+    const id = sanitizeOrganizationIdForPath(String(raw).trim());
+    if (id) out.add(id);
+  }
+  if (hasUnset) out.add(defaultOrganizationId());
+  return [...out].sort((a, b) => a.localeCompare(b, "ja"));
 }

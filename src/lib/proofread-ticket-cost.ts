@@ -24,7 +24,7 @@ export function listSubmissionsForProofreadTicketScope(input: ProofreadTicketSco
     const sid = String(s.submissionId ?? "").trim();
     if (idFilter) {
       if (!idFilter.has(sid)) continue;
-      if (s.status === "pending" || s.status === "processing" || s.status === "failed" || s.status === "done") {
+      if (s.status === "pending" || s.status === "queued" || s.status === "processing" || s.status === "failed" || s.status === "done") {
         out.push(s);
       }
       continue;
@@ -33,7 +33,7 @@ export function listSubmissionsForProofreadTicketScope(input: ProofreadTicketSco
     if (retryFailed) {
       if (s.status === "failed") out.push(s);
     } else {
-      if (s.status === "pending") out.push(s);
+      if (s.status === "pending" || s.status === "queued") out.push(s);
     }
   }
 

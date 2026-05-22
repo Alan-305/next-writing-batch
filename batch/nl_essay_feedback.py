@@ -1040,11 +1040,45 @@ def read_aloud_english_from_proofread(pr: Dict[str, Any]) -> str:
     """TTS 用: final_essay があればそれ。なければ final_version から語数表記を除いた英文。"""
     fe = str(pr.get("final_essay") or "").strip()
     if fe:
-        return fe
+        return strip_final_essay_artifacts(fe)
     fv = str(pr.get("final_version") or "").strip()
     if fv:
-        return finalize_final_version_for_display(fv, append_word_count=False)
+        return strip_final_essay_artifacts(finalize_final_version_for_display(fv, append_word_count=False))
     return ""
+
+
+def _normalize_essay_for_compare(s: str) -> str:
+    """TypeScript normalizeEssayForCompare と同等（完成版・原文の同一判定）。"""
+    t = (s or "").replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"[ \t\xa0]+", " ", t)
+    t = re.sub(r"\s*\n+\s*", " ", t)
+    return t.strip()
+
+
+def resolve_final_essay_for_student_display(
+    submission: Dict[str, Any],
+) -> Tuple[str, str]:
+    """
+    生徒画面の「完成版」と同じ英文を返す（original, revised）。
+    src/lib/student-final-essay-display.ts の resolveFinalEssayForStudentDisplay と揃える。
+    """
+    original = str(submission.get("essayText") or "")
+    sr = submission.get("studentRelease") or {}
+    pr = submission.get("proofread") or {}
+    from_release = ""
+    if str(sr.get("operatorApprovedAt") or "").strip() or str(sr.get("operatorFinalizedAt") or "").strip():
+        from_release = str(sr.get("finalText") or "").strip()
+    orig_n = _normalize_essay_for_compare(original)
+    rel_n = _normalize_essay_for_compare(from_release)
+    from_proofread = read_aloud_english_from_proofread(pr)
+
+    if from_release and rel_n != orig_n:
+        return original, strip_final_essay_artifacts(from_release)
+    if from_proofread:
+        return original, from_proofread
+    if from_release:
+        return original, strip_final_essay_artifacts(from_release)
+    return original, ""
 
 
 def _parse_content_grammar_from_ai_evaluation(eval_text: str) -> Optional[Tuple[int, int]]:
@@ -1336,17 +1370,9 @@ def realign_grammar_deduction_marks_in_merged_explanation(explanation: str, gram
 
 
 def read_aloud_essay_for_day4(submission: Dict[str, Any]) -> str:
-    """運用の finalText を優先（公開済み > 確定のみ > proofread）。"""
-    sr = submission.get("studentRelease") or {}
-    if str(sr.get("operatorApprovedAt") or "").strip():
-        t = str(sr.get("finalText") or "").strip()
-        if t:
-            return t
-    if str(sr.get("operatorFinalizedAt") or "").strip():
-        t = str(sr.get("finalText") or "").strip()
-        if t:
-            return t
-    return read_aloud_english_from_proofread(submission.get("proofread") or {})
+    """TTS・PDF 用: 生徒向け完成版表示と同じルールで revised 英文を返す。"""
+    _original, revised = resolve_final_essay_for_student_display(submission)
+    return revised
 
 
 def pdf_feedback_lines_for_day4(project_root: str, submission: Dict[str, Any]) -> Tuple[str, str, str]:

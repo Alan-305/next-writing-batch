@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { describeOrganizationIdForUid, getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import { assignUserOrganizationId } from "@/lib/org-tenant-lifecycle";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 
 export const dynamic = "force-dynamic";
@@ -42,10 +43,21 @@ export async function POST(request: Request) {
   const useDefault = body.useDefault === true;
   const raw = body.organizationId;
 
-  if (useDefault) {
+  const clearToDefault = async () => {
+    const before = await describeOrganizationIdForUid(auth.uid);
+    const prev = before.firestoreRaw;
     await getAdminFirestore().collection("users").doc(auth.uid).set({ organizationId: null }, { merge: true });
+    let removedPreviousTenant = null;
+    if (prev) {
+      const { removeOrganizationIfUnreferenced } = await import("@/lib/org-tenant-lifecycle");
+      removedPreviousTenant = await removeOrganizationIfUnreferenced(prev);
+    }
     const resolution = await describeOrganizationIdForUid(auth.uid);
-    return NextResponse.json({ ok: true, resolution });
+    return NextResponse.json({ ok: true, resolution, removedPreviousTenant });
+  };
+
+  if (useDefault) {
+    return clearToDefault();
   }
 
   if (raw === undefined) {
@@ -53,9 +65,7 @@ export async function POST(request: Request) {
   }
 
   if (raw === null) {
-    await getAdminFirestore().collection("users").doc(auth.uid).set({ organizationId: null }, { merge: true });
-    const resolution = await describeOrganizationIdForUid(auth.uid);
-    return NextResponse.json({ ok: true, resolution });
+    return clearToDefault();
   }
 
   if (typeof raw !== "string") {
@@ -64,9 +74,7 @@ export async function POST(request: Request) {
 
   const trimmed = raw.trim();
   if (!trimmed) {
-    await getAdminFirestore().collection("users").doc(auth.uid).set({ organizationId: null }, { merge: true });
-    const resolution = await describeOrganizationIdForUid(auth.uid);
-    return NextResponse.json({ ok: true, resolution });
+    return clearToDefault();
   }
 
   const sanitized = sanitizeOrganizationIdForPath(trimmed);
@@ -81,7 +89,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await getAdminFirestore().collection("users").doc(auth.uid).set({ organizationId: sanitized }, { merge: true });
+  const assigned = await assignUserOrganizationId({ targetUid: auth.uid, organizationId: sanitized });
   const resolution = await describeOrganizationIdForUid(auth.uid);
-  return NextResponse.json({ ok: true, resolution });
+  return NextResponse.json({ ok: true, resolution, ...assigned });
 }

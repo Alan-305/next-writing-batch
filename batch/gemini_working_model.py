@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -40,6 +41,28 @@ DEFAULT_CLAUDE_FALLBACKS = (
 )
 
 
+def _is_retryable_claude_error(exc: Exception) -> bool:
+    s = str(exc).lower()
+    return (
+        "overloaded" in s
+        or "529" in s
+        or "rate_limit" in s
+        or "rate limit" in s
+    )
+
+
+def _overload_retry_count() -> int:
+    raw = (get_env_or_secret("CLAUDE_OVERLOADED_RETRIES", "5") or "5").strip()
+    try:
+        return max(1, min(8, int(raw)))
+    except ValueError:
+        return 5
+
+
+def _overload_backoff_s(attempt: int) -> float:
+    return 2.0 * (2**attempt)
+
+
 def _candidate_models() -> list[str]:
     preferred = (get_env_or_secret("CLAUDE_MODEL", DEFAULT_CLAUDE_MODEL) or "").strip() or DEFAULT_CLAUDE_MODEL
     fallback_raw = (get_env_or_secret("CLAUDE_MODEL_FALLBACKS", "") or "").strip()
@@ -70,52 +93,75 @@ class _ClaudeModel:
         temperature = float(generation_config.get("temperature", 0.25))
         max_tokens = int(generation_config.get("max_output_tokens", 1400))
         last_err = None
+        overload_retries = _overload_retry_count()
         for model_name in self._model_names:
-            try:
-                res = self._client.messages.create(
-                    model=model_name,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                self.model_name = model_name
-                parts = []
-                for blk in res.content:
-                    if getattr(blk, "type", None) == "text":
-                        parts.append(getattr(blk, "text", ""))
-                text_out = "".join(parts).strip()
-                # 添削が「途中で切れる」現象の調査用ログ（stderr）。本番でも問題ないように軽量にする。
-                stop_reason = getattr(res, "stop_reason", None)
-                usage = getattr(res, "usage", None)
-                in_tok = getattr(usage, "input_tokens", None) if usage else None
-                out_tok = getattr(usage, "output_tokens", None) if usage else None
+            for overload_try in range(overload_retries):
                 try:
-                    _sys.stderr.write(
-                        f"[claude-call] model={model_name} stop_reason={stop_reason} "
-                        f"max_tokens={max_tokens} input_tokens={in_tok} output_tokens={out_tok} "
-                        f"text_chars={len(text_out)}\n"
+                    res = self._client.messages.create(
+                        model=model_name,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        messages=[{"role": "user", "content": prompt}],
                     )
-                    _sys.stderr.flush()
-                except Exception:
-                    pass
-                # max_tokens で打ち切られている場合は、上位のリトライで気付けるよう例外化する。
-                if stop_reason == "max_tokens":
-                    raise RuntimeError(
-                        f"claude_stop_reason_max_tokens: model={model_name} "
-                        f"max_tokens={max_tokens} output_tokens={out_tok}"
-                    )
-                return _SimpleResponse(text=text_out)
-            except Exception as e:
-                last_err = e
-                # モデル名が無効な場合は次候補へフォールバックする。
-                if "not_found_error" in str(e) or "model:" in str(e):
+                    self.model_name = model_name
+                    parts = []
+                    for blk in res.content:
+                        if getattr(blk, "type", None) == "text":
+                            parts.append(getattr(blk, "text", ""))
+                    text_out = "".join(parts).strip()
+                    # 添削が「途中で切れる」現象の調査用ログ（stderr）。本番でも問題ないように軽量にする。
+                    stop_reason = getattr(res, "stop_reason", None)
+                    usage = getattr(res, "usage", None)
+                    in_tok = getattr(usage, "input_tokens", None) if usage else None
+                    out_tok = getattr(usage, "output_tokens", None) if usage else None
                     try:
-                        _sys.stderr.write(f"[claude-call] fallback_from={model_name} reason={e}\n")
+                        _sys.stderr.write(
+                            f"[claude-call] model={model_name} stop_reason={stop_reason} "
+                            f"max_tokens={max_tokens} input_tokens={in_tok} output_tokens={out_tok} "
+                            f"text_chars={len(text_out)}\n"
+                        )
                         _sys.stderr.flush()
                     except Exception:
                         pass
-                    continue
-                raise
+                    # max_tokens で打ち切られている場合は、上位のリトライで気付けるよう例外化する。
+                    if stop_reason == "max_tokens":
+                        raise RuntimeError(
+                            f"claude_stop_reason_max_tokens: model={model_name} "
+                            f"max_tokens={max_tokens} output_tokens={out_tok}"
+                        )
+                    return _SimpleResponse(text=text_out)
+                except Exception as e:
+                    last_err = e
+                    err_s = str(e)
+                    # モデル名が無効な場合は次候補へフォールバックする。
+                    if "not_found_error" in err_s or "model:" in err_s:
+                        try:
+                            _sys.stderr.write(f"[claude-call] fallback_from={model_name} reason={e}\n")
+                            _sys.stderr.flush()
+                        except Exception:
+                            pass
+                        break
+                    if _is_retryable_claude_error(e):
+                        if overload_try < overload_retries - 1:
+                            try:
+                                _sys.stderr.write(
+                                    f"[claude-call] overloaded_retry model={model_name} "
+                                    f"attempt={overload_try + 1}/{overload_retries}\n"
+                                )
+                                _sys.stderr.flush()
+                            except Exception:
+                                pass
+                            time.sleep(_overload_backoff_s(overload_try))
+                            continue
+                        try:
+                            _sys.stderr.write(
+                                f"[claude-call] overloaded_fallback_from={model_name} reason={e}\n"
+                            )
+                            _sys.stderr.flush()
+                        except Exception:
+                            pass
+                        break
+                    raise
         if last_err is not None:
             raise last_err
         raise RuntimeError("no_claude_model_candidates")

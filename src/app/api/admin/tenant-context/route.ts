@@ -26,17 +26,28 @@ export async function GET(_request: Request) {
 
   try {
     const orgsOnDisk = await listOrganizationIdsForAdmin();
-    const actingOrganizationId = getAdminActingOrganizationIdFromRequest(_request);
+    const actingRaw = getAdminActingOrganizationIdFromRequest(_request);
+    const actingValid = actingRaw && orgsOnDisk.includes(actingRaw) ? actingRaw : null;
     const effectiveOrganizationId = await resolveEffectiveOrganizationIdForApi(auth.uid, _request);
     const profile = await describeOrganizationIdForUid(auth.uid);
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       orgsOnDisk,
-      actingOrganizationId,
+      actingOrganizationId: actingValid,
       effectiveOrganizationId,
       profileOrganizationId: profile.resolvedOrganizationId,
       profileUsedFallback: profile.usedFallback,
     });
+    if (actingRaw && !actingValid) {
+      res.cookies.set(ADMIN_ACTING_ORG_COOKIE, "", {
+        path: "/",
+        maxAge: 0,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
+    return res;
   } catch (e) {
     return NextResponse.json(
       { ok: false, message: e instanceof Error ? e.message : "取得に失敗しました。" },

@@ -35,7 +35,7 @@ def main() -> None:
     parser.add_argument("--task-id", default="", help="Filter both stages by taskId")
     parser.add_argument("--day3-workers", type=int, default=4)
     parser.add_argument("--day4-workers", type=int, default=6)
-    parser.add_argument("--max-retries", type=int, default=3)
+    parser.add_argument("--max-retries", type=int, default=6)
     parser.add_argument("--skip-day3", action="store_true")
     parser.add_argument("--skip-day4", action="store_true")
     parser.add_argument(

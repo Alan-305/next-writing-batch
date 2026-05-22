@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// まずは速度優先のモデルを使い、必要時のみフォールバックする。
-const DEFAULT_MODEL = "models/gemini-flash-latest";
+// 速度・精度のバランス: 2.5 Flash を先頭、品質不足時のみ上位/軽量モデルへ。
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_FALLBACK_MODELS = [
   "models/gemini-2.5-flash",
+  "gemini-3.1-flash",
   "models/gemini-2.5-flash-lite",
-  "models/gemini-2.5-flash-image",
 ] as const;
 
 /** 手書き英文の転記専用（問題文用プロンプトとは別） */

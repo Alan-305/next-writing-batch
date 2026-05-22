@@ -10,10 +10,14 @@ import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-al
 import { classifyProofreadBatchFailure } from "@/lib/proofread-batch-error-code";
 import { estimateProofreadTicketCost, listSubmissionsForProofreadTicketScope } from "@/lib/proofread-ticket-cost";
 import { runProofreadBatch } from "@/lib/run-proofread-batch";
-import { getSubmissions, syncSubmissionsDiskMirrorToFirestore, syncSubmissionsFileMirrorFromFirestore } from "@/lib/submissions-store";
+import {
+  getSubmissions,
+  syncSubmissionsDiskMirrorToFirestore,
+  syncSubmissionsFileMirrorFromFirestore,
+} from "@/lib/submissions-store";
 import { syncTaskProblemsFileMirrorFromFirestore } from "@/lib/task-problems-firestore";
 
-/** 1 件でも Gemini が遅いと 5 分を超えることがある。exec の TIMEOUT_MS（14 分）に近づける。 */
+/** 1 件でも Claude が遅いと 5 分を超えることがある。exec の TIMEOUT_MS（14 分）に近づける。 */
 export const maxDuration = 900;
 export const dynamic = "force-dynamic";
 
@@ -88,9 +92,7 @@ export async function POST(request: Request) {
     );
   }
 
-  /** ローカル試験用。true 時は教員チケット検査もスキップ */
   const skipTicketGate = (process.env.NWB_SKIP_PROOFREAD_TICKET_GATE ?? "").trim() === "true";
-  /** 教員が自分のアカウントで `/submit` した答案のみを対象にする試行（チケット検査不要・消費なし） */
   const teacherSelfServiceProofread = allProofreadTargetsAreSelfSubmitted(targetRows, auth.uid);
   if (!skipTicketGate && !teacherSelfServiceProofread) {
     const canStart = await assertTeacherHasTicketsForProofread(auth.uid, targetRowCount);
@@ -107,15 +109,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        code: "NEXT_WRITING_BATCH_KEY_MISSING",
+        code: "ANTHROPIC_API_KEY_MISSING",
         message:
-          "Claude API キーがありません。このサーバー（Cloud Run）の環境変数 NEXT_WRITING_BATCH_KEY に Secret を紐付けているか確認してください（ローカルなら data/anthropic_api_key.txt または .env.local の NEXT_WRITING_BATCH_KEY）。",
+          "Claude API キーがありません。このサーバー（Cloud Run）の環境変数 ANTHROPIC_API_KEY に Secret を紐付けているか確認してください（ローカルなら data/anthropic_api_key.txt または .env）。",
       },
       { status: 503 },
     );
   }
 
-  // Day3 バッチはローカル submissions.json / task-problems/*.json を読むため、実行直前に Firestore 正から同期する。
   await syncSubmissionsFileMirrorFromFirestore(auth.organizationId);
   await syncTaskProblemsFileMirrorFromFirestore(auth.organizationId);
 
