@@ -248,6 +248,7 @@ export function TextareaWithFileDrop({
           Boolean(geminiHandwritingOcr) && otherFiles.length === 0 && geminiMedia.length > 0;
 
         if (tryEssayGemini) {
+          let claudeOverloadedFallback = false;
           try {
             setStatus("手書き・画像を読み取り中…");
             const normalizedMedia = await normalizeGeminiMediaFiles(geminiMedia);
@@ -265,9 +266,19 @@ export function TextareaWithFileDrop({
               onNotify?.("Claude API キーが未設定です。手書きOCRは Claude が必須です。", "error");
               return;
             } else if (clientError) {
-              setStatus("");
-              onNotify?.(`Claude OCR に失敗しました: ${clientError}`, "error");
-              return;
+              const overloaded = /overloaded|rate.?limit|529/i.test(clientError);
+              if (overloaded) {
+                claudeOverloadedFallback = true;
+                setStatus("Claude API が混雑のため、ブラウザ内の取り込みに切り替えます…");
+                onNotify?.(
+                  "Claude API が一時的に混雑しています。ブラウザ内 OCR（精度はやや下がります）で読み取りを試みます。しばらく待ってから Claude 読み取りを再試行することもできます。",
+                  "info",
+                );
+              } else {
+                setStatus("");
+                onNotify?.(`Claude OCR に失敗しました: ${clientError}`, "error");
+                return;
+              }
             } else if (geminiText.trim()) {
               let block = geminiText.trim();
               if (textJoin) {
@@ -277,15 +288,27 @@ export function TextareaWithFileDrop({
               setStatus("");
               onNotify?.("取り込みが完了しました。内容を確認してください。", "success");
               return;
-            } else {
+            } else if (!claudeOverloadedFallback) {
               setStatus("");
               onNotify?.("Claude OCR が空の結果を返しました。画像の鮮明さを確認して再実行してください。", "error");
               return;
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            setStatus("");
-            onNotify?.(`Claude OCR に失敗しました: ${msg}`, "error");
+            if (/overloaded|rate.?limit|529/i.test(msg)) {
+              claudeOverloadedFallback = true;
+              setStatus("Claude API が混雑のため、ブラウザ内の取り込みに切り替えます…");
+              onNotify?.(
+                "Claude API が一時的に混雑しています。ブラウザ内 OCR で読み取りを試みます。",
+                "info",
+              );
+            } else {
+              setStatus("");
+              onNotify?.(`Claude OCR に失敗しました: ${msg}`, "error");
+              return;
+            }
+          }
+          if (!claudeOverloadedFallback) {
             return;
           }
         }

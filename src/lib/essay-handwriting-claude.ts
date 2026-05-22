@@ -27,6 +27,27 @@ function stripWrapper(text: string): string {
   return text.replace(/\*\*/g, "").replace(/\r\n/g, "\n").trim();
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableClaudeError(status: number, message: string): boolean {
+  const m = (message || "").toLowerCase();
+  return (
+    status === 529 ||
+    status === 503 ||
+    status === 429 ||
+    m.includes("overloaded") ||
+    m.includes("rate_limit") ||
+    m.includes("rate limit")
+  );
+}
+
+function skipOcrRefinePass(): boolean {
+  const v = (process.env.CLAUDE_OCR_SKIP_REFINE || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 function buildBasePrompt(): string {
   return [
     "あなたは英語学習者の手書き英文を高精度で転記するOCRアシスタントです。",
@@ -95,7 +116,9 @@ export async function runEssayHandwritingIngestClaude(opts: {
     });
   }
 
-  async function callClaude(content: ClaudeContentBlock[]): Promise<string> {
+  const maxAttempts = Math.max(1, Math.min(6, Number(process.env.CLAUDE_OCR_MAX_RETRIES) || 5));
+
+  async function callClaudeOnce(content: ClaudeContentBlock[]): Promise<string> {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -112,13 +135,16 @@ export async function runEssayHandwritingIngestClaude(opts: {
     });
 
     const data = (await response.json().catch(() => ({}))) as {
-      error?: { message?: string };
+      error?: { type?: string; message?: string };
       content?: Array<{ type?: string; text?: string }>;
     };
 
     if (!response.ok) {
       const msg = data?.error?.message || `Claude API failed: ${response.status}`;
-      throw new Error(msg);
+      const err = new Error(msg) as Error & { status?: number; retryable?: boolean };
+      err.status = response.status;
+      err.retryable = isRetryableClaudeError(response.status, msg);
+      throw err;
     }
 
     return (data.content || [])
@@ -128,11 +154,40 @@ export async function runEssayHandwritingIngestClaude(opts: {
       .trim();
   }
 
-  const firstPass = await callClaude([{ type: "text", text: buildBasePrompt() }, ...mediaBlocks]);
-  const refined = await callClaude([
-    { type: "text", text: buildRefinePrompt(firstPass) },
-    ...mediaBlocks,
-  ]);
+  async function callClaude(content: ClaudeContentBlock[]): Promise<string> {
+    let lastErr: (Error & { status?: number; retryable?: boolean }) | null = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await callClaudeOnce(content);
+      } catch (e) {
+        const err = e as Error & { status?: number; retryable?: boolean };
+        lastErr = err;
+        const retryable = err.retryable ?? isRetryableClaudeError(err.status ?? 0, err.message);
+        if (!retryable || attempt >= maxAttempts - 1) {
+          throw err;
+        }
+        await sleep(2000 * 2 ** attempt);
+      }
+    }
+    throw lastErr ?? new Error("Claude OCR failed");
+  }
 
-  return stripWrapper(refined || firstPass);
+  const firstPass = await callClaude([{ type: "text", text: buildBasePrompt() }, ...mediaBlocks]);
+  if (skipOcrRefinePass()) {
+    return stripWrapper(firstPass);
+  }
+
+  try {
+    const refined = await callClaude([
+      { type: "text", text: buildRefinePrompt(firstPass) },
+      ...mediaBlocks,
+    ]);
+    return stripWrapper(refined || firstPass);
+  } catch (e) {
+    const err = e as Error & { retryable?: boolean };
+    if (firstPass.trim() && (err.retryable ?? isRetryableClaudeError(0, err.message))) {
+      return stripWrapper(firstPass);
+    }
+    throw e;
+  }
 }
