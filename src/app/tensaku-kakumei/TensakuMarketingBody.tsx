@@ -14,7 +14,7 @@ export function TensakuMarketingBody() {
           教員・運用の入口です。生徒の方は、担当の先生からお送りした URL からお進みください。
         </p>
         <div className="tensaku-quick-actions tensaku-quick-actions--solo">
-          <Link href="/ops" className="tensaku-quick-card tensaku-quick-card--teacher">
+          <Link href="/register/teacher?next=%2Fops" className="tensaku-quick-card tensaku-quick-card--teacher">
             <span className="tensaku-quick-card-label">教員・運用</span>
             <span className="tensaku-quick-card-title">運用ハブ・提出一覧・設定</span>
             <span className="tensaku-quick-card-hint">本番では教員管理 URL に割り当てる想定です。</span>

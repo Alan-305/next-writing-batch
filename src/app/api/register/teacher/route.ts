@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
+import { sendWelcomeEmailIfNeeded } from "@/lib/auth/welcome-email-server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { ensureOrganizationDataDir } from "@/lib/org-data-layout";
@@ -150,21 +151,16 @@ export async function POST(request: Request) {
       { merge: true },
     );
   } catch (e) {
-    console.error("[register/teacher] tenant bootstrap failed", e);
-    return NextResponse.json(
-      {
-        ok: false,
-        message:
-          "教員情報は保存しましたが、テナントの初期化に失敗しました。しばらくしてから再度「テナントを作成」を押すか、管理者に連絡してください。",
-        organizationId: orgId,
-      },
-      { status: 500 },
-    );
+    // Firestore の roles / organizationId はコミット済み。ディスク初期化失敗（Cloud Run 等）でも登録は成功とする。
+    console.error("[register/teacher] tenant bootstrap failed (non-fatal)", e);
   }
+
+  const welcomeEmail = await sendWelcomeEmailIfNeeded(auth.uid);
 
   return NextResponse.json({
     ok: true,
     organizationId: orgId,
     changed: tx.changed,
+    welcomeEmail,
   });
 }

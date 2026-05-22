@@ -5,7 +5,6 @@ import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "fireb
 import { onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
-import { callWelcomeEmailRetry } from "@/lib/auth/welcome-email-retry";
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import {
   readFirebaseWebConfig,
@@ -232,9 +231,23 @@ export function FirebaseAuthProvider({
     sessionStorage.setItem(sk, "pending");
 
     const timer = window.setTimeout(() => {
-      sessionStorage.setItem(sk, "done");
-      void callWelcomeEmailRetry().catch(() => {});
-    }, 12000);
+      void (async () => {
+        try {
+          const authInst = getFirebaseAuth();
+          const current = authInst?.currentUser;
+          if (!current) return;
+          const token = await current.getIdToken();
+          await fetch("/api/user/welcome-email", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch {
+          /* 再試行失敗はサイレント（登録 API 側でも送信する） */
+        } finally {
+          sessionStorage.setItem(sk, "done");
+        }
+      })();
+    }, 3000);
 
     return () => {
       window.clearTimeout(timer);

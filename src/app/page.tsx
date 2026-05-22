@@ -13,7 +13,7 @@ export default async function Home() {
 
   // 教師・管理者向けドメインは運用ホームへ
   if (host.startsWith("tensaku-kakumei-for-teachers.")) {
-    redirect("/ops");
+    redirect("/register/teacher?next=%2Fops");
   }
 
   // それ以外（総合サイト）は添削革命LPへ

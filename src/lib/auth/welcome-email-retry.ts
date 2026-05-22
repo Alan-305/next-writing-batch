@@ -1,28 +1,42 @@
-import { httpsCallable } from "firebase/functions";
+import { getFirebaseAuth } from "@/lib/firebase/client";
 
-import { getFirebaseFunctions } from "@/lib/firebase/client";
+import type { WelcomeEmailSendResult } from "@/lib/auth/welcome-email-server";
 
 export type WelcomeEmailRetryResult = {
   ok: boolean;
+  status?: WelcomeEmailSendResult["status"];
+  reason?: string;
   skipped?: "already_sent";
   sent?: boolean;
-  reason?: "skipped_or_resend_failed";
 };
 
 /**
- * Functions の callable `welcomeEmailRetry`。
- * onCreate で RESEND が未設定でも、後から Functions にキーを載せたあと自動再試行に使える。
+ * ログイン後のウェルカムメール再試行（Next.js API 経由）。
+ * Cloud Functions の Callable より Cloud Run の RESEND_API_KEY を優先して使う。
  */
 export async function callWelcomeEmailRetry(): Promise<WelcomeEmailRetryResult> {
-  const fns = getFirebaseFunctions();
-  if (!fns) {
-    throw new Error("Firebase Functions が初期化されていません。");
-  }
-  const call = httpsCallable<Record<string, never>, WelcomeEmailRetryResult>(fns, "welcomeEmailRetry");
-  const out = await call({});
-  const data = out.data;
-  if (!data?.ok) {
+  const auth = getFirebaseAuth();
+  const u = auth?.currentUser;
+  if (!u) {
     return { ok: false };
   }
-  return data;
+  const token = await u.getIdToken();
+  const res = await fetch("/api/user/welcome-email", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const j = (await res.json()) as WelcomeEmailRetryResult & {
+    status?: WelcomeEmailSendResult["status"];
+    reason?: string;
+  };
+  if (!res.ok || !j?.ok) {
+    return { ok: false };
+  }
+  if (j.status === "sent") {
+    return { ok: true, sent: true, status: "sent" };
+  }
+  if (j.status === "skipped" && j.reason === "already_sent") {
+    return { ok: true, skipped: "already_sent", status: "skipped", reason: j.reason };
+  }
+  return { ok: true, sent: false, status: j.status, reason: j.reason };
 }

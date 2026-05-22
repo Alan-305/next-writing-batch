@@ -5,16 +5,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { needsTeacherTenantSetup, postTeacherRegistration } from "@/lib/auth/teacher-registration";
 import { isTeacherByRoles } from "@/lib/auth/user-roles";
-
-function needsTeacherTenantSetup(
-  roles: string[],
-  organizationId: string | null | undefined,
-): boolean {
-  if (isTeacherByRoles(roles)) return false;
-  if (roles.some((r) => r.toLowerCase() === "student")) return false;
-  return !(organizationId ?? "").trim();
-}
 
 export function RegisterTeacherClient() {
   const router = useRouter();
@@ -41,16 +33,8 @@ export function RegisterTeacherClient() {
     setMessage("");
     try {
       const token = await user.getIdToken();
-      const res = await fetch("/api/register/teacher", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ createNewTenant: true }),
-      });
-      const j = (await res.json()) as { ok?: boolean; message?: string; organizationId?: string };
-      if (!res.ok || !j.ok) {
+      const j = await postTeacherRegistration(token);
+      if (!j.ok) {
         setMessage(j.message ?? "登録に失敗しました。");
         return false;
       }

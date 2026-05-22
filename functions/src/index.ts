@@ -495,7 +495,7 @@ async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Pr
     return;
   }
 
-  const subject = "Next Writing Batch へようこそ";
+  const subject = "添削革命へようこそ";
   const text =
     "ご登録ありがとうございます。\n\n" +
     "このメールは Nexus Learning / next-writing-batch のアカウント登録時に自動送信されています。\n";

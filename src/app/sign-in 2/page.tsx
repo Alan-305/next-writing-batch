@@ -27,13 +27,8 @@ function SignInInner() {
   const { configured, user, authLoading, authRedirectHint } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [origin, setOrigin] = useState<string>("");
   const [inviteApplying, setInviteApplying] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
-
-  useEffect(() => {
-    setOrigin(typeof window !== "undefined" ? window.location.origin : "");
-  }, []);
 
   /** リダイレクト後に getRedirectResult が失敗したとき Provider が sessionStorage に残す */
   useEffect(() => {
@@ -220,32 +215,6 @@ function SignInInner() {
             内蔵ブラウザなどでは、ポップアップがすぐ閉じて <code>auth/popup-closed-by-user</code> になることがあります。
           </p>
         )}
-        {origin ? (
-          <div className="card" style={{ background: "#f1f5f9", marginBottom: 12 }}>
-            <p style={{ marginTop: 0, marginBottom: 8 }}>
-              <strong>接続チェック</strong>（Firebase の「承認済みドメイン」と一致させる）
-            </p>
-            <p className="muted" style={{ marginBottom: 8 }}>
-              いまブラウザが使っている<strong>オリジン</strong>は次のとおりです。このホスト名が Firebase Console → Authentication →
-              設定 → <strong>承認済みドメイン</strong>に<strong>そのまま</strong>入っている必要があります。
-            </p>
-            <p style={{ marginBottom: 0 }}>
-              <code>{origin}</code>
-            </p>
-            <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              Cloud Run 運用では、今のホスト（例: <code>...run.app</code> / 独自ドメイン）を Firebase
-              の承認済みドメインへ追加してください。ローカル検証時のみ <code>localhost</code> や <code>127.0.0.1</code>{" "}
-              を追加します（<code>localhost</code> と <code>127.0.0.1</code> は別ホスト扱いです）。
-            </p>
-            <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              コンソールに <code>getProjectConfig</code> が <strong>403</strong> や{" "}
-              <code>Unable to verify that the app domain is authorized</code> がある場合は、上記の承認済みドメインに加え、
-              Google Cloud → 認証情報 → 使用中のブラウザ用 API キー（<code>NEXT_PUBLIC_FIREBASE_API_KEY</code> と同じ）で{" "}
-              <strong>HTTP リファラー制限</strong>に、いまの <code>{origin || "（このページのオリジン）"}</code>{" "}
-              を許可リストへ入れてください（例: <code>https://{origin ? new URL(origin).host : "your-host"}/*</code>）。
-            </p>
-          </div>
-        ) : null}
         {error ? <p className="error">{error}</p> : null}
         {inviteOrg ? (
           <p className="muted" style={{ marginTop: 0 }}>

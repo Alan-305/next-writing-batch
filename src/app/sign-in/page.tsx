@@ -7,10 +7,16 @@ import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebase/auth";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import {
+  isTeacherEntryPath,
+  needsTeacherTenantSetup,
+  postTeacherRegistration,
+  teacherRegisterPath,
+} from "@/lib/auth/teacher-registration";
 import { shouldRedirectStudentToOnboarding } from "@/lib/student-profile-gate";
 import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
-import { readFirebaseWebConfig, useFirebaseEmulators } from "@/lib/firebase/config";
+import { useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { resetRedirectResultCacheForNewFlow } from "@/lib/firebase/redirect-result-once";
 
@@ -31,16 +37,8 @@ function SignInInner() {
     useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [origin, setOrigin] = useState<string>("");
-  const [firebaseAuthDomain, setFirebaseAuthDomain] = useState<string>("");
   const [inviteApplying, setInviteApplying] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
-
-  useEffect(() => {
-    setOrigin(typeof window !== "undefined" ? window.location.origin : "");
-    const cfg = readFirebaseWebConfig();
-    setFirebaseAuthDomain(cfg?.authDomain ?? "");
-  }, []);
 
   /** リダイレクト後に getRedirectResult が失敗したとき Provider が sessionStorage に残す */
   useEffect(() => {
@@ -67,6 +65,24 @@ function SignInInner() {
     provider.setCustomParameters({ prompt: "select_account" });
     await signInWithRedirect(auth, provider);
   }, [safeNext]);
+
+  /** 運用（/ops）向けログイン後、教員テナント未作成なら API で自動登録 */
+  const ensureTeacherSetupForOpsNext = useCallback(
+    async (token: string): Promise<boolean> => {
+      if (teacherOrg || inviteOrg) return true;
+      if (!isTeacherEntryPath(safeNext)) return true;
+      const pr = await fetch("/api/user/profile", { headers: { Authorization: `Bearer ${token}` } });
+      const pj = (await pr.json()) as { roles?: string[]; organizationId?: string | null };
+      if (!pr.ok) return false;
+      if (!needsTeacherTenantSetup(pj.roles ?? [], pj.organizationId)) return true;
+      const reg = await postTeacherRegistration(token);
+      if (reg.ok) return true;
+      setError(reg.message ?? "教員登録に失敗しました。");
+      router.replace(teacherRegisterPath(safeNext));
+      return false;
+    },
+    [inviteOrg, router, safeNext, teacherOrg],
+  );
 
   const redirectToOnboardingIfNeeded = useCallback(
     async (token: string) => {
@@ -131,6 +147,9 @@ function SignInInner() {
         }
       }
       const tokenAfter = await auth.currentUser?.getIdToken();
+      if (tokenAfter && !(await ensureTeacherSetupForOpsNext(tokenAfter))) {
+        return;
+      }
       if (tokenAfter && (await redirectToOnboardingIfNeeded(tokenAfter))) {
         return;
       }
@@ -171,6 +190,7 @@ function SignInInner() {
     emulatorMode,
     inviteOrg,
     teacherOrg,
+    ensureTeacherSetupForOpsNext,
     redirectToOnboardingIfNeeded,
     router,
     safeNext,
@@ -241,6 +261,17 @@ function SignInInner() {
     };
   }, [inviteOrg, teacherOrg, user, redirectToOnboardingIfNeeded]);
 
+  useEffect(() => {
+    if (!user || authLoading || profileLoading || teacherOrg || inviteOrg) return;
+    if (safeNext.startsWith("/register/teacher")) {
+      router.replace(safeNext);
+      return;
+    }
+    if (needsTeacherTenantSetup(roles, profile?.organizationId) && isTeacherEntryPath(safeNext)) {
+      router.replace(teacherRegisterPath(safeNext));
+    }
+  }, [user, authLoading, profileLoading, safeNext, roles, profile, teacherOrg, inviteOrg, router]);
+
   if (!configured) {
     return (
       <main className="page-surface page-surface--auth">
@@ -265,14 +296,14 @@ function SignInInner() {
     );
   }
 
-  useEffect(() => {
-    if (!user || authLoading || profileLoading) return;
-    if (!safeNext.startsWith("/register/teacher")) return;
-    router.replace(safeNext);
-  }, [user, authLoading, profileLoading, safeNext, router]);
-
   if (user) {
-    if (safeNext.startsWith("/register/teacher")) {
+    if (
+      safeNext.startsWith("/register/teacher") ||
+      (needsTeacherTenantSetup(roles, profile?.organizationId) &&
+        isTeacherEntryPath(safeNext) &&
+        !teacherOrg &&
+        !inviteOrg)
+    ) {
       return (
         <main className="page-surface page-surface--auth">
           <p className="muted">教員登録へ移動しています…</p>
@@ -307,48 +338,6 @@ function SignInInner() {
           現在は安定性を優先して、<strong>ポップアップ方式を推奨</strong>しています。リダイレクト方式で戻り結果が
           空になる環境があるためです。
         </p>
-        {origin ? (
-          <div className="card" style={{ background: "#f1f5f9", marginBottom: 12 }}>
-            <p style={{ marginTop: 0, marginBottom: 8 }}>
-              <strong>接続チェック</strong>（Firebase の「承認済みドメイン」と一致させる）
-            </p>
-            <p className="muted" style={{ marginBottom: 8 }}>
-              いまブラウザが使っている<strong>オリジン</strong>は次のとおりです。このホスト名が Firebase Console → Authentication →
-              設定 → <strong>承認済みドメイン</strong>に<strong>そのまま</strong>入っている必要があります。
-            </p>
-            <p style={{ marginBottom: 0 }}>
-              <code>{origin}</code>
-            </p>
-            {firebaseAuthDomain ? (
-              <>
-                <p className="muted" style={{ marginTop: 12, marginBottom: 8 }}>
-                  次の値は、このアプリが Firebase SDK に渡している <code>authDomain</code> です（<code>NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN</code>{" "}
-                  未設定なら <code>{`{projectId}.firebaseapp.com`}</code> になります）。
-                </p>
-                <p style={{ marginTop: 0, marginBottom: 0 }}>
-                  <code>{firebaseAuthDomain}</code>
-                </p>
-                <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-                  Google Cloud → 認証情報 → OAuth 2.0 クライアント（Web）の <strong>承認済みリダイレクト URI</strong> は通常{" "}
-                  <code>{`https://${firebaseAuthDomain}/__/auth/handler`}</code> です（この値がズレると、Google から戻っても{" "}
-                  <code>getRedirectResult</code> が空になることがあります）。
-                </p>
-              </>
-            ) : null}
-            <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              Cloud Run 運用では、今のホスト（例: <code>...run.app</code> / 独自ドメイン）を Firebase
-              の承認済みドメインへ追加してください。ローカル検証時のみ <code>localhost</code> や <code>127.0.0.1</code>{" "}
-              を追加します（<code>localhost</code> と <code>127.0.0.1</code> は別ホスト扱いです）。
-            </p>
-            <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              コンソールに <code>getProjectConfig</code> が <strong>403</strong> や{" "}
-              <code>Unable to verify that the app domain is authorized</code> がある場合は、上記の承認済みドメインに加え、
-              Google Cloud → 認証情報 → 使用中のブラウザ用 API キー（<code>NEXT_PUBLIC_FIREBASE_API_KEY</code> と同じ）で{" "}
-              <strong>HTTP リファラー制限</strong>に、いまの <code>{origin || "（このページのオリジン）"}</code>{" "}
-              を許可リストへ入れてください（例: <code>https://{origin ? new URL(origin).host : "your-host"}/*</code>）。
-            </p>
-          </div>
-        ) : null}
         {error ? <p className="error">{error}</p> : null}
         {!teacherOrg && inviteOrg ? (
           <p className="muted" style={{ marginTop: 0 }}>
