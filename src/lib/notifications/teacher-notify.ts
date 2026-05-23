@@ -54,6 +54,11 @@ export async function sendResendPlainEmail(to: string, subject: string, text: st
   if (!res.ok) {
     const body = await res.text();
     console.error("[notify] Resend error", { status: res.status, body, to, subject });
+    if (res.status === 403 && body.includes("verify a domain")) {
+      console.error(
+        "[notify] RESEND_FROM_EMAIL が未設定または検証用送信元です。Cloud Run / Functions に検証済みドメインを設定してください。",
+      );
+    }
     return false;
   }
   return true;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
+import { sendWelcomeEmailIfNeeded } from "@/lib/auth/welcome-email-server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { ensureOrganizationDataDir } from "@/lib/org-data-layout";
@@ -154,9 +155,12 @@ export async function POST(request: Request) {
     console.error("[register/teacher] tenant bootstrap failed (non-fatal)", e);
   }
 
+  const welcomeEmail = tx.changed ? await sendWelcomeEmailIfNeeded(auth.uid) : undefined;
+
   return NextResponse.json({
     ok: true,
     organizationId: orgId,
     changed: tx.changed,
+    ...(welcomeEmail ? { welcomeEmail } : {}),
   });
 }

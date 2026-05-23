@@ -88,6 +88,20 @@ function isAdminUid(uid: string): boolean {
   return parseAdminUidSet().has(uid.trim());
 }
 
+/** Cloud Run の RESEND_FROM_EMAIL と揃える（未設定時の onboarding@resend.dev は他宛先に送れない） */
+function resendFromAddress(): string {
+  const explicit = (
+    process.env.RESEND_FROM_EMAIL ??
+    process.env.RESEND_FROM ??
+    ""
+  ).trim();
+  if (explicit) return explicit;
+  logger.warn(
+    "RESEND_FROM_EMAIL / RESEND_FROM 未設定。検証用 onboarding@resend.dev にフォールバックします（他宛先には届きません）。",
+  );
+  return "Nexus Learning <onboarding@resend.dev>";
+}
+
 /**
  * 新規ユーザー登録時:
  * - users/{uid} と entitlements/{productId} の雛形をサーバーで作成（クライアントは書けないルールと整合）
@@ -517,7 +531,7 @@ export const adminCreateStripeRefund = functions.https.onCall(async (data, conte
 
 async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = (process.env.RESEND_FROM ?? "Nexus Learning <onboarding@resend.dev>").trim();
+  const from = resendFromAddress();
   if (!apiKey) {
     logger.info("RESEND_API_KEY 未設定のためウェルカムメールをスキップします", { uid });
     return;

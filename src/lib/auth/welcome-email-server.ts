@@ -76,8 +76,13 @@ export async function sendWelcomeEmailIfNeeded(uid: string): Promise<WelcomeEmai
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
-    console.info("[welcome-email] RESEND_API_KEY 未設定のためスキップ", { uid: u });
+    console.error("[welcome-email] RESEND_API_KEY 未設定のためスキップ", { uid: u });
     return { status: "skipped", reason: "no_api_key" };
+  }
+
+  const from = resendFromAddress();
+  if (from.includes("onboarding@resend.dev")) {
+    console.error("[welcome-email] RESEND_FROM_EMAIL 未設定（検証用送信元のみ）", { uid: u });
   }
 
   const db = getAdminFirestore();

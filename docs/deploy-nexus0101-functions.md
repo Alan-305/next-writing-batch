@@ -41,9 +41,11 @@ npm run firebase:deploy-functions
 | `STRIPE_WEBHOOK_SECRET` | Webhook 署名検証 |
 | `STRIPE_PRICE_T10` など | Checkout の price ID（`STRIPE_PRICE_T10` / `T30` / `T60` / `T120`） |
 | `ADMIN_UIDS` | 管理者 Callable（カンマ区切り・**ルート `.env.local` の allowlist と同じ UID**） |
-| `RESEND_API_KEY` | 任意（ウェルカムメール） |
+| `RESEND_API_KEY` | ウェルカムメール・必須（Secret Manager 推奨） |
+| `RESEND_FROM_EMAIL` | **必須**。検証済みドメイン（例: `添削革命 <noreply@nexus-learning.com>`）。未設定だと他教員宛てに届かない |
+| `NWB_PUBLIC_APP_URL` | 任意。メール内リンク用 |
 
-設定場所の例: Google Cloud Console → Cloud Functions → 各関数 → 編集 → ランタイム・環境変数。本番では **Secret Manager** への移行を推奨（ルール: 機密の直書き回避）。
+`functions/.env.nexus0101-35b17` に `RESEND_FROM_EMAIL` を置くと `firebase deploy --project nexus0101-35b17` で注入されます（`RESEND_API_KEY` は Console / Secret のまま）。
 
 ## トラブルシュート
 
