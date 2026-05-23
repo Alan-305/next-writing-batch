@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { OpsPackageZipTaskPanel } from "@/components/OpsPackageZipTaskPanel";
+import { OpsSubmissionsSummary } from "@/components/ops/OpsSubmissionsSummary";
 import { OpsSubmissionsTable } from "@/components/OpsSubmissionsTable";
 import { RunProofreadPanel } from "@/components/RunProofreadPanel";
+import { OPS_COPY } from "@/lib/ops/submission-status-labels";
 import type { Submission } from "@/lib/submissions-store";
 
 async function fetchSubmissions(token: string): Promise<Submission[]> {
@@ -16,6 +18,14 @@ async function fetchSubmissions(token: string): Promise<Submission[]> {
     throw new Error(json.message ?? "提出一覧を読めませんでした。");
   }
   return json.data;
+}
+
+function hasStudentViewedPublishedResult(s: Submission): boolean {
+  return (
+    s.status === "done" &&
+    Boolean(s.studentRelease?.operatorApprovedAt) &&
+    Boolean(String(s.studentResultFirstViewedAt ?? "").trim())
+  );
 }
 
 export function OpsSubmissionsPageClient() {
@@ -88,14 +98,6 @@ export function OpsSubmissionsPageClient() {
   }, [submissions]);
 
   const pendingTaskIds = useMemo(() => [...pendingByTaskId.keys()].sort(), [pendingByTaskId]);
-  const totalPending = useMemo(
-    () => (submissions ?? []).filter((s) => s.status === "pending").length,
-    [submissions],
-  );
-  const totalQueued = useMemo(
-    () => (submissions ?? []).filter((s) => s.status === "queued" || s.status === "processing").length,
-    [submissions],
-  );
 
   const failedByTaskId = useMemo(() => {
     const m = new Map<string, number>();
@@ -111,6 +113,18 @@ export function OpsSubmissionsPageClient() {
 
   const failedTaskIds = useMemo(() => [...failedByTaskId.keys()].sort(), [failedByTaskId]);
 
+  const summary = useMemo(() => {
+    const rows = submissions ?? [];
+    return {
+      total: rows.length,
+      pending: rows.filter((s) => s.status === "pending").length,
+      inProgress: rows.filter((s) => s.status === "queued" || s.status === "processing").length,
+      failed: rows.filter((s) => s.status === "failed").length,
+      done: rows.filter((s) => s.status === "done" && !hasStudentViewedPublishedResult(s)).length,
+      viewed: rows.filter((s) => hasStudentViewedPublishedResult(s)).length,
+    };
+  }, [submissions]);
+
   const tableRows = useMemo(() => {
     if (!submissions) return [];
     return submissions
@@ -125,17 +139,20 @@ export function OpsSubmissionsPageClient() {
               String(d4.qr_path ?? "").trim()),
         );
         const sr = s.studentRelease;
+        const studentViewed = hasStudentViewedPublishedResult(s);
         return {
           submissionId: s.submissionId,
           submittedAt: s.submittedAt,
           taskId: s.taskId,
           studentId: s.studentId,
           studentName: s.studentName,
-          status: s.status,
+          status: studentViewed ? "viewed" : s.status,
+          rawStatus: s.status,
           proofreadQueuedAt: s.proofreadQueuedAt,
           hasDay4Assets,
           resultPublished: Boolean(sr?.operatorApprovedAt),
           studentResultFirstViewedAt: s.studentResultFirstViewedAt,
+          studentViewed,
         };
       });
   }, [submissions]);
@@ -143,7 +160,7 @@ export function OpsSubmissionsPageClient() {
   if (authLoading || submissions === null) {
     return (
       <main>
-        <h1>提出一覧</h1>
+        <h1>{OPS_COPY.pageTitle}</h1>
         <p className="muted">読み込み中…</p>
       </main>
     );
@@ -152,50 +169,38 @@ export function OpsSubmissionsPageClient() {
   if (loadErr && submissions.length === 0) {
     return (
       <main>
-        <h1>提出一覧</h1>
+        <h1>{OPS_COPY.pageTitle}</h1>
         <p className="error">{loadErr}</p>
         <p>
-          <Link href="/ops">運用ハブ</Link>
+          <Link href="/ops">運用トップ</Link>
         </p>
       </main>
     );
   }
 
   return (
-    <main>
-      <h1>提出一覧</h1>
-      <p>
-        <Link href="/ops">運用ハブ</Link>
-        {" · "}
-        <Link href="/ops/deliverables">納品ZIP</Link>
-        {" · "}
-        <Link href="/submit">提出画面へ</Link>
-      </p>
+    <main className="ops-dashboard">
+      <header className="ops-page-header">
+        <div>
+          <h1>{OPS_COPY.pageTitle}</h1>
+          <p className="ops-page-header__lead">{OPS_COPY.pageLead}</p>
+        </div>
+        <nav className="ops-page-nav" aria-label="関連ページ">
+          <Link href="/ops">運用トップ</Link>
+          <Link href="/ops/deliverables">納品ZIP</Link>
+          <Link href="/submit">提出画面</Link>
+        </nav>
+      </header>
 
-      <div className="card">
-        <h2>一括添削（今すぐ / 預ける）</h2>
-        <p style={{ marginTop: 0, marginBottom: 8 }}>
-          現在の <strong>pending</strong> 件数: {totalPending}
-          {totalQueued > 0 ? (
-            <>
-              {" "}
-              · <strong>queued / processing</strong>: {totalQueued}
-            </>
-          ) : null}
-          {pendingTaskIds.length > 0 ? (
-            <>
-              {" "}
-              （taskId 別:{" "}
-              {pendingTaskIds.map((tid, i) => (
-                <span key={tid}>
-                  {i > 0 ? " · " : null}
-                  <code>{tid}</code> {pendingByTaskId.get(tid) ?? 0} 件
-                </span>
-              ))}
-              ）
-            </>
-          ) : null}
-        </p>
+      <OpsSubmissionsSummary {...summary} />
+
+      <section className="card ops-section" aria-labelledby="ops-bulk-proofread">
+        <div className="ops-section__head">
+          <h2 id="ops-bulk-proofread" className="ops-section__title">
+            {OPS_COPY.bulkTitle}
+          </h2>
+          <p className="ops-section__lead">{OPS_COPY.bulkLead}</p>
+        </div>
         <RunProofreadPanel
           pendingTaskIds={pendingTaskIds}
           pendingByTaskId={Object.fromEntries(pendingByTaskId)}
@@ -203,27 +208,33 @@ export function OpsSubmissionsPageClient() {
           failedByTaskId={Object.fromEntries(failedByTaskId)}
           onEnqueued={() => void reloadSubmissions()}
         />
-        <details className="muted" style={{ marginTop: 16 }}>
-          <summary>ターミナルから同じことをする場合</summary>
-          <p style={{ marginTop: 8, marginBottom: 6 }}>直接 Python する場合:</p>
-          <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
-            {`export NEXT_WRITING_BATCH_KEY='…'
-export NWB_ORGANIZATION_ID=your_tenant_id
+      </section>
 
-./.venv/bin/python3 batch/run_day3_proofread.py --task-id 課題ID --submission-ids 受付UUID`}
-          </pre>
-        </details>
-      </div>
+      <section className="card ops-section" aria-labelledby="ops-deliverables-zip">
+        <div className="ops-section__head">
+          <h2 id="ops-deliverables-zip" className="ops-section__title">
+            {OPS_COPY.deliverablesZip}
+          </h2>
+          <p className="ops-section__lead">課題単位で Day4 成果物を ZIP にまとめます。</p>
+        </div>
+        <OpsPackageZipTaskPanel embedded />
+      </section>
 
-      <OpsPackageZipTaskPanel />
-
-      <div className="card">
+      <section className="card ops-section" aria-labelledby="ops-submissions-list">
+        <div className="ops-section__head">
+          <h2 id="ops-submissions-list" className="ops-section__title">
+            提出リスト
+          </h2>
+          {hasActiveProofread ? (
+            <p className="ops-section__lead">添削処理中のため、5秒ごとに自動更新しています。</p>
+          ) : null}
+        </div>
         <OpsSubmissionsTable
           rows={tableRows}
           enableZipSelection
           onReloadSubmissions={() => void reloadSubmissions()}
         />
-      </div>
+      </section>
     </main>
   );
 }

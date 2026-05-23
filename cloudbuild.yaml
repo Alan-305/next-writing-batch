@@ -86,12 +86,16 @@ steps:
         # ADMIN_UIDS だけ値にカンマがある。他は「KEY=VAL,KEY2=VAL2」で1回、UID は ^|^ で1回（gcloud topic escaping）。
         batch=""
         admin_uids_entry=""
+        resend_from_entry=""
         while IFS= read -r line || [ -n "$$line" ]; do
           line=$$(printf '%s' "$$line" | sed 's/\r$$//')
           [[ -z "$${line// }" ]] && continue
           [[ "$$line" == \#* ]] && continue
           case "$$line" in
             NEXT_PUBLIC_*=*) ;;
+            RESEND_FROM_EMAIL=*) ;;
+            RESEND_FROM=*) ;;
+            NWB_PUBLIC_APP_URL=*) ;;
             *) continue ;;
           esac
           key="$${line%%=*}"
@@ -100,6 +104,10 @@ steps:
           entry="$$key=$$val"
           if [[ "$$key" == "NEXT_PUBLIC_FIREBASE_ADMIN_UIDS" ]]; then
             admin_uids_entry="$$entry"
+            continue
+          fi
+          if [[ "$$key" == "RESEND_FROM_EMAIL" || "$$key" == "RESEND_FROM" ]]; then
+            resend_from_entry="$$entry"
             continue
           fi
           if [[ -z "$$batch" ]]; then
@@ -121,6 +129,13 @@ steps:
             --project="${PROJECT_ID}" \
             --quiet \
             --update-env-vars="^|^$$admin_uids_entry"
+        fi
+        if [[ -n "$$resend_from_entry" ]]; then
+          gcloud run services update "${_SERVICE_NAME}" \
+            --region="${_REGION}" \
+            --project="${PROJECT_ID}" \
+            --quiet \
+            --update-env-vars="^|^$$resend_from_entry"
         fi
 
 images:

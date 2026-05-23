@@ -29,6 +29,8 @@ export type ProofreadBatch = {
   totalJobs: number;
   lastProgressEmailAt?: string;
   completionEmailSentAt?: string;
+  /** Resend 送信成功後のみ設定（旧 completionEmailSentAt だけの失敗分は再送対象） */
+  completionEmailDeliveredAt?: string;
 };
 
 export type EnqueueProofreadInput = {
@@ -80,6 +82,19 @@ export const PROOFREAD_ENQUEUEABLE_STATUSES = new Set([
 export const PROOFREAD_STALE_PROCESSING_MS = 20 * 60 * 1000;
 /** この時間を超えて queued のままなら失敗扱いに戻す（Cloud Tasks 失敗の取り残し） */
 export const PROOFREAD_STALE_QUEUED_MS = 3 * 60 * 1000;
+
+/** 一括「預ける」・同期一括添削の1回あたり上限（Cloud Tasks 同時実行数に合わせる） */
+export const PROOFREAD_MAX_ENQUEUE_BATCH = 5;
+
+/** limit: 0 / 未指定 = 上限いっぱい。1〜上限はその件数。上限超は clamp せず呼び出し側で拒否する。 */
+export function resolveProofreadBatchLimit(raw: unknown): number {
+  if (raw === undefined || raw === null || Number.isNaN(Number(raw))) {
+    return PROOFREAD_MAX_ENQUEUE_BATCH;
+  }
+  const n = Math.floor(Number(raw));
+  if (n <= 0) return PROOFREAD_MAX_ENQUEUE_BATCH;
+  return n;
+}
 
 export function isStaleQueuedRow(row: { status: string; proofreadQueuedAt?: string }): boolean {
   if (row.status !== "queued") return false;

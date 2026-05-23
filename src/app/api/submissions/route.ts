@@ -5,8 +5,12 @@ import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organi
 import { canManageTenantOperations } from "@/lib/auth/require-teacher-or-allowlist";
 import { isTeacherByRoles, needsStudentSubjectProfile, normalizeRoles } from "@/lib/auth/user-roles";
 import { migrateLegacyOrgLayoutOnce } from "@/lib/org-data-layout";
-import { enrichSubmissionsWithResolvedStudentFields } from "@/lib/submission-display-enrich";
+import {
+  enrichSubmissionWithResolvedStudentFields,
+  enrichSubmissionsWithResolvedStudentFields,
+} from "@/lib/submission-display-enrich";
 import { addSubmission, getSubmissions } from "@/lib/submissions-store";
+import { notifyTeachersNewSubmission } from "@/lib/notifications/teacher-notify";
 import { isStudentProfileComplete } from "@/lib/student-profile-gate";
 import { hydrateSubmissionForRegisteredTask } from "@/lib/submission-task-hydration";
 import { normalizeSubmissionFromBody, validateAuthenticatedSubmissionInput } from "@/lib/validation";
@@ -91,6 +95,17 @@ export async function POST(request: Request) {
   }
 
   const submission = await addSubmission(auth.organizationId, hydrated.input, { submittedByUid: auth.uid });
+  const display = await enrichSubmissionWithResolvedStudentFields(submission);
+
+  void notifyTeachersNewSubmission({
+    organizationId: auth.organizationId,
+    submittedByUid: auth.uid,
+    submissionId: display.submissionId,
+    taskId: display.taskId,
+    studentId: display.studentId,
+    studentName: display.studentName,
+  }).catch((e) => console.error("[submissions][notify-new]", e));
+
   return NextResponse.json({
     ok: true,
     submissionId: submission.submissionId,

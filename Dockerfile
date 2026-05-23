@@ -24,7 +24,7 @@ COPY . .
 # ローカル: docker build --secret id=next_public_env,src=./firebase-build.env .
 # 中身のテンプレート: firebase-build.env.example
 RUN --mount=type=secret,id=next_public_env \
-  bash -c 'set -euo pipefail && set -a && source /run/secrets/next_public_env && set +a && npm run build && npm prune --omit=dev'
+  bash scripts/docker-npm-build.sh /run/secrets/next_public_env
 
 ENV NODE_ENV=production
 ENV PROOFREAD_PYTHON=/opt/venv/bin/python

@@ -7,7 +7,12 @@ import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 
 type RegistryRow = { taskId: string; displayLabel: string };
 
-export function OpsPackageZipTaskPanel() {
+type Props = {
+  /** 親 card 内に埋め込む（外側 card は付けない） */
+  embedded?: boolean;
+};
+
+export function OpsPackageZipTaskPanel({ embedded = false }: Props) {
   const { user } = useFirebaseAuthContext();
   const [tasks, setTasks] = useState<RegistryRow[] | null>(null);
   const [taskId, setTaskId] = useState("");
@@ -47,7 +52,7 @@ export function OpsPackageZipTaskPanel() {
       setMsg("課題を選んでください。");
       return;
     }
-    if (!window.confirm(`課題「${tid}」の Day4 成果物（audio/qr/pdf）を ZIP にまとめます。よろしいですか？`)) {
+    if (!window.confirm(`課題「${tid}」の Day4 成果物を ZIP にまとめます。よろしいですか？`)) {
       return;
     }
     setBusy(true);
@@ -79,22 +84,21 @@ export function OpsPackageZipTaskPanel() {
     }
   };
 
-  return (
-    <div className="card">
-      <h2>納品ZIPを作成（課題単位）</h2>
-      <p>
+  const inner = (
+    <>
+      <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
         <Link href="/ops/deliverables">納品ZIPのダウンロード一覧</Link>
       </p>
 
       {loadErr ? <p className="error">{loadErr}</p> : null}
       {tasks === null && !loadErr ? <p className="muted">課題一覧を読み込み中…</p> : null}
       {tasks && tasks.length === 0 ? (
-        <p className="muted">登録課題がありません。課題・添削設定でサーバー保存してください。</p>
+        <p className="muted">登録課題がありません。課題・添削設定から保存してください。</p>
       ) : null}
 
       {tasks && tasks.length > 0 ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end", marginTop: 8 }}>
-          <label className="field" style={{ marginBottom: 0, minWidth: 280 }}>
+        <div className="ops-panel-grid">
+          <label className="field">
             <span>課題</span>
             <select value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={busy}>
               <option value="">選択してください</option>
@@ -105,17 +109,33 @@ export function OpsPackageZipTaskPanel() {
               ))}
             </select>
           </label>
-          <button type="button" disabled={busy || !taskId.trim()} onClick={() => void onZipByTask()}>
-            {busy ? "ZIP 作成中…" : "この課題で ZIP を作成"}
-          </button>
+          <div className="ops-panel-actions" style={{ marginTop: 0 }}>
+            <button
+              type="button"
+              className="ops-btn ops-btn--primary"
+              disabled={busy || !taskId.trim()}
+              onClick={() => void onZipByTask()}
+            >
+              {busy ? "ZIP 作成中…" : "ZIP を作成"}
+            </button>
+          </div>
         </div>
       ) : null}
 
       {msg ? (
-        <p className={msg.includes("失敗") || msg.includes("エラー") ? "error" : "success"} style={{ marginTop: 12 }}>
+        <p className={msg.includes("失敗") || msg.includes("エラー") ? "error" : "muted"} style={{ marginTop: 12 }}>
           {msg}
         </p>
       ) : null}
+    </>
+  );
+
+  if (embedded) return inner;
+
+  return (
+    <div className="card">
+      <h2>納品ZIP（課題単位）</h2>
+      {inner}
     </div>
   );
 }

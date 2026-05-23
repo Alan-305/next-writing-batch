@@ -75,6 +75,12 @@ async function sendResendEmail(to: string, subject: string, text: string): Promi
   if (!res.ok) {
     const body = await res.text();
     console.error("[proofread-notify] Resend error", { status: res.status, body, to, subject });
+    if (res.status === 403 && body.includes("verify a domain")) {
+      console.error(
+        "[proofread-notify] Resend は検証用送信元 (onboarding@resend.dev) ではアカウント所有者以外に送れません。" +
+          " resend.com/domains でドメインを検証し、Cloud Run に RESEND_FROM_EMAIL を設定してください。",
+      );
+    }
     return false;
   }
   return true;
@@ -191,8 +197,8 @@ export async function maybeNotifyProofreadBatch(organizationId: string, batchId:
     const data = snap.data() as ProofreadBatch;
 
     if (terminal) {
-      if (data.completionEmailSentAt) return;
-      tx.set(batchRef, { completionEmailSentAt: nowIso }, { merge: true });
+      // 成功送信済みのみスキップ。旧実装で completionEmailSentAt だけ付いた失敗分は再送する。
+      if (data.completionEmailDeliveredAt) return;
       kind = "completion";
       return;
     }
@@ -205,7 +211,6 @@ export async function maybeNotifyProofreadBatch(organizationId: string, batchId:
       !lastRaw || (Number.isFinite(lastMs) && now - lastMs >= PROGRESS_EMAIL_INTERVAL_MS);
     if (!batchAgeOk || !sinceLastOk) return;
 
-    tx.set(batchRef, { lastProgressEmailAt: nowIso }, { merge: true });
     kind = "progress";
   });
 
@@ -219,19 +224,36 @@ export async function maybeNotifyProofreadBatch(organizationId: string, batchId:
 
   const listUrl = submissionsListUrl();
   if (kind === "completion") {
-    await sendResendEmail(
+    const sent = await sendResendEmail(
       email,
       `【添削革命】添削が完了しました（${counts.total}件）`,
       buildCompletionBody(counts, listUrl),
     );
-    console.info("[proofread-notify] completion sent", { batchId: bid, to: email, counts });
+    if (sent) {
+      await batchRef.set(
+        { completionEmailSentAt: nowIso, completionEmailDeliveredAt: nowIso },
+        { merge: true },
+      );
+      console.info("[proofread-notify] completion sent", { batchId: bid, to: email, counts });
+    } else {
+      console.warn("[proofread-notify] completion not delivered (will retry on next job finish)", {
+        batchId: bid,
+        to: email,
+        counts,
+      });
+    }
   } else {
-    await sendResendEmail(
+    const sent = await sendResendEmail(
       email,
       `【添削革命】添削の途中経過（${counts.succeeded + counts.failed + counts.cancelled}/${counts.total}件）`,
       buildProgressBody(counts, listUrl),
     );
-    console.info("[proofread-notify] progress sent", { batchId: bid, to: email, counts });
+    if (sent) {
+      await batchRef.set({ lastProgressEmailAt: nowIso }, { merge: true });
+      console.info("[proofread-notify] progress sent", { batchId: bid, to: email, counts });
+    } else {
+      console.warn("[proofread-notify] progress not delivered", { batchId: bid, to: email, counts });
+    }
   }
 }
 

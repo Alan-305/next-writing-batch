@@ -1,4 +1,5 @@
 import type { Submission } from "@/lib/submissions-store";
+import { resolveProofreadBatchLimit } from "@/lib/proofread/proofread-job-types";
 
 export type ProofreadTicketScopeInput = {
   submissions: Submission[];
@@ -17,7 +18,7 @@ export function listSubmissionsForProofreadTicketScope(input: ProofreadTicketSco
   const submissionIds = input.submissionIds ?? [];
   const idFilter = submissionIds.length > 0 ? new Set(submissionIds.map((x) => x.trim()).filter(Boolean)) : null;
   const retryFailed = Boolean(input.retryFailed);
-  const limit = Math.min(500, Math.max(0, Math.floor(Number(input.limit) || 0)));
+  const limit = resolveProofreadBatchLimit(input.limit);
 
   const out: Submission[] = [];
   for (const s of input.submissions) {

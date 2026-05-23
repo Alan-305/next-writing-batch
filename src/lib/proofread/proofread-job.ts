@@ -105,12 +105,20 @@ async function createProofreadJobDoc(job: ProofreadJob): Promise<void> {
   await orgProofreadJobsCol(job.organizationId).doc(job.jobId).set(job);
 }
 
+function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) out[key as keyof T] = value as T[keyof T];
+  }
+  return out;
+}
+
 async function updateProofreadJobDoc(
   organizationId: string,
   jobId: string,
   patch: Partial<ProofreadJob>,
 ): Promise<void> {
-  await orgProofreadJobsCol(organizationId).doc(jobId).set(patch, { merge: true });
+  await orgProofreadJobsCol(organizationId).doc(jobId).set(omitUndefined(patch), { merge: true });
 }
 
 async function isProofreadJobCancelled(organizationId: string, jobId: string): Promise<boolean> {
@@ -484,11 +492,14 @@ export async function processProofreadJob(input: ProcessProofreadJobInput): Prom
     const after = await getSubmissionByIdInOrganization(organizationId, submissionId);
     const finalStatus = after?.status ?? "done";
 
-    await updateProofreadJobDoc(organizationId, jobId, {
+    const jobFinishPatch: Partial<ProofreadJob> = {
       status: finalStatus === "done" ? "succeeded" : "failed",
       finishedAt: new Date().toISOString(),
-      lastError: finalStatus === "failed" ? after?.proofread?.error : undefined,
-    });
+    };
+    if (finalStatus === "failed" && after?.proofread?.error) {
+      jobFinishPatch.lastError = after.proofread.error;
+    }
+    await updateProofreadJobDoc(organizationId, jobId, jobFinishPatch);
 
     fireBatchNotify(organizationId, job.batchId);
 
@@ -497,6 +508,16 @@ export async function processProofreadJob(input: ProcessProofreadJobInput): Prom
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[proofread][process-job-failed]", { organizationId, submissionId, jobId, msg });
     await syncSubmissionsDiskMirrorToFirestore(organizationId).catch(() => undefined);
+    const afterSync = await getSubmissionByIdInOrganization(organizationId, submissionId);
+    if (afterSync?.status === "done") {
+      // Python 添削は成功済み。ジョブ doc 更新だけ失敗したケースで提出を failed に戻さない。
+      await updateProofreadJobDoc(organizationId, jobId, {
+        status: "succeeded",
+        finishedAt: new Date().toISOString(),
+      }).catch((jobErr) => console.error("[proofread] job doc success recovery", jobErr));
+      fireBatchNotify(organizationId, job.batchId);
+      return { ok: true, submissionStatus: "done" };
+    }
     await failProofreadJobAndSubmission(
       organizationId,
       submissionId,

@@ -31,9 +31,9 @@ export function AuthToolbar({ variant }: Props) {
         </span>
         {variant === "teacher" ? (
           profileLoading ? (
-            <span className="muted auth-toolbar-meta">テナント ID を読み込み中…</span>
+            <span className="auth-toolbar-meta auth-toolbar-tenant-id">テナント ID を読み込み中…</span>
           ) : orgId ? (
-            <span className="muted auth-toolbar-tenant-id auth-toolbar-meta" title={`organizationId: ${orgId}`}>
+            <span className="auth-toolbar-tenant-id auth-toolbar-meta" title={`organizationId: ${orgId}`}>
               テナント ID: <code>{orgId}</code>
             </span>
           ) : null

@@ -6,7 +6,12 @@ import {
 } from "@/lib/billing/proofread-ticket-firestore";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
+import {
+  PROOFREAD_MAX_ENQUEUE_BATCH,
+  resolveProofreadBatchLimit,
+} from "@/lib/proofread/proofread-job-types";
 import { enqueueProofreadJobs } from "@/lib/proofread/proofread-job";
+import { notifyProofreadEnqueueReceipt } from "@/lib/notifications/teacher-notify";
 import { estimateProofreadTicketCost, listSubmissionsForProofreadTicketScope } from "@/lib/proofread-ticket-cost";
 import { getSubmissions } from "@/lib/submissions-store";
 
@@ -45,10 +50,21 @@ export async function POST(request: Request) {
   const taskId = String(body.taskId ?? "").trim();
   const queuePending = Boolean(body.queuePendingForTaskId);
   const limitRaw = body.limit;
-  const limit =
-    limitRaw === undefined || limitRaw === null || Number.isNaN(Number(limitRaw))
-      ? 0
-      : Math.min(500, Math.max(0, Math.floor(Number(limitRaw))));
+  const limitExplicit =
+    limitRaw !== undefined && limitRaw !== null && !Number.isNaN(Number(limitRaw))
+      ? Math.floor(Number(limitRaw))
+      : null;
+  if (limitExplicit !== null && limitExplicit > PROOFREAD_MAX_ENQUEUE_BATCH) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "BATCH_LIMIT_EXCEEDED",
+        message: `1回に預けられるのは最大 ${PROOFREAD_MAX_ENQUEUE_BATCH} 件です。${PROOFREAD_MAX_ENQUEUE_BATCH} 件以下に分けて実行してください。`,
+      },
+      { status: 422 },
+    );
+  }
+  const limit = resolveProofreadBatchLimit(limitRaw);
 
   if (queuePending) {
     if (!taskId) {
@@ -58,8 +74,18 @@ export async function POST(request: Request) {
     const pending = submissions.filter(
       (s) => s.status === "pending" && String(s.taskId ?? "").trim() === taskId,
     );
-    const slice = limit > 0 ? pending.slice(0, limit) : pending;
-    submissionIds = slice.map((s) => s.submissionId);
+    submissionIds = pending.slice(0, limit).map((s) => s.submissionId);
+  }
+
+  if (submissionIds.length > PROOFREAD_MAX_ENQUEUE_BATCH) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "BATCH_LIMIT_EXCEEDED",
+        message: `1回に預けられるのは最大 ${PROOFREAD_MAX_ENQUEUE_BATCH} 件です（指定 ${submissionIds.length} 件）。分けて実行してください。`,
+      },
+      { status: 422 },
+    );
   }
 
   if (submissionIds.length === 0) {
@@ -117,6 +143,12 @@ export async function POST(request: Request) {
       { status: result.code === "NOTHING_ENQUEUED" ? 422 : 503 },
     );
   }
+
+  void notifyProofreadEnqueueReceipt({
+    requestedByUid: auth.uid,
+    enqueuedCount: result.enqueued.length,
+    batchId: result.batchId,
+  }).catch((e) => console.error("[enqueue-proofread][receipt-notify]", e));
 
   return NextResponse.json(
     {

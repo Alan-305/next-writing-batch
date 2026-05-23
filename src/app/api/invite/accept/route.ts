@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
-import { sendWelcomeEmailIfNeeded } from "@/lib/auth/welcome-email-server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
@@ -80,13 +79,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const welcomeEmail = await sendWelcomeEmailIfNeeded(auth.uid);
-
   return NextResponse.json({
     ok: true,
     organizationId: tx.organizationId,
     changed: tx.changed,
-    welcomeEmail,
   });
 }
 

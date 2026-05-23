@@ -8,6 +8,10 @@ import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
 import { classifyProofreadBatchFailure } from "@/lib/proofread-batch-error-code";
+import {
+  PROOFREAD_MAX_ENQUEUE_BATCH,
+  resolveProofreadBatchLimit,
+} from "@/lib/proofread/proofread-job-types";
 import { estimateProofreadTicketCost, listSubmissionsForProofreadTicketScope } from "@/lib/proofread-ticket-cost";
 import { runProofreadBatch } from "@/lib/run-proofread-batch";
 import {
@@ -64,10 +68,32 @@ export async function POST(request: Request) {
   }
 
   const taskId = String(body.taskId ?? "");
-  const limit =
-    body.limit === undefined || body.limit === null || Number.isNaN(Number(body.limit))
-      ? 0
-      : Math.min(500, Math.max(0, Math.floor(Number(body.limit))));
+  const limitExplicit =
+    body.limit !== undefined && body.limit !== null && !Number.isNaN(Number(body.limit))
+      ? Math.floor(Number(body.limit))
+      : null;
+  if (limitExplicit !== null && limitExplicit > PROOFREAD_MAX_ENQUEUE_BATCH) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "BATCH_LIMIT_EXCEEDED",
+        message: `1回に添削できるのは最大 ${PROOFREAD_MAX_ENQUEUE_BATCH} 件です。${PROOFREAD_MAX_ENQUEUE_BATCH} 件以下に分けて実行してください。`,
+      },
+      { status: 422 },
+    );
+  }
+  const limit = resolveProofreadBatchLimit(body.limit);
+
+  if (submissionIds.length > PROOFREAD_MAX_ENQUEUE_BATCH) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "BATCH_LIMIT_EXCEEDED",
+        message: `1回に添削できるのは最大 ${PROOFREAD_MAX_ENQUEUE_BATCH} 件です（指定 ${submissionIds.length} 件）。分けて実行してください。`,
+      },
+      { status: 422 },
+    );
+  }
 
   const scope = {
     submissions,
@@ -87,6 +113,17 @@ export async function POST(request: Request) {
         code: "NO_PROOFREAD_TARGETS",
         message:
           "この条件で添削対象となる提出がありません（pending / 指定ID / retryFailed を確認してください）。",
+      },
+      { status: 422 },
+    );
+  }
+
+  if (targetRowCount > PROOFREAD_MAX_ENQUEUE_BATCH) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "BATCH_LIMIT_EXCEEDED",
+        message: `1回に添削できるのは最大 ${PROOFREAD_MAX_ENQUEUE_BATCH} 件です（対象 ${targetRowCount} 件）。分けて実行してください。`,
       },
       { status: 422 },
     );
@@ -124,7 +161,7 @@ export async function POST(request: Request) {
     organizationId: auth.organizationId,
     taskId: String(body.taskId ?? ""),
     workers: body.workers,
-    limit: body.limit,
+    limit,
     retryFailed: Boolean(body.retryFailed),
     submissionIds: submissionIds.length ? submissionIds : undefined,
   });

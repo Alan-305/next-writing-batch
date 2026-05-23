@@ -6,11 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { DeleteSubmissionButton } from "@/components/DeleteSubmissionButton";
+import { OpsSubmissionStatusBadge } from "@/components/ops/OpsSubmissionStatusBadge";
 import {
   CancelProofreadButton,
   ProofreadSubmissionButton,
   RedoProofreadSubmissionButton,
 } from "@/components/ProofreadSubmissionButton";
+import { OPS_COPY, STATUS_FILTER_OPTIONS } from "@/lib/ops/submission-status-labels";
 import { formatDateTimeIso } from "@/lib/format-date";
 
 export type SubmissionListRow = {
@@ -19,13 +21,14 @@ export type SubmissionListRow = {
   taskId: string;
   studentId: string;
   studentName: string;
+  /** 表示用（viewed 含む） */
   status: string;
+  /** 操作ボタン用の生 status */
+  rawStatus?: string;
   proofreadQueuedAt?: string;
-  /** Day4 成果物（ZIP 対象）が1つ以上ある */
+  studentViewed?: boolean;
   hasDay4Assets?: boolean;
-  /** 運用が生徒向け結果を公開済み（studentRelease.operatorApprovedAt あり） */
   resultPublished?: boolean;
-  /** 公開結果ページの初回閲覧日時（ISO） */
   studentResultFirstViewedAt?: string;
 };
 
@@ -37,36 +40,21 @@ type SortKey =
   | "status_alpha"
   | "status_pending_first";
 
-function hasStudentViewedPublishedResult(item: SubmissionListRow): boolean {
-  return (
-    item.status === "done" &&
-    Boolean(item.resultPublished) &&
-    Boolean(String(item.studentResultFirstViewedAt ?? "").trim())
-  );
-}
-
-/** 未処理を上に並べる用（Viewed は done より後ろ） */
 function submissionListRank(item: SubmissionListRow): number {
-  const st = item.status;
+  const st = item.rawStatus ?? item.status;
   if (st === "pending") return 0;
   if (st === "queued") return 1;
   if (st === "processing") return 2;
   if (st === "failed") return 3;
-  if (st === "done") {
-    if (hasStudentViewedPublishedResult(item)) return 5;
-    return 4;
-  }
+  if (item.studentViewed || item.status === "viewed") return 5;
+  if (st === "done") return 4;
   return 99;
 }
 
 function submissionStatusSortLabel(item: SubmissionListRow): string {
-  if (item.status === "pending") return "pending";
-  if (item.status === "queued") return "queued";
-  if (item.status === "processing") return "processing";
-  if (item.status === "failed") return "failed";
-  if (hasStudentViewedPublishedResult(item)) return "viewed";
-  if (item.status === "done") return "done";
-  return item.status;
+  if (item.studentViewed || item.status === "viewed") return "viewed";
+  const st = item.rawStatus ?? item.status;
+  return st;
 }
 
 function compareRows(a: SubmissionListRow, b: SubmissionListRow, sort: SortKey): number {
@@ -103,7 +91,6 @@ function compareRows(a: SubmissionListRow, b: SubmissionListRow, sort: SortKey):
 
 type Props = {
   rows: SubmissionListRow[];
-  /** 受付IDを選んで ZIP（Day4 ファイル） */
   enableZipSelection?: boolean;
   onReloadSubmissions?: () => void;
 };
@@ -117,7 +104,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [sort, setSort] = useState<SortKey>("submitted_desc");
+  const [sort, setSort] = useState<SortKey>("status_pending_first");
   const [pageSize, setPageSize] = useState<number>(50);
   const [page, setPage] = useState(1);
   const [zipSelected, setZipSelected] = useState<Set<string>>(() => new Set());
@@ -130,7 +117,9 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
-      if (statusFilter && r.status !== statusFilter) return false;
+      const raw = r.rawStatus ?? r.status;
+      if (statusFilter === "done" && r.studentViewed) return false;
+      if (statusFilter && raw !== statusFilter) return false;
       if (!q) return true;
       const hay = `${r.taskId}\n${r.studentId}\n${r.studentName}\n${r.submissionId}`.toLowerCase();
       return hay.includes(q);
@@ -153,9 +142,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
   const sliceStart = pageSize <= 0 ? 0 : (safePage - 1) * pageSize;
   const pageRows = pageSize <= 0 ? sorted : sorted.slice(sliceStart, sliceStart + pageSize);
 
-  const onFilterChange = () => {
-    setPage(1);
-  };
+  const onFilterChange = () => setPage(1);
 
   useEffect(() => {
     if (enableZipSelection) {
@@ -165,16 +152,12 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
   }, [enableZipSelection, statusFilter, query]);
 
   useEffect(() => {
-    /** 再読み込み・別ページから戻る・HMR 後に「一括添削中」の表示だけが残るのを防ぐ */
     setRunningTaskId(null);
     const onStart = (ev: Event) => {
       const d = (ev as CustomEvent<{ taskId?: string }>).detail;
-      const tid = (d?.taskId || "").trim();
-      setRunningTaskId(tid || null);
+      setRunningTaskId((d?.taskId || "").trim() || null);
     };
-    const onEnd = () => {
-      setRunningTaskId(null);
-    };
+    const onEnd = () => setRunningTaskId(null);
     window.addEventListener("proofread:run-start", onStart as EventListener);
     window.addEventListener("proofread:run-end", onEnd as EventListener);
     return () => {
@@ -182,54 +165,6 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
       window.removeEventListener("proofread:run-end", onEnd as EventListener);
     };
   }, []);
-
-  const statusCell = (item: SubmissionListRow) => {
-    const tid = (runningTaskId ?? "").trim();
-    /** 一括「添削を実行」が走っている間だけ。ページ再読み込みで runningTaskId は消える。 */
-    const runningPending = item.status === "pending" && tid !== "" && item.taskId === tid;
-    if (runningPending) {
-      return (
-        <span className="status-running status-running--pending" title="一括添削実行中">
-          <span className="status-spinner" aria-hidden="true" />
-          processing
-        </span>
-      );
-    }
-    if (item.status === "queued") {
-      return (
-        <span className="status-running status-running--pending" title="queued（旧非同期キューの取り残し）">
-          <span className="status-spinner" aria-hidden="true" />
-          queued
-        </span>
-      );
-    }
-    if (item.status === "processing") {
-      return (
-        <span className="status-running status-running--pending" title="Claude で添削実行中">
-          <span className="status-spinner" aria-hidden="true" />
-          processing
-        </span>
-      );
-    }
-    if (item.status === "pending") {
-      return <span className="ops-status-pending">pending</span>;
-    }
-    if (item.status === "failed") {
-      return <span className="ops-status-failed">failed</span>;
-    }
-    if (item.status === "done") {
-      if (hasStudentViewedPublishedResult(item)) {
-        const at = String(item.studentResultFirstViewedAt ?? "").trim();
-        return (
-          <span className="ops-status-viewed" title={at ? `初回閲覧: ${at}` : undefined}>
-            Viewed
-          </span>
-        );
-      }
-      return <span className="ops-status-done">done</span>;
-    }
-    return item.status;
-  };
 
   const toggleZipSelect = (submissionId: string) => {
     setZipSelected((prev) => {
@@ -271,7 +206,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
       setZipMsg("ZIP する提出を選んでください。");
       return;
     }
-    if (!window.confirm(`${ids.length} 件の提出を 1 つの ZIP にまとめます（各 Day4 の pdf/audio/qr）。よろしいですか？`)) {
+    if (!window.confirm(`${ids.length} 件の提出を 1 つの ZIP にまとめます。よろしいですか？`)) {
       return;
     }
     setZipBusy(true);
@@ -279,7 +214,6 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
     try {
       if (!user) {
         setZipMsg("ログインしてください。");
-        setZipBusy(false);
         return;
       }
       const token = await user.getIdToken();
@@ -308,38 +242,24 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
   const onRefreshList = () => {
     setListRefreshing(true);
     router.refresh();
+    onReloadSubmissions?.();
     window.setTimeout(() => setListRefreshing(false), 900);
   };
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "10px 14px",
-          alignItems: "center",
-          marginTop: 0,
-          marginBottom: 14,
-        }}
-      >
-        <button type="button" disabled={listRefreshing} onClick={() => onRefreshList()}>
-          {listRefreshing ? "再読み込み中…" : "一覧を最新化（JSONの手編集を反映）"}
+      <div className="ops-toolbar">
+        <button
+          type="button"
+          className="ops-btn ops-btn--ghost"
+          disabled={listRefreshing}
+          onClick={() => onRefreshList()}
+        >
+          {listRefreshing ? OPS_COPY.refreshing : OPS_COPY.refresh}
         </button>
-      </div>
 
-      <div
-        className="field"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
-          gap: "10px 14px",
-          alignItems: "end",
-          marginBottom: 14,
-        }}
-      >
-        <label className="field" style={{ marginBottom: 0 }}>
-          <span>検索（課題ID・学籍・氏名・受付ID の一部）</span>
+        <label className="field">
+          <span>検索</span>
           <input
             type="search"
             value={query}
@@ -347,12 +267,13 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
               setQuery(e.target.value);
               onFilterChange();
             }}
-            placeholder="入力すると即座に絞り込み"
+            placeholder={OPS_COPY.searchPlaceholder}
             autoComplete="off"
           />
         </label>
-        <label className="field" style={{ marginBottom: 0 }}>
-          <span>ステータス</span>
+
+        <label className="field">
+          <span>状態</span>
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -360,15 +281,15 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
               onFilterChange();
             }}
           >
-            <option value="">すべて</option>
-            <option value="pending">pending</option>
-            <option value="queued">queued</option>
-            <option value="processing">processing</option>
-            <option value="done">done</option>
-            <option value="failed">failed</option>
+            {STATUS_FILTER_OPTIONS.map((o) => (
+              <option key={o.value || "all"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </label>
-        <label className="field" style={{ marginBottom: 0 }}>
+
+        <label className="field">
           <span>並べ替え</span>
           <select
             value={sort}
@@ -377,21 +298,21 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
               setPage(1);
             }}
           >
+            <option value="status_pending_first">要対応を上に</option>
             <option value="submitted_desc">提出日（新しい順）</option>
             <option value="submitted_asc">提出日（古い順）</option>
-            <option value="status_pending_first">ステータス（未処理を上）</option>
-            <option value="status_alpha">ステータス（あいうえお）</option>
             <option value="task_id">課題ID</option>
             <option value="student_name">氏名</option>
+            <option value="status_alpha">状態（あいうえお）</option>
           </select>
         </label>
-        <label className="field" style={{ marginBottom: 0 }}>
-          <span>1ページ件数</span>
+
+        <label className="field">
+          <span>表示件数</span>
           <select
             value={pageSize}
             onChange={(e) => {
-              const v = parseInt(e.target.value, 10);
-              setPageSize(v);
+              setPageSize(parseInt(e.target.value, 10));
               setPage(1);
             }}
           >
@@ -400,32 +321,30 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                 {n} 件
               </option>
             ))}
-            <option value={0}>全件（フィルタ後）</option>
+            <option value={0}>すべて</option>
           </select>
         </label>
       </div>
 
-      <p style={{ margin: "0 0 10px", fontSize: "0.92rem" }}>
+      <p className="ops-table-meta">
         全 <strong>{total}</strong> 件
         {filtered.length !== total ? (
           <>
             {" "}
-            → 条件一致 <strong>{filtered.length}</strong> 件
+            / 表示対象 <strong>{filtered.length}</strong> 件
           </>
         ) : null}
-        {pageSize > 0 ? (
+        {pageSize > 0 && sorted.length > 0 ? (
           <>
             {" "}
-            · 表示 {sliceStart + 1}–{Math.min(sliceStart + pageSize, sorted.length)} 件目
+            / {sliceStart + 1}–{Math.min(sliceStart + pageSize, sorted.length)} 件目
           </>
-        ) : (
-          <> · 表示 {sorted.length} 件</>
-        )}
+        ) : null}
       </p>
 
       {pageSize > 0 && pageCount > 1 ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 10 }}>
-          <button type="button" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
+          <button type="button" className="ops-btn ops-btn--ghost" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             前へ
           </button>
           <span style={{ fontSize: "0.9rem" }}>
@@ -433,6 +352,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
           </span>
           <button
             type="button"
+            className="ops-btn ops-btn--ghost"
             disabled={safePage >= pageCount}
             onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
           >
@@ -441,7 +361,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
         </div>
       ) : null}
 
-      <div style={{ overflowX: "auto" }}>
+      <div className="ops-table-wrap">
         <table>
           <thead>
             <tr>
@@ -449,7 +369,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                 <th style={{ width: 36 }}>
                   <input
                     type="checkbox"
-                    title="このページの Day4 済みをすべて選択／解除"
+                    title="このページの Day4 済みをすべて選択"
                     aria-label="このページの Day4 済みをすべて選択"
                     disabled={zipBusy || !pageRows.some((r) => r.hasDay4Assets)}
                     checked={(() => {
@@ -460,13 +380,13 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                   />
                 </th>
               ) : null}
-              <th>detail</th>
-              <th>submittedAt</th>
-              <th>taskId</th>
-              <th>studentId</th>
-              <th>studentName</th>
-              <th>status</th>
-              <th style={{ minWidth: "200px" }}>操作</th>
+              <th>詳細</th>
+              <th>提出日時</th>
+              <th>課題ID</th>
+              <th>学籍</th>
+              <th>氏名</th>
+              <th>状態</th>
+              <th style={{ minWidth: 180 }}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -477,91 +397,108 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                 </td>
               </tr>
             ) : (
-              pageRows.map((item) => (
-                <tr key={item.submissionId}>
-                  {enableZipSelection ? (
+              pageRows.map((item) => {
+                const rawStatus = item.rawStatus ?? item.status;
+                const tid = (runningTaskId ?? "").trim();
+                const forceProcessing =
+                  rawStatus === "pending" && tid !== "" && item.taskId === tid;
+
+                return (
+                  <tr key={item.submissionId}>
+                    {enableZipSelection ? (
+                      <td>
+                        <input
+                          type="checkbox"
+                          disabled={zipBusy || !item.hasDay4Assets}
+                          title={item.hasDay4Assets ? "ZIP に含める" : "Day4 成果物なし"}
+                          checked={zipSelected.has(item.submissionId)}
+                          onChange={() => toggleZipSelect(item.submissionId)}
+                          aria-label={`ZIP に含める ${item.submissionId}`}
+                        />
+                      </td>
+                    ) : null}
                     <td>
-                      <input
-                        type="checkbox"
-                        disabled={zipBusy || !item.hasDay4Assets}
-                        title={item.hasDay4Assets ? "ZIP に含める" : "Day4 成果物なし"}
-                        checked={zipSelected.has(item.submissionId)}
-                        onChange={() => toggleZipSelect(item.submissionId)}
-                        aria-label={`ZIP に含める ${item.submissionId}`}
+                      {String(item.submissionId ?? "").trim() ? (
+                        <Link
+                          href={`/ops/submissions/${encodeURIComponent(item.submissionId)}`}
+                          className="ops-btn ops-btn--ghost ops-btn--compact"
+                          prefetch={false}
+                        >
+                          {OPS_COPY.detailLink}
+                        </Link>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>{formatDateTimeIso(item.submittedAt)}</td>
+                    <td>
+                      <code style={{ fontSize: "0.85rem" }}>{item.taskId}</code>
+                    </td>
+                    <td>{item.studentId}</td>
+                    <td>{item.studentName}</td>
+                    <td>
+                      <OpsSubmissionStatusBadge
+                        status={rawStatus}
+                        studentViewed={item.studentViewed}
+                        viewedAt={item.studentResultFirstViewedAt}
+                        forceProcessing={forceProcessing}
                       />
                     </td>
-                  ) : null}
-                  <td>
-                    {String(item.submissionId ?? "").trim() ? (
-                      <Link
-                        href={`/ops/submissions/${encodeURIComponent(item.submissionId)}`}
-                        prefetch={false}
-                      >
-                        修正・詳細
-                      </Link>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td>{formatDateTimeIso(item.submittedAt)}</td>
-                  <td>{item.taskId}</td>
-                  <td>{item.studentId}</td>
-                  <td>{item.studentName}</td>
-                  <td>{statusCell(item)}</td>
-                  <td>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      <ProofreadSubmissionButton
-                        submissionId={item.submissionId}
-                        taskId={item.taskId}
-                        studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
-                        status={item.status}
-                        proofreadQueuedAt={item.proofreadQueuedAt}
-                        onEnqueued={onReloadSubmissions}
-                      />
-                      <CancelProofreadButton
-                        submissionId={item.submissionId}
-                        taskId={item.taskId}
-                        studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
-                        status={item.status}
-                        proofreadQueuedAt={item.proofreadQueuedAt}
-                        onCancelled={onReloadSubmissions}
-                      />
-                      {item.status === "done" || item.status === "failed" || item.status === "queued" ? (
-                        <RedoProofreadSubmissionButton
+                    <td>
+                      <div className="ops-row-actions">
+                        <ProofreadSubmissionButton
                           submissionId={item.submissionId}
                           taskId={item.taskId}
                           studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
-                          status={item.status}
+                          status={rawStatus}
                           proofreadQueuedAt={item.proofreadQueuedAt}
                           onEnqueued={onReloadSubmissions}
                         />
-                      ) : null}
-                      <DeleteSubmissionButton
-                        submissionId={item.submissionId}
-                        confirmLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        <CancelProofreadButton
+                          submissionId={item.submissionId}
+                          taskId={item.taskId}
+                          studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
+                          status={rawStatus}
+                          proofreadQueuedAt={item.proofreadQueuedAt}
+                          onCancelled={onReloadSubmissions}
+                        />
+                        {rawStatus === "done" || rawStatus === "failed" || rawStatus === "queued" ? (
+                          <RedoProofreadSubmissionButton
+                            submissionId={item.submissionId}
+                            taskId={item.taskId}
+                            studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
+                            status={rawStatus}
+                            proofreadQueuedAt={item.proofreadQueuedAt}
+                            onEnqueued={onReloadSubmissions}
+                          />
+                        ) : null}
+                        <DeleteSubmissionButton
+                          submissionId={item.submissionId}
+                          confirmLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
       {enableZipSelection ? (
-        <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <span style={{ fontSize: "0.95rem" }}>
-            ZIP 対象: <strong>{zipSelected.size}</strong> 件
+        <div className="ops-zip-bar">
+          <span style={{ fontSize: "0.92rem" }}>
+            ZIP 選択: <strong>{zipSelected.size}</strong> 件
           </span>
-          <button type="button" disabled={zipBusy} onClick={() => selectAllFilteredWithDay4()}>
-            フィルタ一致の Day4 済みをすべて選択
+          <button type="button" className="ops-btn ops-btn--ghost" disabled={zipBusy} onClick={() => selectAllFilteredWithDay4()}>
+            表示中の Day4 済みをすべて選択
           </button>
-          <button type="button" disabled={zipBusy || zipSelected.size === 0} onClick={() => clearZipSelection()}>
+          <button type="button" className="ops-btn ops-btn--ghost" disabled={zipBusy || zipSelected.size === 0} onClick={() => clearZipSelection()}>
             選択解除
           </button>
-          <button type="button" disabled={zipBusy || zipSelected.size === 0} onClick={() => void runZipSelection()}>
-            {zipBusy ? "ZIP 作成中…" : "選択した提出を ZIP 化"}
+          <button type="button" className="ops-btn ops-btn--primary" disabled={zipBusy || zipSelected.size === 0} onClick={() => void runZipSelection()}>
+            {zipBusy ? "ZIP 作成中…" : "選択分を ZIP 化"}
           </button>
         </div>
       ) : null}

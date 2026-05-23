@@ -29,6 +29,45 @@ const TICKETS_BY_PLAN = {
   t120: 120,
 } as const;
 
+const WELCOME_EMAIL_SEND_LOCK_STALE_MS = 5 * 60 * 1000;
+
+function welcomeEmailInFlightStartedAtMs(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (raw instanceof admin.firestore.Timestamp) return raw.toMillis();
+  if (raw instanceof Date) return raw.getTime();
+  if (typeof raw === "object" && raw !== null && "toDate" in raw) {
+    const d = (raw as { toDate: () => Date }).toDate();
+    const ms = d.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof raw === "string") {
+    const ms = Date.parse(raw);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  return null;
+}
+
+async function claimWelcomeEmailSend(
+  userRef: FirebaseFirestore.DocumentReference,
+): Promise<"claimed" | "already_sent" | "in_flight"> {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) return "already_sent";
+    if (snap.get("welcomeEmailSentAt") != null) return "already_sent";
+
+    const inFlightMs = welcomeEmailInFlightStartedAtMs(snap.get("welcomeEmailSendingAt"));
+    if (
+      inFlightMs != null &&
+      Date.now() - inFlightMs < WELCOME_EMAIL_SEND_LOCK_STALE_MS
+    ) {
+      return "in_flight";
+    }
+
+    tx.update(userRef, { welcomeEmailSendingAt: FieldValue.serverTimestamp() });
+    return "claimed";
+  });
+}
+
 function parseAdminUidSet(): Set<string> {
   const raw = (
     process.env.ADMIN_UIDS ??
@@ -489,9 +528,9 @@ async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Pr
   }
 
   const userRef = db.doc(`users/${uid}`);
-  const snap = await userRef.get();
-  if (snap.get("welcomeEmailSentAt") != null) {
-    logger.info("welcomeEmailSentAt 済みのためスキップ", { uid });
+  const claim = await claimWelcomeEmailSend(userRef);
+  if (claim !== "claimed") {
+    logger.info("ウェルカムメール送信をスキップ", { uid, claim });
     return;
   }
 
@@ -500,30 +539,37 @@ async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Pr
     "ご登録ありがとうございます。\n\n" +
     "このメールは Nexus Learning / next-writing-batch のアカウント登録時に自動送信されています。\n";
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [email],
-      subject,
-      text,
-    }),
-  });
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject,
+        text,
+      }),
+    });
 
-  if (!res.ok) {
-    const body = await res.text();
-    logger.error("Resend API エラー", { status: res.status, body, uid });
-    return;
+    if (!res.ok) {
+      const body = await res.text();
+      await userRef.update({ welcomeEmailSendingAt: FieldValue.delete() }).catch(() => undefined);
+      logger.error("Resend API エラー", { status: res.status, body, uid });
+      return;
+    }
+
+    await userRef.update({
+      welcomeEmailSentAt: FieldValue.serverTimestamp(),
+      welcomeEmailSendingAt: FieldValue.delete(),
+    });
+    logger.info("ウェルカムメール送信済み", { uid });
+  } catch (error) {
+    await userRef.update({ welcomeEmailSendingAt: FieldValue.delete() }).catch(() => undefined);
+    logger.error("ウェルカムメール送信失敗", { uid, error });
   }
-
-  await userRef.update({
-    welcomeEmailSentAt: FieldValue.serverTimestamp(),
-  });
-  logger.info("ウェルカムメール送信済み", { uid });
 }
 
 /**
