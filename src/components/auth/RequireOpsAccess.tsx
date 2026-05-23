@@ -142,7 +142,7 @@ export function RequireOpsAccess({ children }: Props) {
               {" · "}
             </>
           ) : null}
-          <Link href="/hub">開発ハブ</Link>
+          <Link href="/tensaku-kakumei">トップへ</Link>
         </p>
       </main>
     );

@@ -85,7 +85,7 @@ export function RegisterTeacherClient() {
           <Link href={signInHref}>ログインへ</Link>
         </p>
         <p className="muted" style={{ marginTop: 24 }}>
-          <Link href="/hub">ハブへ戻る</Link>
+          <Link href="/tensaku-kakumei">トップへ戻る</Link>
         </p>
       </main>
     );
@@ -99,7 +99,7 @@ export function RegisterTeacherClient() {
           このアカウントは生徒として登録されています。教員用に別の Google アカウントを使うか、管理者に依頼してください。
         </p>
         <p>
-          <Link href="/hub">ハブへ戻る</Link>
+          <Link href="/tensaku-kakumei">トップへ戻る</Link>
         </p>
       </main>
     );
@@ -140,7 +140,7 @@ export function RegisterTeacherClient() {
       {message ? <p className="error">{message}</p> : null}
 
       <p className="muted" style={{ marginTop: 24 }}>
-        <Link href="/hub">ハブへ戻る</Link>
+        <Link href="/tensaku-kakumei">トップへ戻る</Link>
       </p>
     </main>
   );
