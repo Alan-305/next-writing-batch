@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { resolveEffectiveOrganizationIdForApi } from "@/lib/auth/resolve-effective-organization";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
+import { loadTeacherUidsFromProofreadingSetup } from "@/lib/admin/tenant-roster";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 
@@ -13,10 +14,17 @@ type TicketRow = {
   uid: string;
   displayLabel: string;
   email: string | null;
+  nickname: string | null;
+  studentNumber: string | null;
+  roles: string[];
   kind: "teacher" | "student";
+  statusLabel: string;
+  registeredAt: string | null;
   tickets: number;
   lastProofreadTicketConsume: number | null;
   lastProofreadTicketAt: string | null;
+  lastCheckoutSessionId: string | null;
+  lastPaymentIntentId: string | null;
 };
 
 function normalizeRoles(raw: unknown): string[] {
@@ -37,9 +45,15 @@ function displayLabelFor(uid: string, email: string | null, displayName: string 
   return uid;
 }
 
-async function fetchAuthLabels(uids: string[]): Promise<Map<string, { email: string | null; displayName: string | null }>> {
+type AuthLabel = {
+  email: string | null;
+  displayName: string | null;
+  registeredAt: string | null;
+};
+
+async function fetchAuthLabels(uids: string[]): Promise<Map<string, AuthLabel>> {
   const auth = getAdminAuth();
-  const map = new Map<string, { email: string | null; displayName: string | null }>();
+  const map = new Map<string, AuthLabel>();
   const chunk = 25;
   for (let i = 0; i < uids.length; i += chunk) {
     const slice = uids.slice(i, i + chunk);
@@ -47,14 +61,34 @@ async function fetchAuthLabels(uids: string[]): Promise<Map<string, { email: str
       slice.map(async (uid) => {
         try {
           const u = await auth.getUser(uid);
-          map.set(uid, { email: u.email ?? null, displayName: u.displayName ?? null });
+          const created = u.metadata?.creationTime;
+          map.set(uid, {
+            email: u.email ?? null,
+            displayName: u.displayName ?? null,
+            registeredAt: created ? new Date(created).toISOString() : null,
+          });
         } catch {
-          map.set(uid, { email: null, displayName: null });
+          map.set(uid, { email: null, displayName: null, registeredAt: null });
         }
       }),
     );
   }
   return map;
+}
+
+function statusLabelFor(kind: "teacher" | "student", roles: string[], profileCompleted: boolean): string {
+  const lower = roles.map((r) => r.toLowerCase());
+  if (kind === "teacher") {
+    if (lower.includes("admin")) return "管理者・教員";
+    return "教員";
+  }
+  return profileCompleted ? "生徒（登録済）" : "生徒（未登録）";
+}
+
+function stringOrNull(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  return s || null;
 }
 
 function numberOrZero(raw: unknown): number {
@@ -84,6 +118,7 @@ export async function GET(request: Request) {
   try {
     const organizationId = await resolveEffectiveOrganizationIdForApi(auth.uid, request);
     const db = getAdminFirestore();
+    const teacherUidsFromDisk = await loadTeacherUidsFromProofreadingSetup(organizationId);
     const snap = await db.collection("users").where("organizationId", "==", organizationId).get();
     const uids = snap.docs.map((d) => d.id);
     const authMap = await fetchAuthLabels(uids);
@@ -91,23 +126,35 @@ export async function GET(request: Request) {
     const rows: TicketRow[] = snap.docs.map((doc) => {
       const uid = doc.id;
       const roles = normalizeRoles(doc.get("roles"));
-      const kind: "teacher" | "student" = isTeacherByRoles(roles) ? "teacher" : "student";
+      const kind: "teacher" | "student" =
+        isTeacherByRoles(roles) || teacherUidsFromDisk.has(uid) ? "teacher" : "student";
       const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
       const tickets = Math.max(0, Math.floor(numberOrZero(billing["tickets"])));
       const lastConsumeRaw = billing["lastProofreadTicketConsume"];
       const lastProofreadTicketConsume =
         typeof lastConsumeRaw === "number" && Number.isFinite(lastConsumeRaw) ? Math.floor(lastConsumeRaw) : null;
       const lastProofreadTicketAt = timestampToIso(billing["lastProofreadTicketAt"]);
-      const authLabel = authMap.get(uid) ?? { email: null, displayName: null };
+      const authLabel = authMap.get(uid) ?? { email: null, displayName: null, registeredAt: null };
       const displayLabel = displayLabelFor(uid, authLabel.email, authLabel.displayName);
+      const nickname = stringOrNull(doc.get("nickname"));
+      const studentNumber = stringOrNull(doc.get("studentNumber"));
+      const profileCompleted = doc.get("studentProfileCompletedAt") != null;
+      const docCreatedAt = timestampToIso(doc.get("createdAt"));
       return {
         uid,
         displayLabel,
         email: authLabel.email,
+        nickname,
+        studentNumber,
+        roles,
         kind,
+        statusLabel: statusLabelFor(kind, roles, profileCompleted),
+        registeredAt: authLabel.registeredAt ?? docCreatedAt,
         tickets,
         lastProofreadTicketConsume,
         lastProofreadTicketAt,
+        lastCheckoutSessionId: stringOrNull(billing["lastCheckoutSessionId"]),
+        lastPaymentIntentId: stringOrNull(billing["lastPaymentIntentId"]),
       };
     });
 
@@ -121,7 +168,7 @@ export async function GET(request: Request) {
       students,
       teacherCount: teachers.length,
       studentCount: students.length,
-      note: "消費履歴は現状『直近1回分』のみ（billing.lastProofreadTicketConsume / lastProofreadTicketAt）。",
+      note: null,
     });
   } catch (e) {
     return NextResponse.json(

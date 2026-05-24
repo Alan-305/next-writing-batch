@@ -1,6 +1,4 @@
-import { httpsCallable } from "firebase/functions";
-
-import { getFirebaseFunctions } from "@/lib/firebase/client";
+import { getFirebaseAuth } from "@/lib/firebase/client";
 
 export type AdminAdjustBillingTicketsInput = {
   targetUserId: string;
@@ -16,17 +14,34 @@ export type AdminAdjustBillingTicketsResult = {
   deltaTickets: number;
 };
 
+type ApiJson = AdminAdjustBillingTicketsResult & {
+  message?: string;
+  code?: string;
+};
+
+/**
+ * 管理者チケット手動増減。Next.js API（Admin SDK）経由。
+ * allowlist（NEXT_PUBLIC_FIREBASE_ADMIN_UIDS）に載っている UID なら dev / 本番どちらでも実行可。
+ */
 export async function adminAdjustBillingTickets(
   input: AdminAdjustBillingTicketsInput,
 ): Promise<AdminAdjustBillingTicketsResult> {
-  const fns = getFirebaseFunctions();
-  if (!fns) {
-    throw new Error("Firebase Functions が初期化されていません。");
+  const u = getFirebaseAuth()?.currentUser;
+  if (!u) {
+    throw new Error("ログインが必要です。");
   }
-  const call = httpsCallable<AdminAdjustBillingTicketsInput, AdminAdjustBillingTicketsResult>(
-    fns,
-    "adminAdjustBillingTickets",
-  );
-  const result = await call(input);
-  return result.data;
+  const token = await u.getIdToken();
+  const res = await fetch("/api/admin/adjust-billing-tickets", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  const data = (await res.json()) as ApiJson;
+  if (!res.ok || data.ok !== true) {
+    throw new Error(data.message ?? "チケット調整に失敗しました。");
+  }
+  return data;
 }

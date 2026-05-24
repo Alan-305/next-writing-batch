@@ -278,7 +278,7 @@ export default function AdminBillingPage() {
         </form>
       </div>
       <p className="muted" style={{ marginTop: 16 }}>
-        <Link href="/admin">管理トップへ</Link>
+        <Link href="/admin">ダッシュボードへ</Link>
       </p>
     </main>
   );

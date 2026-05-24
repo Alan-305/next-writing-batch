@@ -1,31 +1,6 @@
-import Link from "next/link";
+import { AdminTenantDashboard } from "@/components/admin/AdminTenantDashboard";
 
-/** 管理者（allowlist uid）専用。運用ハブ /ops とは別 URL。 */
+/** 管理者（allowlist uid）専用ダッシュボード */
 export default function AdminHomePage() {
-  return (
-    <main>
-      <h1>管理</h1>
-      <div className="card">
-        <p style={{ marginTop: 0 }}>
-          このエリアは <code>NEXT_PUBLIC_FIREBASE_ADMIN_UIDS</code> に登録された Firebase Auth uid のみが利用できます。
-        </p>
-        <p style={{ marginBottom: 12 }}>
-          <Link href="/admin/billing">チケット手動調整（管理者・例外返金など）</Link>
-        </p>
-        <p style={{ marginBottom: 12 }}>
-          <Link href="/admin/account-delete">退会・ユーザー削除（Auth・Firestore・提出の削除）</Link>
-        </p>
-        <p style={{ marginBottom: 12 }}>
-          <Link href="/admin/tenant-maintenance">テナントメンテナンス（孤立テナント削除・ID変更）</Link>
-        </p>
-        <p className="muted" style={{ marginBottom: 0 }}>
-          運用バッチは従来どおり{" "}
-          <Link href="/ops">/ops</Link> を利用してください。ヘッダーの <strong>テナント</strong>{" "}
-          プルダウンで代理テナントを選ぶと、同じブラウザでは運用 API もその{" "}
-          <code>{"data/orgs/{id}/"}</code> として解決されます（空欄で Firestore の organizationId に戻ります）。その直下に、当該テナントの{" "}
-          <strong>教員・生徒（想定）の名簿</strong>と人数が出ます。名前は mailto リンクで既定のメールアプリが開きます。
-        </p>
-      </div>
-    </main>
-  );
+  return <AdminTenantDashboard />;
 }

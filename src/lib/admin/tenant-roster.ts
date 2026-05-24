@@ -31,7 +31,7 @@ function isTeacherByRoles(roles: string[]): boolean {
   return lower.includes("teacher") || lower.includes("admin");
 }
 
-async function loadTeacherUidsFromProofreadingSetup(organizationId: string): Promise<Set<string>> {
+export async function loadTeacherUidsFromProofreadingSetup(organizationId: string): Promise<Set<string>> {
   const dir = organizationTeacherSetupDir(organizationId);
   const uids = new Set<string>();
   let names: string[] = [];
