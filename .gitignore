@@ -1,4 +1,5 @@
 .next
+.next*/
 node_modules
 .venv
 # ローカル秘密（GCS 鍵パス・バケット名など）— コミット禁止
@@ -20,6 +21,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .DS_Store
+tsconfig.tsbuildinfo
+**/__pycache__/
+*.pyc
 # Day4 PDF: auto-downloaded Noto Sans JP (OFL). Override path with DAY4_JP_FONT.
 batch/fonts/NotoSansJP-Variable.ttf
 credentials/

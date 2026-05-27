@@ -10,15 +10,14 @@ export type EssayHandwritingIngestResult = {
   usedFallback: boolean;
 };
 
-export function essayOcrProviderMode(): "claude-first" | "gemini-only" {
-  const v = (process.env.ESSAY_OCR_PROVIDER || "gemini-only").trim().toLowerCase();
-  if (v === "claude" || v === "claude-first") return "claude-first";
-  return "gemini-only";
+function essayOcrProviderMode(): "claude-first" | "gemini-only" {
+  const v = (process.env.ESSAY_OCR_PROVIDER || "claude-first").trim().toLowerCase();
+  if (v === "gemini" || v === "gemini-only") return "gemini-only";
+  return "claude-first";
 }
 
 /**
- * 手書き英文 OCR: 既定は Gemini のみ（速さ優先）。Claude キーは添削専用。
- * ESSAY_OCR_PROVIDER=claude-first で旧来の Claude → Gemini フォールバック。
+ * 手書き英文 OCR: 既定は Claude → 失敗時 Gemini。GEMINI のみ指定時は Claude を使わない。
  */
 export async function runEssayHandwritingIngest(opts: {
   parts: EssayHandwritingPart[];
@@ -27,20 +26,13 @@ export async function runEssayHandwritingIngest(opts: {
 }): Promise<EssayHandwritingIngestResult> {
   const claudeKey = (opts.claudeApiKey || "").trim();
   const geminiKey = (opts.geminiApiKey || "").trim();
-  const mode = essayOcrProviderMode();
-
-  if (mode === "gemini-only" && !geminiKey) {
-    throw new Error(
-      "手書き OCR 用の GEMINI_API_KEY（または GOOGLE_API_KEY）が未設定です。運用の「Gemini API キー」画面または Cloud Run の環境変数で設定してください。",
-    );
-  }
-
   if (!claudeKey && !geminiKey) {
     throw new Error(
-      "Claude / Gemini API キーがどちらも未設定です。OCR には GEMINI_API_KEY、添削には NEXT_WRITING_BATCH_KEY を設定してください。",
+      "Claude / Gemini API キーがどちらも未設定です。NEXT_WRITING_BATCH_KEY または GEMINI_API_KEY を設定してください。",
     );
   }
 
+  const mode = essayOcrProviderMode();
   let claudeError: string | null = null;
 
   if (mode === "claude-first" && claudeKey) {
