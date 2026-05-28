@@ -12,3 +12,5 @@ data/*
 !data/task-problems/
 !data/task-problems/*.json
 *.tsbuildinfo
+src/**/* 2/**
+src/**/* 3/**

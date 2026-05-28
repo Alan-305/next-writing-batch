@@ -28,7 +28,7 @@ function SignInInner() {
   const router = useRouter();
   const params = useSearchParams();
   const nextRaw = (params.get("next") ?? "").trim();
-  const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/tensaku-kakumei";
+  const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/hub";
   const inviteOrg = (params.get("org") ?? "").trim();
   /** 教員の既存テナント参加（URL の teacherOrg）。画面には特別な案内は出さない */
   const teacherOrg = (params.get("teacherOrg") ?? "").trim();
@@ -281,7 +281,7 @@ function SignInInner() {
             を設定してください（検証用の Firebase プロジェクト ID は Console の値どおり）。
           </p>
           <p className="muted" style={{ marginBottom: 0 }}>
-            <Link href="/tensaku-kakumei">トップへ戻る</Link>
+            <Link href="/hub">ハブへ戻る</Link>
           </p>
         </div>
       </main>
@@ -322,7 +322,7 @@ function SignInInner() {
             </p>
           ) : null}
           <p style={{ marginBottom: 0 }}>
-            <Link href={safeNext}>続ける（{safeNext}）</Link> ・ <Link href="/tensaku-kakumei">トップへ</Link>
+            <Link href={safeNext}>続ける（{safeNext}）</Link> ・ <Link href="/hub">ハブ</Link>
           </p>
         </div>
       </main>
@@ -378,7 +378,7 @@ function SignInInner() {
           </p>
         )}
         <p className="muted" style={{ marginBottom: 0 }}>
-          <Link href="/tensaku-kakumei">キャンセルしてトップへ</Link>
+          <Link href="/hub">キャンセルしてハブへ</Link>
         </p>
       </div>
     </main>

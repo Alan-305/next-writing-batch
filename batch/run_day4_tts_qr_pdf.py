@@ -52,7 +52,15 @@ def _save_submissions_unlocked(project_root: str, submissions: List[Dict[str, An
 
 
 def _day4_asset_basename(sub: Dict[str, Any]) -> str:
-    """studentId が空の提出向け: submittedByUid や submissionId で一意なファイル名ベースを作る。"""
+    """提出ごとに衝突しないファイル名ベースを作る。"""
+    # 最優先は submissionId（提出ドキュメント単位で一意）。
+    # 試験運用で同一教員UIDが複数生徒分を処理しても上書きしないようにする。
+    sid = str(sub.get("submissionId") or "").strip()
+    if sid:
+        safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in sid)[:80]
+        if safe:
+            return safe
+
     raw_id = str(sub.get("studentId") or "").strip()
     if raw_id:
         safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in raw_id)[:80]
@@ -61,11 +69,6 @@ def _day4_asset_basename(sub: Dict[str, Any]) -> str:
     uid = str(sub.get("submittedByUid") or "").strip()
     if uid:
         safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in uid)[:36]
-        if safe:
-            return safe
-    sid = str(sub.get("submissionId") or "").strip()
-    if sid:
-        safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in sid)[:36]
         if safe:
             return safe
     return "submission"

@@ -10,7 +10,7 @@ export type EssayHandwritingIngestResult = {
   usedFallback: boolean;
 };
 
-function essayOcrProviderMode(): "claude-first" | "gemini-only" {
+export function essayOcrProviderMode(): "claude-first" | "gemini-only" {
   const v = (process.env.ESSAY_OCR_PROVIDER || "claude-first").trim().toLowerCase();
   if (v === "gemini" || v === "gemini-only") return "gemini-only";
   return "claude-first";

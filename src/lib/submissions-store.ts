@@ -133,7 +133,6 @@ export async function syncSubmissionsDiskMirrorToFirestore(organizationId: strin
         submissionId: sid,
         organizationId: oid,
       };
-      // ディスク mirror を Firestore 正へ反映するときは、古い day4.error などの残留を防ぐため全置換する。
       batch.set(col.doc(sid), normalized, { merge: false });
     }
     await batch.commit();
@@ -222,7 +221,6 @@ export async function getSubmissionByIdInOrganization(
 
 export type SubmissionWithOrganization = { submission: Submission; organizationId: string };
 
-/** 受付 ID はテナント横断で一意とし、公開用リンクなどで検索する。 */
 export async function findSubmissionAcrossOrganizations(
   submissionId: string,
 ): Promise<SubmissionWithOrganization | null> {
@@ -231,7 +229,6 @@ export async function findSubmissionAcrossOrganizations(
   if (!sid) return null;
 
   const db = getAdminFirestore();
-  /** コレクション group で `documentId()` に UUID だけを渡すと「奇数セグメント」で無効。フィールドで一意検索する。 */
   const byId = await db.collectionGroup("submissions").where("submissionId", "==", sid).limit(1).get();
   if (!byId.empty) {
     const doc = byId.docs[0]!;
@@ -239,7 +236,6 @@ export async function findSubmissionAcrossOrganizations(
     return { submission: doc.data() as Submission, organizationId };
   }
 
-  // 旧データ互換: ディスクのみ残っている場合のフォールバック
   await migrateLegacyOrgLayoutOnce();
   const orgIds = await listOrganizationIdsOnDisk();
   for (const oid of orgIds) {
@@ -254,14 +250,10 @@ export async function getSubmissionById(submissionId: string): Promise<Submissio
   return hit?.submission ?? null;
 }
 
-/** 全角半角・連続空白をそろえて比較 */
 function normalizeLookupToken(s: string): string {
   return s.normalize("NFKC").trim().replace(/\s+/g, " ");
 }
 
-/**
- * 同一テナント内で、課題ID・学籍番号・氏名が一致する提出のうち最新の1件。
- */
 export async function findLatestSubmissionByStudentLookup(
   organizationId: string,
   args: { taskId: string; studentId: string; studentName: string },
@@ -283,9 +275,6 @@ export async function findLatestSubmissionByStudentLookup(
   return matches[0] ?? null;
 }
 
-/**
- * ログイン提出: 同一テナント内で taskId と submittedByUid が一致する最新の1件。
- */
 export async function findLatestSubmissionByUidAndTask(
   organizationId: string,
   uid: string,

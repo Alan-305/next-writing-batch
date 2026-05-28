@@ -280,7 +280,7 @@ export function TextareaWithFileDrop({
             if (noApiKey) {
               setStatus("");
               onNotify?.(
-                "手書き OCR 用の API キーがありません。NEXT_WRITING_BATCH_KEY（Claude）または GEMINI_API_KEY（Gemini）を設定してください。",
+                "手書き OCR 用の GEMINI_API_KEY がありません。運用の「Gemini API キー」画面で設定してください。",
                 "error",
               );
               return;

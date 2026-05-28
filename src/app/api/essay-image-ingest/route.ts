@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
-import { runEssayHandwritingIngest } from "@/lib/essay-handwriting-ingest";
+import { essayOcrProviderMode, runEssayHandwritingIngest } from "@/lib/essay-handwriting-ingest";
 import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
 import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
 
@@ -34,7 +34,7 @@ function isMediaFile(file: File): boolean {
 
 /**
  * 提出フォームの英文欄向け: 手書き写真・HEIC・PDF を転記。
- * 既定は Claude、失敗・混雑時は Gemini に自動フォールバック（GEMINI_API_KEY がある場合）。
+ * 既定は Gemini のみ（ESSAY_OCR_PROVIDER=gemini-only）。添削は Claude 専用。
  */
 export async function POST(request: Request) {
   const auth = await verifyBearerUidAndOrganization(request);
@@ -42,11 +42,21 @@ export async function POST(request: Request) {
 
   const claudeKey = resolveEffectiveAnthropicApiKey();
   const geminiKey = resolveEffectiveGeminiApiKey();
+  const ocrMode = essayOcrProviderMode();
+  if (ocrMode === "gemini-only" && !geminiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "手書き OCR 用の GEMINI_API_KEY（または GOOGLE_API_KEY）がありません。運用の「Gemini API キー」画面で設定してください。",
+      },
+      { status: 503 },
+    );
+  }
   if (!claudeKey && !geminiKey) {
     return NextResponse.json(
       {
         error:
-          "手書き OCR 用の API キーがありません。NEXT_WRITING_BATCH_KEY（Claude）または GEMINI_API_KEY（Gemini）を設定してください。",
+          "OCR 用 GEMINI_API_KEY または（claude-first 時）NEXT_WRITING_BATCH_KEY が必要です。",
       },
       { status: 503 },
     );
