@@ -21,7 +21,8 @@ cd /path/to/next-writing-batch
 3. 環境変数（`.env` ではなくシェルで export する想定）  
    - **Day3**: `NEXT_WRITING_BATCH_KEY`（Secret Manager のシークレット ID および Cloud Run の環境変数名）  
    - **Day4（GCS）**: `GCS_BUCKET_NAME`, `GOOGLE_APPLICATION_CREDENTIALS`（サービスアカウントJSONのパス）  
-   - **署名URL**: `GCS_SIGNED_URL_EXPIRE_DAYS`（省略時 **180** 日）  
+   - **QR 用の安定 URL**: `NWB_PUBLIC_APP_URL` または `AUDIO_BASE_URL`（`/api/day4-audio/...` で配信。再生は既定 **30 日**・`DAY4_AUDIO_RETENTION_DAYS`）
+   - **署名URL（フォールバック）**: `GCS_SIGNED_URL_EXPIRE_DAYS`（V4 の上限 **7** 日。超過分は切り詰め）  
    - GCS を初めて使う場合のコンソール手順は **「0.5 GCS 初回セットアップ」** を参照してください。
 4. 生徒画面・管理画面: `npm install && npm run dev`（別ターミナル）  
    - スマホから **LAN の IP（例 `192.168.x.x:3001`）** で開くには、開発サーバーが **`0.0.0.0` で待ち受け**る必要があります（本プロジェクトの `npm run dev` は既にそうなっています）。  
@@ -46,7 +47,7 @@ cd /path/to/next-writing-batch
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcp/nexus-day4.json"
 export GCS_BUCKET_NAME="あなたのバケット名"
-export GCS_SIGNED_URL_EXPIRE_DAYS=180   # 任意
+export GCS_SIGNED_URL_EXPIRE_DAYS=7   # フォールバック時のみ（V4 上限 7 日）
 ```
 
 7. **接続確認**（テスト用オブジェクトを 1 件アップロードしてから削除します）:

@@ -5,7 +5,7 @@ import shutil
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from day4_assets import ensure_dirs, resolve_paths
@@ -13,7 +13,12 @@ from day4_pdf import render_return_pdf
 from day4_qr import make_qr_png
 from day4_tts_local import synthesize_mp3_to_path
 
-from day4_gcs import upload_mp3_and_get_signed_url
+from day4_gcs import (
+    GCS_V4_SIGNED_URL_MAX_SECONDS,
+    public_audio_url_for_day4,
+    upload_mp3_and_get_signed_url,
+    upload_mp3_to_gcs,
+)
 
 from nl_essay_feedback import pdf_feedback_lines_for_day4, read_aloud_essay_for_day4
 
@@ -76,6 +81,16 @@ def _day4_asset_basename(sub: Dict[str, Any]) -> str:
 
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _day4_audio_expires_at_iso() -> str:
+    raw = (os.environ.get("DAY4_AUDIO_RETENTION_DAYS") or "30").strip() or "30"
+    try:
+        days = int(raw)
+    except ValueError:
+        days = 30
+    days = max(1, min(days, 365))
+    return (datetime.now() + timedelta(days=days)).isoformat(timespec="seconds")
 
 
 def _signed_url_or_local(*, local_audio_url: str) -> str:
@@ -278,13 +293,25 @@ def main() -> None:
                     audio_url = f"{base}/output/audio/{task_id}/{mp3_filename}"
             # 明示的に --allow-local-qr が付いている場合は、GCS設定が見えていてもローカルURLを優先する。
             elif gcs_bucket and not args.allow_local_qr:
-                expires_days = int(os.environ.get("GCS_SIGNED_URL_EXPIRE_DAYS", "180").strip() or "180")
                 object_name = f"audio/{task_id}/{mp3_filename}"
-                audio_url = upload_mp3_and_get_signed_url(
-                    local_path=mp3_path,
-                    object_name=object_name,
-                    expires_days=expires_days,
-                )
+                stable_url = public_audio_url_for_day4(task_id=task_id, mp3_filename=mp3_filename)
+                if stable_url:
+                    upload_mp3_to_gcs(local_path=mp3_path, object_name=object_name)
+                    audio_url = stable_url
+                else:
+                    expires_days = int(os.environ.get("GCS_SIGNED_URL_EXPIRE_DAYS", "7").strip() or "7")
+                    max_days = GCS_V4_SIGNED_URL_MAX_SECONDS // 86400
+                    if expires_days > max_days:
+                        print(
+                            f"[day4] warning: GCS 署名 URL は最大 {max_days} 日です。"
+                            f" GCS_SIGNED_URL_EXPIRE_DAYS={expires_days} は {max_days} 日に切り詰めます。"
+                            " QR 用には AUDIO_BASE_URL または NWB_PUBLIC_APP_URL を設定してください。"
+                        )
+                    audio_url = upload_mp3_and_get_signed_url(
+                        local_path=mp3_path,
+                        object_name=object_name,
+                        expires_days=expires_days,
+                    )
             elif args.allow_local_qr:
                 # ローカルQR: GCS なしで音声 URL を /output/ または AUDIO_BASE_URL 下に
                 base = (args.audio_base_url or "").rstrip("/")
@@ -336,6 +363,7 @@ def main() -> None:
                 s["day4"] = {
                     "audio_path": mp3_rel,
                     "audio_url": audio_url,
+                    "audio_expires_at": _day4_audio_expires_at_iso(),
                     "pdf_path": pdf_rel,
                     "generatedAt": _now_iso(),
                 }

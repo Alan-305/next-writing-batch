@@ -56,6 +56,8 @@ export type Submission = SubmissionInput & {
   day4?: {
     audio_path?: string;
     audio_url?: string;
+    /** 音声 QR / /api/day4-audio の再生可能期限（ISO）。Day4 確定時に設定。 */
+    audio_expires_at?: string;
     qr_path?: string;
     pdf_path?: string;
     generatedAt?: string;
