@@ -21,7 +21,8 @@ export default async function DeliverablesPage() {
       <h1>納品ZIP（ダウンロード）</h1>
       <p className="muted">
         課題単位・個別選択で作成した ZIP がここに並びます。フォルダ実体は <code>output/zips/</code> です。
-        <strong>課題ID</strong>列はファイル名からの推定です（<code>selection_*.zip</code> は複数提出のため「個別選択」）。
+        ファイル名は <code>課題ID_生徒_件数pdfs_日時.pdf.zip</code> 形式です（課題まとめは生徒名を省略）。
+        <strong>課題ID</strong>列はファイル名先頭から推定します。
       </p>
       <p>
         <Link href="/ops">運用ハブへ</Link>

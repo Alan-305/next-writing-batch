@@ -51,6 +51,84 @@ def _safe_arc_segment(s: str) -> str:
     return re.sub(r"[^a-zA-Z0-9._-]", "_", t)[:120]
 
 
+def _student_label_for_filename(submission: Dict[str, Any]) -> str:
+    """ZIP ファイル名用の生徒ラベル（学籍番号優先、英字氏名があれば併記）。"""
+    sid = str(submission.get("studentId") or "").strip()
+    name = str(submission.get("studentName") or "").strip()
+    safe_sid = _safe_arc_segment(sid) if sid else ""
+    safe_name = _safe_arc_segment(name) if name else ""
+    readable_name = safe_name.strip("_-")
+    if readable_name and not readable_name.replace("_", "").isdigit():
+        if safe_sid and safe_sid != readable_name:
+            return f"{safe_sid}-{readable_name}"[:48]
+        return readable_name[:48]
+    if safe_sid:
+        return safe_sid[:48]
+    return _safe_arc_segment(str(submission.get("submissionId") or ""))[:24] or "student"
+
+
+def _unique_ordered(items: List[str]) -> List[str]:
+    seen: Set[str] = set()
+    out: List[str] = []
+    for x in items:
+        if not x or x in seen:
+            continue
+        seen.add(x)
+        out.append(x)
+    return out
+
+
+def _truncate_zip_stem(stem: str, *, max_len: int = 176) -> str:
+    if len(stem) <= max_len:
+        return stem
+    return stem[:max_len].rstrip("_-.")
+
+
+def _build_zip_out_name(
+    submissions: List[Dict[str, Any]],
+    *,
+    mode: str,
+    pdf_count: int,
+    task_id: str = "",
+) -> str:
+    """
+    納品 ZIP のファイル名を組み立てる。
+    例: 2026-4_111-222_2pdfs_20260605_143022.pdf.zip
+        2026-4_20pdfs_20260605_143022.pdf.zip（課題まとめ）
+    """
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    count_part = f"{max(0, pdf_count)}pdfs"
+
+    task_ids = _unique_ordered(
+        [str(s.get("taskId") or "").strip() for s in submissions if str(s.get("taskId") or "").strip()]
+    )
+    if mode == "task" and task_id.strip():
+        task_part = _safe_arc_segment(task_id.strip())
+    elif len(task_ids) == 1:
+        task_part = _safe_arc_segment(task_ids[0])
+    elif len(task_ids) > 1:
+        task_part = f"tasks-{len(task_ids)}"
+    else:
+        task_part = "no-task"
+
+    labels = _unique_ordered([_student_label_for_filename(s) for s in submissions])
+
+    if mode == "task":
+        # 課題単位は件数が多くなりがちなので生徒名は省略
+        stem = f"{task_part}_{count_part}_{stamp}"
+    else:
+        max_labels = 4
+        if len(labels) <= max_labels:
+            students_part = "-".join(labels) if labels else "students"
+        elif labels:
+            students_part = "-".join(labels[:3]) + f"-他{len(labels) - 3}"
+        else:
+            students_part = "students"
+        stem = f"{task_part}_{students_part}_{count_part}_{stamp}"
+
+    return f"{_truncate_zip_stem(stem)}.pdf.zip"
+
+
 def _pdf_pairs_from_submissions(
     project_root: str,
     submissions: List[Dict[str, Any]],
@@ -144,8 +222,11 @@ def _zip_by_submissions(project_root: str, submission_ids: List[str]) -> str:
         for sid in unique:
             if sid not in by_id:
                 missing.append(f"{sid}(not_found)")
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_name = f"selection_{stamp}_{len(unique)}subs.pdf.zip"
+        out_name = _build_zip_out_name(
+            selected,
+            mode="selection",
+            pdf_count=len(pairs),
+        )
         return _write_zip(project_root, out_name, pairs, missing)
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
@@ -170,8 +251,12 @@ def _zip_by_task(project_root: str, task_id: str) -> str:
     work_dir = tempfile.mkdtemp(prefix="zip_task_", dir=zips_parent)
     try:
         pairs, missing = _pdf_pairs_from_submissions(project_root, eligible, work_dir)
-        safe_tid = _safe_arc_segment(tid)
-        out_name = f"{safe_tid}.pdf.zip"
+        out_name = _build_zip_out_name(
+            eligible,
+            mode="task",
+            pdf_count=len(pairs),
+            task_id=tid,
+        )
         return _write_zip(project_root, out_name, pairs, missing)
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)

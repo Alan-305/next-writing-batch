@@ -19,8 +19,8 @@ export type DeliverableZipRow = {
   size: number;
   mtimeMs: number;
   /**
-   * 課題単位 ZIP（`{taskId}.zip`）のとき、ファイル名から読み取った課題ID。
-   * `selection_*.zip` の個別選択 ZIP は null（一覧では「個別選択」と表示）。
+   * ファイル名から推定した課題ID（例: `2026-4_111-222_2件_...pdf.zip` → `2026-4`）。
+   * 複数課題や旧形式は null。
    */
   taskIdFromName: string | null;
 };
@@ -31,8 +31,12 @@ export type DeliverableZipRow = {
 export function taskIdFromDeliverableZipName(name: string): string | null {
   if (!isSafeDeliverableZipName(name) || !name.endsWith(".zip")) return null;
   const stem = name.slice(0, -4).replace(/\.pdf$/i, "");
-  if (stem.startsWith("selection_")) return null;
-  return stem;
+  if (!stem || stem.startsWith("selection_")) return null;
+  const first = stem.split("_")[0]?.trim() ?? "";
+  if (!first || first === "tasks" || first.startsWith("tasks-") || first === "no-task") {
+    return null;
+  }
+  return first;
 }
 
 export async function listDeliverableZips(): Promise<DeliverableZipRow[]> {
