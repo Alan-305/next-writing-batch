@@ -14,6 +14,9 @@ type Props = {
   master: TaskProblemsMaster | null;
   taskRubricDefaults: Record<string, number>;
   teacherSetupDefaults: Record<string, number>;
+  /** API がサーバー側で解決した再生 URL（クライアント単体では env が無いため必須） */
+  day4AudioPlayUrl?: string;
+  day4AudioQrUrl?: string;
 };
 
 export function OpsSubmissionDetailBody({
@@ -21,6 +24,8 @@ export function OpsSubmissionDetailBody({
   master,
   taskRubricDefaults,
   teacherSetupDefaults,
+  day4AudioPlayUrl = "",
+  day4AudioQrUrl = "",
 }: Props) {
   const day4 = submission.day4;
   const hasDay4Pdf = Boolean(String(day4?.pdf_path ?? "").trim()) && !day4?.error;
@@ -29,8 +34,10 @@ export function OpsSubmissionDetailBody({
   const qrPath = submission.day4?.qr_path ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
-  const audioHref = audioUrl ? resolveDay4AudioPlayUrl(audioUrl) : "";
-  const audioQrUrl = audioUrl ? resolveDay4AudioQrUrl(audioUrl) : "";
+  const audioHref =
+    day4AudioPlayUrl.trim() || (audioUrl ? resolveDay4AudioPlayUrl(audioUrl) : "");
+  const audioQrUrl =
+    day4AudioQrUrl.trim() || (audioUrl ? resolveDay4AudioQrUrl(audioUrl) : "");
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
   const taskMismatch = submissionProofreadTaskMismatch(submission);

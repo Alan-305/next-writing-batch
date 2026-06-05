@@ -9,6 +9,7 @@ import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { loadTaskRubricDefaultScores } from "@/lib/task-rubric-default-scores";
 import { loadTeacherProofreadingSetup } from "@/lib/teacher-proofreading-setup-store";
+import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
 
 type RouteContext = { params: Promise<{ submissionId: string }> };
 
@@ -44,6 +45,10 @@ export async function GET(request: Request, context: RouteContext) {
   const teacherSetupDefaults =
     master && teacherSetupJson ? defaultScoresFromTeacherSetup(master, teacherSetupJson) : {};
 
+  const storedAudioUrl = String(submission.day4?.audio_url ?? "").trim();
+  const day4AudioPlayUrl = storedAudioUrl ? resolveDay4AudioPlayUrl(storedAudioUrl) : "";
+  const day4AudioQrUrl = storedAudioUrl ? resolveDay4AudioQrUrl(storedAudioUrl) : "";
+
   return NextResponse.json({
     ok: true,
     submission,
@@ -51,5 +56,7 @@ export async function GET(request: Request, context: RouteContext) {
     taskRubricDefaults,
     teacherSetupJson,
     teacherSetupDefaults,
+    day4AudioPlayUrl,
+    day4AudioQrUrl,
   });
 }

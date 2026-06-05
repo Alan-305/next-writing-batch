@@ -15,6 +15,8 @@ type Bundle = {
   master?: TaskProblemsMaster | null;
   taskRubricDefaults?: Record<string, number>;
   teacherSetupDefaults?: Record<string, number>;
+  day4AudioPlayUrl?: string;
+  day4AudioQrUrl?: string;
   message?: string;
 };
 
@@ -101,6 +103,8 @@ export function OpsSubmissionDetailClient() {
       master={bundle.master ?? null}
       taskRubricDefaults={bundle.taskRubricDefaults ?? {}}
       teacherSetupDefaults={bundle.teacherSetupDefaults ?? {}}
+      day4AudioPlayUrl={bundle.day4AudioPlayUrl ?? ""}
+      day4AudioQrUrl={bundle.day4AudioQrUrl ?? ""}
     />
   );
 }
