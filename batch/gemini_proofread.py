@@ -12,12 +12,14 @@ if _THIS_DIR not in sys.path:
 from gemini_working_model import get_working_model
 
 from nl_essay_feedback import (  # noqa: E402
+    build_final_version_refinement_prompt,
     build_nl_essay_prompt,
     finalize_final_version_for_display,
     grammar_body_from_merged_explanation,
     merge_proofread_explanation_for_storage,
     parse_free_writing_feedback,
     polish_final_essay_paragraphs,
+    strip_final_essay_artifacts,
 )
 
 
@@ -63,6 +65,54 @@ def _generation_response_text(response: object) -> str:
         return "".join(parts).strip()
     except Exception:
         return ""
+
+
+def _refine_final_version_from_content_advice(
+    *,
+    working_model: object,
+    question: str,
+    original_essay: str,
+    draft_final: str,
+    content_comment: str,
+    grammar_bullets: str,
+    multipart: bool,
+) -> str:
+    """
+    第1パスで生成した完成版を、content_comment（①②③・【ヒント】）と文法修正に
+    忠実に沿うよう第2パスで書き直す。失敗時は下書きをそのまま返す。
+    """
+    draft = (draft_final or "").strip()
+    cc = (content_comment or "").strip()
+    if not draft or not cc or "【ヒント】" not in cc:
+        return draft
+
+    prompt = build_final_version_refinement_prompt(
+        question=question,
+        original_essay=original_essay,
+        draft_final=draft,
+        content_comment=cc,
+        grammar_bullets=grammar_bullets,
+        multipart=multipart,
+    )
+    try:
+        response = working_model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.15,
+                "top_p": 0.9,
+                "top_k": 20,
+                "max_output_tokens": 8192,
+            },
+        )
+        raw = _generation_response_text(response)
+        if not raw:
+            return draft
+        refined = strip_final_essay_artifacts(
+            finalize_final_version_for_display(raw, append_word_count=False)
+        ).strip()
+        return refined or draft
+    except Exception:
+        return draft
 
 
 def _generation_error_hint(response: object) -> str:
@@ -140,6 +190,18 @@ def proofread_one(
 
             if not (final_version or "").strip() and "採点エラー" in (evaluation or ""):
                 final_version = finalize_final_version_for_display(original_essay, append_word_count=False)
+
+            refined_final = _refine_final_version_from_content_advice(
+                working_model=working_model,
+                question=question,
+                original_essay=original_essay,
+                draft_final=final_version or "",
+                content_comment=content_comment or "",
+                grammar_bullets=explanation or "",
+                multipart=multipart,
+            )
+            if (refined_final or "").strip():
+                final_version = refined_final
 
             read_aloud = finalize_final_version_for_display(
                 final_version or "",
