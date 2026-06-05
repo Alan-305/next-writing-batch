@@ -64,16 +64,28 @@ def _resolve_rel_file(project_root: str, output_root: str, rel: str) -> Optional
     return None
 
 
-def _pdf_dest_basename(submission: Dict[str, Any]) -> str:
-    student_id = _safe_arc_segment(str(submission.get("studentId") or "student"))
-    student_name = str(submission.get("studentName") or "").strip().replace(" ", "_")
-    name_part = _safe_arc_segment(student_name) if student_name else ""
-    sid = str(submission.get("submissionId") or "").strip()
-    if name_part:
-        return f"{student_id}_{name_part}.pdf"
-    if sid:
-        return f"{_safe_arc_segment(sid)}.pdf"
-    return f"{student_id}.pdf"
+def pdf_filename_for_submission(submission: Dict[str, Any]) -> str:
+    """
+    人間が識別しやすい PDF ファイル名。
+    例: 2026-4_111_naoki.pdf / 2026-4_400438.pdf（氏名が日本語のみのときは学籍のみ）
+    """
+    task = _safe_arc_segment(str(submission.get("taskId") or "task"))
+    raw_student_id = str(submission.get("studentId") or "").strip()
+    safe_student = _safe_arc_segment(raw_student_id) if raw_student_id else ""
+    name = str(submission.get("studentName") or "").strip().replace(" ", "_")
+    safe_name = _safe_arc_segment(name) if name else ""
+    readable_name = safe_name.strip("_-")
+    has_ascii_name = bool(re.search(r"[a-zA-Z]", readable_name))
+
+    if safe_student and has_ascii_name:
+        stem = f"{task}_{safe_student}_{readable_name}"
+    elif safe_student:
+        stem = f"{task}_{safe_student}"
+    else:
+        short_sub = _safe_arc_segment(str(submission.get("submissionId") or ""))[:8]
+        stem = f"{task}_{short_sub or 'unknown'}"
+
+    return f"{stem[:160]}.pdf"
 
 
 def _gcs_object_for_submission(submission: Dict[str, Any]) -> Optional[str]:
@@ -203,7 +215,7 @@ def ensure_submission_pdf_abs(
             return abs_path, None
 
     os.makedirs(work_dir, exist_ok=True)
-    base = _pdf_dest_basename(submission)
+    base = pdf_filename_for_submission(submission)
     dest = os.path.join(work_dir, base)
 
     wants_qr = _submission_wants_qr_in_pdf(submission)

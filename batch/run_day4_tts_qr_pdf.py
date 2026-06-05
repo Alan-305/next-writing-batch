@@ -22,6 +22,7 @@ from day4_gcs import (
     upload_qr_png_to_gcs,
 )
 
+from day4_pdf_delivery import pdf_filename_for_submission
 from nl_essay_feedback import pdf_feedback_lines_for_day4, read_aloud_essay_for_day4
 
 from env_local import load_env_local
@@ -336,10 +337,7 @@ def main() -> None:
                 qr_rel = _public_output_rel("qr", task_id, f"{student_id}.png")
                 qr_arg = qr
 
-            name_part = student_name.replace(" ", "_") if student_name else ""
-            pdf_filename = (
-                f"{student_id}_{name_part}.pdf" if name_part else f"{student_id}.pdf"
-            )
+            pdf_filename = pdf_filename_for_submission(s)
             pdf_path = os.path.join(
                 paths.pdf_dir, task_id, pdf_filename
             )

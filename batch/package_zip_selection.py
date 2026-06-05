@@ -18,7 +18,7 @@ import zipfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from day4_pdf_delivery import ensure_submission_pdf_abs, zip_eligible_submission
+from day4_pdf_delivery import ensure_submission_pdf_abs, pdf_filename_for_submission, zip_eligible_submission
 from org_paths import submissions_json
 
 
@@ -153,10 +153,7 @@ def _pdf_pairs_from_submissions(
             missing.append(skip or f"{sid}(pdf_unavailable)")
             continue
 
-        task_id = _safe_arc_segment(str(s.get("taskId") or "task"))
-        student = _safe_arc_segment(str(s.get("studentName") or s.get("studentId") or sid))
-        base = os.path.basename(abs_path)
-        arc = f"{task_id}/{student}_{base}"
+        arc = pdf_filename_for_submission(s)
         pairs.append((abs_path, arc))
 
     return pairs, missing
