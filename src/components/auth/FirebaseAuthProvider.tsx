@@ -99,7 +99,9 @@ export function FirebaseAuthProvider({
           setUser(result.user);
           const stored = sessionStorage.getItem(AUTH_REDIRECT_NEXT_KEY);
           const next =
-            stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : "/hub";
+            stored && stored.startsWith("/") && !stored.startsWith("//") && stored !== "/hub"
+              ? stored
+              : "/";
           queueMicrotask(() => {
             requestAnimationFrame(() => {
               sessionStorage.removeItem(AUTH_REDIRECT_NEXT_KEY);

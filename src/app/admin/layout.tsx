@@ -9,7 +9,7 @@ export default function AdminLayout({ children }: Readonly<{ children: React.Rea
       <div className="app-shell app-shell--teacher">
         <header className="app-shell-header app-shell-header--teacher">
           <div className="app-shell-header-inner">
-            <Link href="/hub" className="app-shell-brand">
+            <Link href="/tensaku-kakumei" className="app-shell-brand">
               Next Writing Batch
             </Link>
             <span className="app-shell-badge">管理</span>

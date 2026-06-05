@@ -19,6 +19,7 @@ import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
 import { useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { resetRedirectResultCacheForNewFlow } from "@/lib/firebase/redirect-result-once";
+import { resolveSignInNextPath, signInPublicHomePath } from "@/lib/auth/sign-in-navigation";
 
 function isPopupBlocked(e: unknown): boolean {
   return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "auth/popup-blocked";
@@ -28,7 +29,12 @@ function SignInInner() {
   const router = useRouter();
   const params = useSearchParams();
   const nextRaw = (params.get("next") ?? "").trim();
-  const safeNext = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/hub";
+  const [hostname, setHostname] = useState("");
+  useEffect(() => {
+    setHostname(window.location.hostname);
+  }, []);
+  const publicHome = signInPublicHomePath(hostname || undefined);
+  const safeNext = resolveSignInNextPath(nextRaw, hostname || undefined);
   const inviteOrg = (params.get("org") ?? "").trim();
   /** 教員の既存テナント参加（URL の teacherOrg）。画面には特別な案内は出さない */
   const teacherOrg = (params.get("teacherOrg") ?? "").trim();
@@ -281,7 +287,7 @@ function SignInInner() {
             を設定してください（検証用の Firebase プロジェクト ID は Console の値どおり）。
           </p>
           <p className="muted" style={{ marginBottom: 0 }}>
-            <Link href="/hub">ハブへ戻る</Link>
+            <Link href="/tensaku-kakumei">トップへ戻る</Link>
           </p>
         </div>
       </main>
@@ -322,7 +328,7 @@ function SignInInner() {
             </p>
           ) : null}
           <p style={{ marginBottom: 0 }}>
-            <Link href={safeNext}>続ける（{safeNext}）</Link> ・ <Link href="/hub">ハブ</Link>
+            <Link href={safeNext}>続ける（{safeNext}）</Link>
           </p>
         </div>
       </main>
@@ -378,7 +384,7 @@ function SignInInner() {
           </p>
         )}
         <p className="muted" style={{ marginBottom: 0 }}>
-          <Link href="/hub">キャンセルしてハブへ</Link>
+          <Link href={publicHome}>キャンセルして戻る</Link>
         </p>
       </div>
     </main>

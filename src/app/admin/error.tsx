@@ -20,7 +20,7 @@ export default function AdminError({
           <button type="button" onClick={() => reset()}>
             もう一度試す
           </button>{" "}
-          <Link href="/hub">ハブへ</Link> ・ <Link href="/sign-in?next=%2Fadmin">ログインへ</Link>
+          <Link href="/tensaku-kakumei">トップへ</Link> ・ <Link href="/sign-in?next=%2Fadmin">ログインへ</Link>
         </p>
       </div>
     </main>
