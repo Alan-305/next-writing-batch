@@ -6,7 +6,7 @@ import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-di
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
 import { findSubmissionAcrossOrganizations } from "@/lib/submissions-store";
-import { absoluteUrlForAudioQr, hrefForAudioUrl } from "@/lib/audio-url-href";
+import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
 
 export type StudentResultPublishedModel = {
   submissionId: string;
@@ -50,9 +50,9 @@ export async function loadStudentResultPublishedView(
   const qrPath = submission.day4?.qr_path?.trim() ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
-  const audioSrc = audioUrl ? hrefForAudioUrl(audioUrl) : "";
   const requestOrigin = (options?.requestOrigin ?? "").trim();
-  const audioQrEncodeUrl = audioSrc ? absoluteUrlForAudioQr(audioSrc, requestOrigin) : "";
+  const audioSrc = audioUrl ? resolveDay4AudioPlayUrl(audioUrl, requestOrigin) : "";
+  const audioQrEncodeUrl = audioUrl ? resolveDay4AudioQrUrl(audioUrl, requestOrigin) : "";
 
   const explanationHtml = studentExplanationToDisplayHtml(sr.explanation ?? "");
   const { revised: finalRevised } = resolveFinalEssayForStudentDisplay({

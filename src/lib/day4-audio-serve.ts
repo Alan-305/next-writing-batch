@@ -20,6 +20,15 @@ function segmentOk(seg: string): boolean {
  * QR / 生徒向け結果で使う安定 URL 用（署名付き URL は使わない）。
  */
 export async function getDay4AudioResponse(taskId: string, filename: string): Promise<NextResponse> {
+  try {
+    return await getDay4AudioResponseInner(taskId, filename);
+  } catch (e) {
+    console.error("[day4-audio] unhandled error", { taskId, filename, e });
+    return NextResponse.json({ message: "Internal error" }, { status: 500 });
+  }
+}
+
+async function getDay4AudioResponseInner(taskId: string, filename: string): Promise<NextResponse> {
   const tid = taskId.trim();
   const fn = filename.trim();
   if (!segmentOk(tid) || !segmentOk(fn) || !fn.toLowerCase().endsWith(".mp3")) {

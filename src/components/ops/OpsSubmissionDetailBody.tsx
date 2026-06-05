@@ -4,7 +4,7 @@ import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEdito
 import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
 import { formatDateTimeIso } from "@/lib/format-date";
-import { hrefForAudioUrl } from "@/lib/audio-url-href";
+import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
 import { submissionProofreadTaskMismatch } from "@/lib/submission-proofread-task-mismatch";
 import type { Submission } from "@/lib/submissions-store";
 import type { TaskProblemsMaster } from "@/lib/task-problems-core";
@@ -29,7 +29,8 @@ export function OpsSubmissionDetailBody({
   const qrPath = submission.day4?.qr_path ?? "";
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
-  const audioHref = audioUrl ? hrefForAudioUrl(audioUrl) : "";
+  const audioHref = audioUrl ? resolveDay4AudioPlayUrl(audioUrl) : "";
+  const audioQrUrl = audioUrl ? resolveDay4AudioQrUrl(audioUrl) : "";
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
   const taskMismatch = submissionProofreadTaskMismatch(submission);
@@ -201,7 +202,7 @@ export function OpsSubmissionDetailBody({
                 <p>
                   <b>QR（この画像をスキャン）</b>
                 </p>
-                <StudentResultAudioQr audioHref={audioHref} />
+                <StudentResultAudioQr audioHref={audioHref} serverAbsolute={audioQrUrl} />
                 <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
                   音声 URL からアプリ内で QR を生成しています（PNG ファイルが無くても表示されます）。
                 </p>
@@ -223,20 +224,11 @@ export function OpsSubmissionDetailBody({
                 </p>
               </div>
             ) : null}
-            {audioUrl ? (
+            {audioHref ? (
               <p style={{ wordBreak: "break-all" }}>
-                <b>音声URL（QRに埋め込んだ文字列）</b>: {audioUrl}
-                {audioUrl.startsWith("/") ? (
-                  <>
-                    {" "}
-                    <a href={audioUrl}>PCで開いて試聴</a>
-                  </>
-                ) : (
-                  <>
-                    {" "}
-                    <a href={audioUrl}>音声URLを開く</a>
-                  </>
-                )}
+                <b>音声URL（再生・QR用）</b>: {audioHref}
+                {" "}
+                <a href={audioHref}>PCで開いて試聴</a>
               </p>
             ) : null}
             <p className="muted" style={{ marginTop: 8 }}>

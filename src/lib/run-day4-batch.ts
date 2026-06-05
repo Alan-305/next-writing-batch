@@ -107,9 +107,10 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
   if (oid) {
     childEnv.NWB_ORGANIZATION_ID = oid;
   }
-  // Day4 バッチが QR 用の安定 URL を組み立てる（GCS 署名 URL の 7 日制限を避ける）
-  if (!(childEnv.AUDIO_BASE_URL ?? "").trim() && (childEnv.NWB_PUBLIC_APP_URL ?? "").trim()) {
-    childEnv.AUDIO_BASE_URL = (childEnv.NWB_PUBLIC_APP_URL ?? "").trim();
+  // Day4 の QR / audio_url は必ず動作する Cloud Run URL を使う（壊れた独自ドメインを避ける）
+  const publicApp = (childEnv.NWB_PUBLIC_APP_URL ?? "").trim();
+  if (publicApp) {
+    childEnv.AUDIO_BASE_URL = publicApp;
   }
   try {
     const { stdout, stderr } = await execFileAsync(python, args, {

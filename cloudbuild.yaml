@@ -137,6 +137,20 @@ steps:
             --quiet \
             --update-env-vars="^|^$$resend_from_entry"
         fi
+        # 壊れた独自ドメインの AUDIO_BASE_URL を上書きし、Day4 音声は Cloud Run URL に統一する。
+        nwb_url=""
+        while IFS= read -r line || [ -n "$$line" ]; do
+          line=$$(printf '%s' "$$line" | sed 's/\r$$//')
+          [[ "$$line" == NWB_PUBLIC_APP_URL=* ]] || continue
+          nwb_url="$${line#NWB_PUBLIC_APP_URL=}"
+        done < /workspace/firebase-build.env
+        if [[ -n "$$nwb_url" ]]; then
+          gcloud run services update "${_SERVICE_NAME}" \
+            --region="${_REGION}" \
+            --project="${PROJECT_ID}" \
+            --quiet \
+            --update-env-vars="AUDIO_BASE_URL=$$nwb_url"
+        fi
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE_NAME}:$BUILD_ID

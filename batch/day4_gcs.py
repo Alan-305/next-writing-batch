@@ -75,7 +75,8 @@ def public_audio_url_for_day4(*, task_id: str, mp3_filename: str) -> Optional[st
     QR / Firestore 用の安定した公開 URL（アプリが GCS またはローカル output から配信）。
     AUDIO_BASE_URL または NWB_PUBLIC_APP_URL が必要。
     """
-    base = (os.environ.get("AUDIO_BASE_URL") or os.environ.get("NWB_PUBLIC_APP_URL") or "").strip().rstrip("/")
+    # 独自ドメインが Cloud Run に未接続でも動くよう、実サービス URL を優先する。
+    base = (os.environ.get("NWB_PUBLIC_APP_URL") or os.environ.get("AUDIO_BASE_URL") or "").strip().rstrip("/")
     if not base:
         return None
     tid = (task_id or "").strip()
