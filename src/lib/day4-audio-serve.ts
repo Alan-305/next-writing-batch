@@ -27,19 +27,32 @@ export async function getDay4AudioResponse(taskId: string, filename: string): Pr
   }
 
   const submissionId = fn.replace(/\.mp3$/i, "");
-  const hit = await findSubmissionAcrossOrganizations(submissionId);
-  if (!hit || (hit.submission.taskId ?? "").trim() !== tid) {
-    return NextResponse.json({ message: "Not found" }, { status: 404 });
-  }
-  if (!isDay4AudioPlaybackAllowed(hit.submission)) {
-    return new NextResponse(day4AudioExpiredMessage(), {
-      status: 410,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+  // 再生は「致命的に止めない」が最優先（QR の配布体験が重要）。
+  // 期限判定に必要な Firestore 取得が失敗する/まだ未反映の場合でも、
+  // ファイルが存在すればそのまま配信する（UI 側の Server Error を防ぐ）。
+  let shouldCheckRetentionForHit: boolean | null = null;
+  let hitSubmission: Parameters<typeof isDay4AudioPlaybackAllowed>[0] | null = null;
+  try {
+    const hit = await findSubmissionAcrossOrganizations(submissionId);
+    if (hit && (hit.submission.taskId ?? "").trim() === tid) {
+      shouldCheckRetentionForHit = true;
+      hitSubmission = hit.submission;
+    } else {
+      shouldCheckRetentionForHit = false;
+    }
+  } catch (e) {
+    console.error("[day4-audio] findSubmissionAcrossOrganizations failed", { submissionId, tid, e });
+    shouldCheckRetentionForHit = false;
   }
 
   const local = await getOutputFileResponse(["audio", tid, fn]);
   if (local.status === 200) {
+    if (shouldCheckRetentionForHit && hitSubmission && !isDay4AudioPlaybackAllowed(hitSubmission)) {
+      return new NextResponse(day4AudioExpiredMessage(), {
+        status: 410,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
     return local;
   }
 
@@ -55,6 +68,12 @@ export async function getDay4AudioResponse(taskId: string, filename: string): Pr
     const [exists] = await file.exists();
     if (!exists) {
       return NextResponse.json({ message: "Not found" }, { status: 404 });
+    }
+    if (shouldCheckRetentionForHit && hitSubmission && !isDay4AudioPlaybackAllowed(hitSubmission)) {
+      return new NextResponse(day4AudioExpiredMessage(), {
+        status: 410,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
     const [buf] = await file.download();
     return new NextResponse(buf, {

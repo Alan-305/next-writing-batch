@@ -36,7 +36,9 @@ export function day4AudioExpiresAtIso(submission: Submission): string | null {
 
 export function isDay4AudioPlaybackAllowed(submission: Submission): boolean {
   const expiresIso = day4AudioExpiresAtIso(submission);
-  if (!expiresIso) return false;
+  // 期限の判定に必要な day4 情報が Firestore に未反映のタイミングなど、
+  // 「判定できない」ケースでは音声再生を止めない（UI の致命的失敗を防ぐ）。
+  if (!expiresIso) return true;
   return Date.now() < Date.parse(expiresIso);
 }
 
