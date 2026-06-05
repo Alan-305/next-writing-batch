@@ -36,11 +36,14 @@ def main() -> None:
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     task_id = str(args.task_id).replace(os.sep, "_").replace("/", "_")
 
+    out_root_env = (os.environ.get("NWB_OUTPUT_ROOT") or "").strip()
+    out_dir = out_root_env if out_root_env else os.path.join(project_root, "output")
+
     # Day4 writes to output/{audio,qr,pdf}/<taskId>/ — not output/<taskId>/
     roots: List[Tuple[str, str]] = [
-        (os.path.join(project_root, "output", "audio", task_id), "audio"),
-        (os.path.join(project_root, "output", "qr", task_id), "qr"),
-        (os.path.join(project_root, "output", "pdf", task_id), "pdf"),
+        (os.path.join(out_dir, "audio", task_id), "audio"),
+        (os.path.join(out_dir, "qr", task_id), "qr"),
+        (os.path.join(out_dir, "pdf", task_id), "pdf"),
     ]
     existing = [(path, kind) for path, kind in roots if os.path.isdir(path)]
     if not existing:
@@ -52,7 +55,7 @@ def main() -> None:
 
     out_path = args.out.strip()
     if not out_path:
-        zips_dir = os.path.join(project_root, "output", "zips")
+        zips_dir = os.path.join(out_dir, "zips")
         os.makedirs(zips_dir, exist_ok=True)
         out_path = os.path.join(zips_dir, f"{task_id}.zip")
     else:

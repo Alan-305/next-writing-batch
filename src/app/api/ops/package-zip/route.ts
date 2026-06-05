@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
-import { getSubmissions } from "@/lib/submissions-store";
+import { getSubmissions, syncSubmissionsFileMirrorFromFirestore } from "@/lib/submissions-store";
 import { runPackageZipSelection } from "@/lib/run-package-zip-batch";
 
 export const maxDuration = 300;
@@ -29,6 +29,8 @@ export async function POST(request: Request) {
 
   const mode = String(body.mode ?? "").trim();
   const orgId = auth.organizationId;
+
+  await syncSubmissionsFileMirrorFromFirestore(orgId);
 
   if (mode === "task") {
     const taskId = String(body.taskId ?? "").trim();

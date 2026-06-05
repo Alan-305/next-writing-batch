@@ -498,7 +498,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
             選択解除
           </button>
           <button type="button" className="ops-btn ops-btn--primary" disabled={zipBusy || zipSelected.size === 0} onClick={() => void runZipSelection()}>
-            {zipBusy ? "ZIP 作成中…" : "選択分を ZIP 化"}
+            {zipBusy ? "ZIP 作成中…" : "選択分の PDF を ZIP 化"}
           </button>
         </div>
       ) : null}

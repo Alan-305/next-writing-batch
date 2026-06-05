@@ -1,9 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
 
-const ZIPS_DIR = path.join(process.cwd(), "output", "zips");
+function zipsDir(): string {
+  const outRoot = (process.env.NWB_OUTPUT_ROOT ?? "").trim();
+  const base = outRoot || path.join(process.cwd(), "output");
+  return path.join(base, "zips");
+}
 
-/** ZIP ファイル名のみ許可（パス traversal 防止） */
+/** ZIP ファイル名のみ許可（パス traversal 防止）。`*.pdf.zip` も可。 */
 export function isSafeDeliverableZipName(name: string): boolean {
   if (!name || name.length > 200) return false;
   if (name.includes("/") || name.includes("\\") || name.includes("..")) return false;
@@ -26,22 +30,22 @@ export type DeliverableZipRow = {
  */
 export function taskIdFromDeliverableZipName(name: string): string | null {
   if (!isSafeDeliverableZipName(name) || !name.endsWith(".zip")) return null;
-  const stem = name.slice(0, -4);
+  const stem = name.slice(0, -4).replace(/\.pdf$/i, "");
   if (stem.startsWith("selection_")) return null;
   return stem;
 }
 
 export async function listDeliverableZips(): Promise<DeliverableZipRow[]> {
   try {
-    await fs.access(ZIPS_DIR);
+    await fs.access(zipsDir());
   } catch {
     return [];
   }
-  const names = await fs.readdir(ZIPS_DIR);
+  const names = await fs.readdir(zipsDir());
   const out: DeliverableZipRow[] = [];
   for (const name of names) {
     if (!name.endsWith(".zip") || !isSafeDeliverableZipName(name)) continue;
-    const full = path.join(ZIPS_DIR, name);
+    const full = path.join(zipsDir(), name);
     const st = await fs.stat(full);
     if (!st.isFile()) continue;
     out.push({
@@ -56,7 +60,7 @@ export async function listDeliverableZips(): Promise<DeliverableZipRow[]> {
 
 export function deliverableZipAbsolutePath(name: string): string | null {
   if (!isSafeDeliverableZipName(name)) return null;
-  return path.join(ZIPS_DIR, name);
+  return path.join(zipsDir(), name);
 }
 
 /** 納品ZIPを1件削除。`invalid` はファイル名が許可パターン外。 */

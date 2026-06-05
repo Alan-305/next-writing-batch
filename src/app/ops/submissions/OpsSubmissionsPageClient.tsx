@@ -132,11 +132,7 @@ export function OpsSubmissionsPageClient() {
       .map((s) => {
         const d4 = s.day4;
         const hasDay4Assets = Boolean(
-          d4 &&
-            !String(d4.error ?? "").trim() &&
-            (String(d4.pdf_path ?? "").trim() ||
-              String(d4.audio_path ?? "").trim() ||
-              String(d4.qr_path ?? "").trim()),
+          d4 && !String(d4.error ?? "").trim() && String(d4.pdf_path ?? "").trim(),
         );
         const sr = s.studentRelease;
         const studentViewed = hasStudentViewedPublishedResult(s);
@@ -215,7 +211,9 @@ export function OpsSubmissionsPageClient() {
           <h2 id="ops-deliverables-zip" className="ops-section__title">
             {OPS_COPY.deliverablesZip}
           </h2>
-          <p className="ops-section__lead">課題単位で Day4 成果物を ZIP にまとめます。</p>
+          <p className="ops-section__lead">
+            添削済み PDF を ZIP にまとめます。課題単位・受付ID指定・提出一覧のチェック選択が使えます。
+          </p>
         </div>
         <OpsPackageZipTaskPanel embedded />
       </section>
