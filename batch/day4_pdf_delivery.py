@@ -1,4 +1,4 @@
-"""Day4 納品 PDF の解決（ローカル / GCS / 再生成）。"""
+"""Day4 納品 PDF の解決（ローカル / GCS / 再生成）。PDF 内 QR は必須。"""
 
 from __future__ import annotations
 
@@ -6,8 +6,14 @@ import os
 import re
 from typing import Any, Dict, Optional, Tuple
 
-from day4_gcs import download_gcs_object_to_file, pdf_gcs_object_from_rel
+from day4_gcs import (
+    download_gcs_object_to_file,
+    pdf_gcs_object_from_rel,
+    qr_gcs_object_from_rel,
+    resolve_qr_audio_url_for_day4,
+)
 from day4_pdf import render_return_pdf
+from day4_qr import make_qr_png
 from nl_essay_feedback import pdf_feedback_lines_for_day4, read_aloud_essay_for_day4
 
 
@@ -80,12 +86,63 @@ def _gcs_object_for_submission(submission: Dict[str, Any]) -> Optional[str]:
     return pdf_gcs_object_from_rel(str(d4.get("pdf_path") or ""))
 
 
+def _submission_wants_qr_in_pdf(submission: Dict[str, Any]) -> bool:
+    d4 = submission.get("day4") or {}
+    if not isinstance(d4, dict):
+        return False
+    return bool(
+        str(d4.get("qr_path") or "").strip()
+        or str(d4.get("audio_url") or "").strip()
+        or str(d4.get("audio_path") or "").strip()
+    )
+
+
+def _ensure_qr_png_for_submission(
+    *,
+    submission: Dict[str, Any],
+    project_root: str,
+    output_root: str,
+    work_dir: str,
+) -> Optional[str]:
+    """PDF 埋め込み用 QR PNG。ローカル → GCS → audio_url から再生成。"""
+    d4 = submission.get("day4") or {}
+    if not isinstance(d4, dict):
+        return None
+
+    qr_rel = str(d4.get("qr_path") or "").strip()
+    if qr_rel:
+        local = _resolve_rel_file(project_root, output_root, qr_rel)
+        if local:
+            return local
+
+    os.makedirs(work_dir, exist_ok=True)
+    dest = os.path.join(work_dir, "qr.png")
+
+    gcs_obj = str(d4.get("qr_gcs_object") or "").strip()
+    if not gcs_obj and qr_rel:
+        gcs_obj = qr_gcs_object_from_rel(qr_rel) or ""
+    if gcs_obj and download_gcs_object_to_file(object_name=gcs_obj, dest_path=dest):
+        return dest
+
+    task_id = str(submission.get("taskId") or "").strip()
+    qr_url = resolve_qr_audio_url_for_day4(
+        audio_url=str(d4.get("audio_url") or ""),
+        task_id=task_id,
+        audio_path=str(d4.get("audio_path") or ""),
+    )
+    if not qr_url:
+        return None
+
+    return make_qr_png(url=qr_url, out_path=dest)
+
+
 def _regenerate_pdf(
     *,
     project_root: str,
     submission: Dict[str, Any],
     dest_path: str,
     output_root: str,
+    work_dir: str,
 ) -> bool:
     read_aloud = read_aloud_essay_for_day4(submission)
     if not read_aloud:
@@ -96,11 +153,13 @@ def _regenerate_pdf(
     fb1, fb2, fb3 = pdf_feedback_lines_for_day4(project_root, submission)
 
     qr_arg: Optional[str] = None
-    d4 = submission.get("day4") or {}
-    if isinstance(d4, dict):
-        qr_rel = str(d4.get("qr_path") or "").strip()
-        if qr_rel:
-            qr_arg = _resolve_rel_file(project_root, output_root, qr_rel)
+    if _submission_wants_qr_in_pdf(submission):
+        qr_arg = _ensure_qr_png_for_submission(
+            submission=submission,
+            project_root=project_root,
+            output_root=output_root,
+            work_dir=os.path.join(work_dir, "qr"),
+        )
 
     try:
         render_return_pdf(
@@ -128,6 +187,7 @@ def ensure_submission_pdf_abs(
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     提出の PDF 絶対パスを返す。必要なら GCS 取得または再生成する。
+    QR 付き PDF が期待される場合は、GCS の古い PDF より再生成を優先する。
     戻り値: (abs_path, skip_reason)
     """
     sid = str(submission.get("submissionId") or "").strip()
@@ -146,6 +206,16 @@ def ensure_submission_pdf_abs(
     base = _pdf_dest_basename(submission)
     dest = os.path.join(work_dir, base)
 
+    wants_qr = _submission_wants_qr_in_pdf(submission)
+    if wants_qr and _regenerate_pdf(
+        project_root=project_root,
+        submission=submission,
+        dest_path=dest,
+        output_root=output_root,
+        work_dir=work_dir,
+    ):
+        return dest, None
+
     gcs_obj = _gcs_object_for_submission(submission)
     if gcs_obj and download_gcs_object_to_file(object_name=gcs_obj, dest_path=dest):
         return dest, None
@@ -155,6 +225,7 @@ def ensure_submission_pdf_abs(
         submission=submission,
         dest_path=dest,
         output_root=output_root,
+        work_dir=work_dir,
     ):
         return dest, None
 

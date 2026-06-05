@@ -19,6 +19,7 @@ from day4_gcs import (
     upload_mp3_and_get_signed_url,
     upload_mp3_to_gcs,
     upload_pdf_to_gcs,
+    upload_qr_png_to_gcs,
 )
 
 from nl_essay_feedback import pdf_feedback_lines_for_day4, read_aloud_essay_for_day4
@@ -357,9 +358,13 @@ def main() -> None:
             )
 
             pdf_gcs_object: Optional[str] = None
+            qr_gcs_object: Optional[str] = None
             if _gcs_bucket_from_env():
                 pdf_gcs_object = f"pdf/{task_id}/{pdf_filename}"
                 upload_pdf_to_gcs(local_path=pdf_path, object_name=pdf_gcs_object)
+                if qr_rel and qr_arg:
+                    qr_gcs_object = f"qr/{task_id}/{student_id}.png"
+                    upload_qr_png_to_gcs(local_path=qr_arg, object_name=qr_gcs_object)
 
             with store_lock:
                 data = _load_submissions_unlocked(paths.project_root)
@@ -375,6 +380,8 @@ def main() -> None:
                 }
                 if pdf_gcs_object:
                     s["day4"]["pdf_gcs_object"] = pdf_gcs_object
+                if qr_gcs_object:
+                    s["day4"]["qr_gcs_object"] = qr_gcs_object
                 if qr_rel:
                     s["day4"]["qr_path"] = qr_rel
                 else:

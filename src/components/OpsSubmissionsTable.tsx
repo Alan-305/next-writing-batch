@@ -328,7 +328,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
 
       {enableZipSelection ? (
         <p className="muted" style={{ marginBottom: 10, fontSize: "0.92rem" }}>
-          左端のチェックで ZIP に入れる提出を選び、表の下で「選択分の PDF を ZIP 化」を押してください（PDF のみ。ディスクに無い場合は自動で再生成します）。
+          左端のチェックで ZIP に入れる提出を選び、表の下で「選択分の PDF を ZIP 化」を押してください（ZIP 内は PDF のみ。PDF 内の QR コードは含みます。音声 mp3 は含みません）。
         </p>
       ) : null}
 

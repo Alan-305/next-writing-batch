@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import timedelta
 from typing import Optional
 
@@ -100,6 +101,11 @@ def upload_pdf_to_gcs(*, local_path: str, object_name: str) -> None:
     _upload_blob(local_path=local_path, object_name=object_name, content_type="application/pdf")
 
 
+def upload_qr_png_to_gcs(*, local_path: str, object_name: str) -> None:
+    """GCS へ QR PNG をアップロードする。"""
+    _upload_blob(local_path=local_path, object_name=object_name, content_type="image/png")
+
+
 def pdf_gcs_object_from_rel(pdf_rel: str) -> Optional[str]:
     """output/pdf/<task>/<file>.pdf → pdf/<task>/<file>.pdf"""
     rel = str(pdf_rel or "").strip().replace("\\", "/").lstrip("/")
@@ -110,6 +116,95 @@ def pdf_gcs_object_from_rel(pdf_rel: str) -> Optional[str]:
     if rel.startswith("pdf/"):
         return rel
     return None
+
+
+def qr_gcs_object_from_rel(qr_rel: str) -> Optional[str]:
+    """output/qr/<task>/<file>.png → qr/<task>/<file>.png"""
+    rel = str(qr_rel or "").strip().replace("\\", "/").lstrip("/")
+    if not rel:
+        return None
+    if rel.startswith("output/qr/"):
+        return rel.removeprefix("output/")
+    if rel.startswith("qr/"):
+        return rel
+    return None
+
+
+_BROKEN_AUDIO_HOST_PREFIXES = (
+    "tensaku-kakumei-for-students.",
+    "tensaku-kakumei-for-teachers.",
+)
+
+
+def _public_app_base() -> str:
+    return (os.environ.get("NWB_PUBLIC_APP_URL") or os.environ.get("AUDIO_BASE_URL") or "").strip().rstrip("/")
+
+
+def _is_broken_audio_host(hostname: str) -> bool:
+    h = (hostname or "").lower()
+    return any(h.startswith(p) for p in _BROKEN_AUDIO_HOST_PREFIXES)
+
+
+def _api_day4_audio_url(*, base: str, task_id: str, filename: str) -> str:
+    return f"{base.rstrip('/')}/api/day4-audio/{task_id}/{filename}"
+
+
+def resolve_qr_audio_url_for_day4(
+    *,
+    audio_url: str = "",
+    task_id: str = "",
+    audio_path: str = "",
+) -> Optional[str]:
+    """
+    QR に埋める絶対 URL（TypeScript resolveDay4AudioQrUrl 相当）。
+    ZIP 用 PDF 再生成時、音声ファイルは不要だが QR は PDF 内に必要。
+    """
+    base = _public_app_base()
+    raw = str(audio_url or "").strip()
+
+    if not raw:
+        rel = str(audio_path or "").strip().replace("\\", "/").lstrip("/")
+        m = re.match(r"^output/audio/([^/]+)/([^/]+\.mp3)$", rel, re.I)
+        if m and base:
+            return _api_day4_audio_url(base=base, task_id=m.group(1), filename=m.group(2))
+        tid = str(task_id or "").strip()
+        if tid and base:
+            fn = os.path.basename(rel) if rel else ""
+            if fn.lower().endswith(".mp3"):
+                return _api_day4_audio_url(base=base, task_id=tid, filename=fn)
+        return None
+
+    m = re.match(r"^/?output/audio/([^/]+)/([^/]+\.mp3)$", raw, re.I)
+    if m and base:
+        return _api_day4_audio_url(base=base, task_id=m.group(1), filename=m.group(2))
+
+    m = re.match(r"^/?api/day4-audio/([^/]+)/([^/]+\.mp3)$", raw, re.I)
+    if m and base:
+        return _api_day4_audio_url(base=base, task_id=m.group(1), filename=m.group(2))
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        try:
+            from urllib.parse import urlparse
+
+            u = urlparse(raw)
+            if _is_broken_audio_host(u.hostname or ""):
+                from_output = re.match(r"^/output/audio/([^/]+)/([^/]+\.mp3)$", u.path, re.I)
+                if from_output and base:
+                    return _api_day4_audio_url(
+                        base=base, task_id=from_output.group(1), filename=from_output.group(2)
+                    )
+                from_api = re.match(r"^/api/day4-audio/([^/]+)/([^/]+\.mp3)$", u.path, re.I)
+                if from_api and base:
+                    return _api_day4_audio_url(
+                        base=base, task_id=from_api.group(1), filename=from_api.group(2)
+                    )
+            return raw
+        except Exception:
+            return raw
+
+    if raw.startswith("/") and base:
+        return f"{base}{raw}"
+    return raw if raw.startswith("http://") or raw.startswith("https://") else None
 
 
 def download_gcs_object_to_file(*, object_name: str, dest_path: str) -> bool:

@@ -40,10 +40,15 @@ function shouldAllowLocalQrForDay4(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-/** QR 生成は明示オプションのみ（既定オフ）。将来つけるときは DAY4_ENABLE_QR=true */
+/** QR 生成: 本番は GCS または公開 URL があれば既定オン。明示オフは DAY4_ENABLE_QR=false */
 function shouldEnableQrForDay4(): boolean {
   const expl = (process.env.DAY4_ENABLE_QR ?? "").trim().toLowerCase();
-  return expl === "true" || expl === "1";
+  if (expl === "false" || expl === "0") return false;
+  if (expl === "true" || expl === "1") return true;
+  const gcs = (process.env.GCS_BUCKET_NAME ?? "").trim();
+  const publicApp = (process.env.NWB_PUBLIC_APP_URL ?? "").trim();
+  const audioBase = (process.env.AUDIO_BASE_URL ?? "").trim();
+  return Boolean(gcs || publicApp || audioBase);
 }
 
 export function resolveDay4Python(): string | null {
