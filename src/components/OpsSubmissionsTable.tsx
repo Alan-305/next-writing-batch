@@ -326,6 +326,12 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
         </label>
       </div>
 
+      {enableZipSelection ? (
+        <p className="muted" style={{ marginBottom: 10, fontSize: "0.92rem" }}>
+          左端のチェックで ZIP に入れる提出を選び、表の下で「選択分の PDF を ZIP 化」を押してください（PDF のみ。ディスクに無い場合は自動で再生成します）。
+        </p>
+      ) : null}
+
       <p className="ops-table-meta">
         全 <strong>{total}</strong> 件
         {filtered.length !== total ? (
@@ -410,7 +416,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         <input
                           type="checkbox"
                           disabled={zipBusy || !item.hasDay4Assets}
-                          title={item.hasDay4Assets ? "ZIP に含める" : "Day4 成果物なし"}
+                          title={item.hasDay4Assets ? "ZIP に含める" : "添削確定・PDF 化できる状態ではありません"}
                           checked={zipSelected.has(item.submissionId)}
                           onChange={() => toggleZipSelect(item.submissionId)}
                           aria-label={`ZIP に含める ${item.submissionId}`}

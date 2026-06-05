@@ -131,10 +131,15 @@ export function OpsSubmissionsPageClient() {
       .filter((s) => String(s.submissionId ?? "").trim().length > 0)
       .map((s) => {
         const d4 = s.day4;
-        const hasDay4Assets = Boolean(
-          d4 && !String(d4.error ?? "").trim() && String(d4.pdf_path ?? "").trim(),
-        );
         const sr = s.studentRelease;
+        const hasDay4Assets = Boolean(
+          s.status === "done" &&
+            !(d4 && String(d4.error ?? "").trim()) &&
+            (String(d4?.pdf_path ?? "").trim() ||
+              String(sr?.operatorApprovedAt ?? "").trim() ||
+              String(sr?.operatorFinalizedAt ?? "").trim() ||
+              String(s.proofread?.evaluation ?? "").trim()),
+        );
         const studentViewed = hasStudentViewedPublishedResult(s);
         return {
           submissionId: s.submissionId,
@@ -212,7 +217,7 @@ export function OpsSubmissionsPageClient() {
             {OPS_COPY.deliverablesZip}
           </h2>
           <p className="ops-section__lead">
-            添削済み PDF を ZIP にまとめます。課題単位・受付ID指定・提出一覧のチェック選択が使えます。
+            補助機能です。通常は下の<strong>提出リスト左端のチェック</strong>で選び、表下の「選択分の PDF を ZIP 化」を使ってください。
           </p>
         </div>
         <OpsPackageZipTaskPanel embedded />

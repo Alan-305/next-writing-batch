@@ -1,9 +1,9 @@
 """
 納品 ZIP: Day4 済み提出の **PDF のみ** をまとめる。
-- --by-task: 課題IDに属する提出から pdf_path を収集
-- --by-submissions: 受付IDを指定して pdf_path を収集
+- --by-task: 課題IDに属する提出から PDF を収集
+- --by-submissions: 受付IDを指定して PDF を収集
 
-ローカル output は NWB_OUTPUT_ROOT（Cloud Run では /tmp/...）を参照する。
+ローカルに無い PDF は GCS から取得し、それでも無ければ提出データから再生成する。
 """
 
 from __future__ import annotations
@@ -12,10 +12,13 @@ import argparse
 import json
 import os
 import re
+import shutil
+import tempfile
 import zipfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from day4_pdf_delivery import ensure_submission_pdf_abs, zip_eligible_submission
 from org_paths import submissions_json
 
 
@@ -48,53 +51,28 @@ def _safe_arc_segment(s: str) -> str:
     return re.sub(r"[^a-zA-Z0-9._-]", "_", t)[:120]
 
 
-def _resolve_rel_file(project_root: str, rel: str) -> Optional[str]:
-    rel_norm = str(rel or "").strip().replace("\\", "/").lstrip("/")
-    if not rel_norm or ".." in rel_norm.split("/"):
-        return None
-
-    out_root = _output_root(project_root)
-    candidates = [
-        os.path.normpath(os.path.join(project_root, rel_norm)),
-        os.path.normpath(os.path.join(out_root, rel_norm.removeprefix("output/"))),
-    ]
-    seen: Set[str] = set()
-    for cand in candidates:
-        if cand in seen:
-            continue
-        seen.add(cand)
-        if os.path.isfile(cand):
-            return cand
-    return None
-
-
 def _pdf_pairs_from_submissions(
     project_root: str,
     submissions: List[Dict[str, Any]],
+    work_dir: str,
 ) -> Tuple[List[Tuple[str, str]], List[str]]:
     pairs: List[Tuple[str, str]] = []
     missing: List[str] = []
+    output_root = _output_root(project_root)
 
     for s in submissions:
         sid = str(s.get("submissionId") or "").strip()
         if not sid:
             continue
-        d4 = s.get("day4") or {}
-        if not isinstance(d4, dict):
-            missing.append(f"{sid}(no_day4)")
-            continue
-        if str(d4.get("error") or "").strip():
-            missing.append(f"{sid}(day4_error)")
-            continue
 
-        pdf_rel = str(d4.get("pdf_path") or "").strip()
-        if not pdf_rel:
-            missing.append(f"{sid}(no_pdf)")
-            continue
-
-        abs_path = _resolve_rel_file(project_root, pdf_rel)
+        abs_path, skip = ensure_submission_pdf_abs(
+            project_root=project_root,
+            output_root=output_root,
+            submission=s,
+            work_dir=os.path.join(work_dir, sid),
+        )
         if not abs_path:
-            missing.append(f"{sid}(pdf_missing_on_disk)")
+            missing.append(skip or f"{sid}(pdf_unavailable)")
             continue
 
         task_id = _safe_arc_segment(str(s.get("taskId") or "task"))
@@ -110,7 +88,8 @@ def _write_zip(project_root: str, out_name: str, pairs: List[Tuple[str, str]], m
     if not pairs:
         detail = ", ".join(missing[:20]) + (" ..." if len(missing) > 20 else "")
         raise SystemExit(
-            "ZIP に入れる PDF がありません。Day4 確定後、PDF がサーバー上に残っているか確認してください。"
+            "ZIP に入れる PDF がありません。添削確定・Day4 済みの提出を選ぶか、"
+            "該当提出の Day4 を再実行してください。"
             + (f" detail: {detail}" if detail else "")
         )
 
@@ -157,14 +136,19 @@ def _zip_by_submissions(project_root: str, submission_ids: List[str]) -> str:
         if s:
             selected.append(s)
 
-    pairs, missing = _pdf_pairs_from_submissions(project_root, selected)
-    for sid in unique:
-        if sid not in by_id:
-            missing.append(f"{sid}(not_found)")
-
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_name = f"selection_{stamp}_{len(unique)}subs.pdf.zip"
-    return _write_zip(project_root, out_name, pairs, missing)
+    zips_parent = os.path.join(_output_root(project_root), "zips")
+    os.makedirs(zips_parent, exist_ok=True)
+    work_dir = tempfile.mkdtemp(prefix="zip_sel_", dir=zips_parent)
+    try:
+        pairs, missing = _pdf_pairs_from_submissions(project_root, selected, work_dir)
+        for sid in unique:
+            if sid not in by_id:
+                missing.append(f"{sid}(not_found)")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_name = f"selection_{stamp}_{len(unique)}subs.pdf.zip"
+        return _write_zip(project_root, out_name, pairs, missing)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def _zip_by_task(project_root: str, task_id: str) -> str:
@@ -177,10 +161,20 @@ def _zip_by_task(project_root: str, task_id: str) -> str:
     if not matched:
         raise SystemExit(f"no submissions found for taskId={tid}")
 
-    pairs, missing = _pdf_pairs_from_submissions(project_root, matched)
-    safe_tid = _safe_arc_segment(tid)
-    out_name = f"{safe_tid}.pdf.zip"
-    return _write_zip(project_root, out_name, pairs, missing)
+    eligible = [s for s in matched if zip_eligible_submission(s)]
+    if not eligible:
+        raise SystemExit(f"no zip-eligible submissions for taskId={tid}")
+
+    zips_parent = os.path.join(_output_root(project_root), "zips")
+    os.makedirs(zips_parent, exist_ok=True)
+    work_dir = tempfile.mkdtemp(prefix="zip_task_", dir=zips_parent)
+    try:
+        pairs, missing = _pdf_pairs_from_submissions(project_root, eligible, work_dir)
+        safe_tid = _safe_arc_segment(tid)
+        out_name = f"{safe_tid}.pdf.zip"
+        return _write_zip(project_root, out_name, pairs, missing)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def main() -> None:

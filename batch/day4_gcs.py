@@ -70,6 +70,75 @@ def upload_mp3_to_gcs(*, local_path: str, object_name: str) -> None:
     _upload_mp3_blob(local_path=local_path, object_name=object_name)
 
 
+def _upload_blob(*, local_path: str, object_name: str, content_type: str):
+    from google.cloud import storage
+
+    bucket_candidates = _bucket_candidates_from_env()
+    if not bucket_candidates:
+        raise RuntimeError("missing_env:GCS_BUCKET_NAME")
+
+    client = storage.Client()
+    last_err: Exception | None = None
+    for bucket_name in bucket_candidates:
+        try:
+            bucket = client.bucket(bucket_name)
+            blob = bucket.blob(object_name)
+            blob.upload_from_filename(local_path, content_type=content_type)
+            return blob
+        except Exception as e:
+            last_err = e
+            continue
+
+    if last_err is not None:
+        tried = ", ".join(bucket_candidates)
+        raise RuntimeError(f"gcs_upload_failed: tried buckets=[{tried}] last_error={last_err}") from last_err
+    raise RuntimeError("upload_failed")
+
+
+def upload_pdf_to_gcs(*, local_path: str, object_name: str) -> None:
+    """GCS へ PDF をアップロードする。"""
+    _upload_blob(local_path=local_path, object_name=object_name, content_type="application/pdf")
+
+
+def pdf_gcs_object_from_rel(pdf_rel: str) -> Optional[str]:
+    """output/pdf/<task>/<file>.pdf → pdf/<task>/<file>.pdf"""
+    rel = str(pdf_rel or "").strip().replace("\\", "/").lstrip("/")
+    if not rel:
+        return None
+    if rel.startswith("output/pdf/"):
+        return rel.removeprefix("output/")
+    if rel.startswith("pdf/"):
+        return rel
+    return None
+
+
+def download_gcs_object_to_file(*, object_name: str, dest_path: str) -> bool:
+    """GCS オブジェクトをローカルへ取得。成功時 True。"""
+    from google.cloud import storage
+
+    obj = str(object_name or "").strip().lstrip("/")
+    if not obj or ".." in obj.split("/"):
+        return False
+
+    bucket_candidates = _bucket_candidates_from_env()
+    if not bucket_candidates:
+        return False
+
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    client = storage.Client()
+    for bucket_name in bucket_candidates:
+        try:
+            bucket = client.bucket(bucket_name)
+            blob = bucket.blob(obj)
+            if not blob.exists():
+                continue
+            blob.download_to_filename(dest_path)
+            return os.path.isfile(dest_path)
+        except Exception:
+            continue
+    return False
+
+
 def public_audio_url_for_day4(*, task_id: str, mp3_filename: str) -> Optional[str]:
     """
     QR / Firestore 用の安定した公開 URL（アプリが GCS またはローカル output から配信）。

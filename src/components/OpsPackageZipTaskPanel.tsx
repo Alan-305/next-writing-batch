@@ -114,7 +114,8 @@ export function OpsPackageZipTaskPanel({ embedded = false }: Props) {
   const inner = (
     <>
       <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-        納品 ZIP の中身は <strong>添削済み PDF のみ</strong> です（音声・QR は含みません）。{" "}
+        <strong>提出リストのチェック選択が基本</strong>です。ここは課題まとめ・受付ID指定の補助です。中身は{" "}
+        <strong>添削済み PDF のみ</strong>（音声・QR なし）。{" "}
         <Link href="/ops/deliverables">納品ZIPのダウンロード一覧</Link>
       </p>
 
