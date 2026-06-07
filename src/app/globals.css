@@ -651,6 +651,8 @@ td {
 
 .ops-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   border: 1px solid #e2e8f0;
   border-radius: var(--radius-md, 10px);
 }
@@ -671,32 +673,59 @@ td {
   background: #fafbfc;
 }
 
+.ops-table-actions-col {
+  min-width: 240px;
+  vertical-align: top;
+}
+
 .ops-row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 10px;
   align-items: center;
+  min-width: 220px;
+  padding: 4px 0;
+}
+
+.ops-row-actions .ops-btn {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
 }
 
 .ops-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 7px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 14px;
   font-size: 0.86rem;
   font-weight: 600;
   border: none;
   border-radius: 8px;
   color: #fff;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(15, 23, 42, 0.12);
   transition: opacity 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .ops-btn:hover:not(:disabled) {
   opacity: 0.92;
   transform: translateY(-1px);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .ops-btn:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .ops-row-actions {
+    gap: 12px;
+  }
 }
 
 .ops-btn:focus-visible {

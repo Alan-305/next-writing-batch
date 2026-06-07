@@ -193,6 +193,15 @@ export function ProofreadSubmissionButton({
       <button
         type="button"
         disabled={!canAct || busySync || busyQueue}
+        title="空き時間に処理・メール通知"
+        className={`ops-btn ${busyQueue ? "ops-btn--muted" : canAct ? "ops-btn--queue" : "ops-btn--muted"}`}
+        onClick={() => void onQueue()}
+      >
+        {busyQueue ? OPS_COPY.proofreadQueueBusy : OPS_COPY.proofreadQueue}
+      </button>
+      <button
+        type="button"
+        disabled={!canAct || busySync || busyQueue}
         title="完了までこの画面で待つ"
         className={`ops-btn ${busySync ? "ops-btn--muted" : staleQueued || status === "processing" ? "ops-btn--warn" : canAct ? "ops-btn--now" : "ops-btn--muted"}`}
         onClick={() => void onSync()}
@@ -202,15 +211,6 @@ export function ProofreadSubmissionButton({
           : staleQueued || status === "processing"
             ? OPS_COPY.proofreadRetryNow
             : OPS_COPY.proofreadNow}
-      </button>
-      <button
-        type="button"
-        disabled={!canAct || busySync || busyQueue}
-        title="空き時間に処理・メール通知"
-        className={`ops-btn ${busyQueue ? "ops-btn--muted" : canAct ? "ops-btn--queue" : "ops-btn--muted"}`}
-        onClick={() => void onQueue()}
-      >
-        {busyQueue ? OPS_COPY.proofreadQueueBusy : OPS_COPY.proofreadQueue}
       </button>
     </>
   );
@@ -302,20 +302,20 @@ export function RedoProofreadSubmissionButton({
       <button
         type="button"
         disabled={busySync || busyQueue}
-        title="設定変更後に AI 添削を出し直す"
-        className={`ops-btn ${busySync ? "ops-btn--muted" : "ops-btn--warn"}`}
-        onClick={() => void onSync()}
-      >
-        {busySync ? OPS_COPY.proofreadNowBusy : OPS_COPY.redo}
-      </button>
-      <button
-        type="button"
-        disabled={busySync || busyQueue}
         title="やり直しをキューに預ける"
         className={`ops-btn ${busyQueue ? "ops-btn--muted" : "ops-btn--queue"}`}
         onClick={() => void onQueue()}
       >
         {busyQueue ? OPS_COPY.proofreadQueueBusy : OPS_COPY.redoQueue}
+      </button>
+      <button
+        type="button"
+        disabled={busySync || busyQueue}
+        title="設定変更後に AI 添削を出し直す"
+        className={`ops-btn ${busySync ? "ops-btn--muted" : "ops-btn--warn"}`}
+        onClick={() => void onSync()}
+      >
+        {busySync ? OPS_COPY.proofreadNowBusy : OPS_COPY.redo}
       </button>
     </>
   );

@@ -392,7 +392,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
               <th>学籍</th>
               <th>氏名</th>
               <th>状態</th>
-              <th style={{ minWidth: 180 }}>操作</th>
+              <th className="ops-table-actions-col">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -450,7 +450,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         forceProcessing={forceProcessing}
                       />
                     </td>
-                    <td>
+                    <td className="ops-table-actions-col">
                       <div className="ops-row-actions">
                         <ProofreadSubmissionButton
                           submissionId={item.submissionId}

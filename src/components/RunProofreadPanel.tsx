@@ -256,11 +256,11 @@ export function RunProofreadPanel({
       </div>
 
       <div className="ops-panel-actions">
-        <button type="button" className="ops-btn ops-btn--ghost" disabled={busy} onClick={() => void runSync()}>
-          {busySync ? OPS_COPY.bulkNowBusy : OPS_COPY.bulkNow}
-        </button>
         <button type="button" className="ops-btn ops-btn--queue" disabled={busy} onClick={() => void runQueue()}>
           {busyQueue ? OPS_COPY.bulkQueueBusy : OPS_COPY.bulkQueue}
+        </button>
+        <button type="button" className="ops-btn ops-btn--ghost" disabled={busy} onClick={() => void runSync()}>
+          {busySync ? OPS_COPY.bulkNowBusy : OPS_COPY.bulkNow}
         </button>
       </div>
 
