@@ -1,33 +1,23 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { logger } from "firebase-functions";
-import Stripe from "stripe";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "./product-ids";
+import {
+  lookupTicketsByPriceId,
+  resendApiKey,
+  stripePriceByPlan,
+  stripeSecretKey,
+  stripeWebhookSecret,
+  TICKETS_BY_PLAN,
+  type BillingPlan,
+} from "./runtime-config";
+import { createStripeClient, type StripeClient } from "./stripe-client";
 
 admin.initializeApp();
 
 const db = admin.firestore();
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
-const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
-const stripe = stripeSecretKey
-  ? new Stripe(stripeSecretKey, {
-      apiVersion: "2026-04-22.dahlia",
-    })
-  : null;
-const STRIPE_PRICE_BY_PLAN = {
-  t10: process.env.STRIPE_PRICE_T10?.trim() ?? "",
-  t30: process.env.STRIPE_PRICE_T30?.trim() ?? "",
-  t60: process.env.STRIPE_PRICE_T60?.trim() ?? "",
-  t120: process.env.STRIPE_PRICE_T120?.trim() ?? "",
-} as const;
-const TICKETS_BY_PLAN = {
-  t10: 10,
-  t30: 30,
-  t60: 60,
-  t120: 120,
-} as const;
 
 const WELCOME_EMAIL_SEND_LOCK_STALE_MS = 5 * 60 * 1000;
 
@@ -110,7 +100,10 @@ function resendFromAddress(): string {
  *
  * リージョン未指定 = 既定の us-central1（デプロイ済み第1世代と getFunctions のリージョンを一致させる）。
  */
-export const onAuthUserCreate = functions.auth.user().onCreate(async (user) => {
+export const onAuthUserCreate = functions
+  .runWith({ secrets: [resendApiKey] })
+  .auth.user()
+  .onCreate(async (user) => {
   const uid = user.uid;
   const email = user.email;
 
@@ -138,17 +131,23 @@ export const onAuthUserCreate = functions.auth.user().onCreate(async (user) => {
   });
 
   await maybeSendWelcomeEmail(uid, email);
-});
+  });
 
-export const stripeWebhook = functions.https.onRequest(async (req, res) => {
+export const stripeWebhook = functions
+  .runWith({ secrets: [stripeSecretKey, stripeWebhookSecret] })
+  .https.onRequest(async (req, res) => {
+  const secretKey = stripeSecretKey.value().trim();
+  const webhookSecret = stripeWebhookSecret.value().trim();
+  const stripe = createStripeClient(secretKey);
+
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
     return;
   }
-  if (!stripe || !stripeWebhookSecret) {
+  if (!stripe || !webhookSecret) {
     logger.error("Stripe 環境変数が不足しています", {
-      hasSecretKey: Boolean(stripeSecretKey),
-      hasWebhookSecret: Boolean(stripeWebhookSecret),
+      hasSecretKey: Boolean(secretKey),
+      hasWebhookSecret: Boolean(webhookSecret),
     });
     res.status(500).send("Stripe is not configured");
     return;
@@ -162,7 +161,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
 
   let event: { id: string; type: string; data: { object: unknown } };
   try {
-    event = stripe.webhooks.constructEvent(req.rawBody, signature, stripeWebhookSecret);
+    event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
   } catch (error) {
     logger.error("Stripe webhook 署名検証エラー", { error });
     res.status(400).send("Invalid signature");
@@ -175,7 +174,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
         await handleCheckoutCompleted(event);
         break;
       case "charge.refunded":
-        await handleChargeRefunded(event);
+        await handleChargeRefunded(event, stripe);
         break;
       default:
         logger.info("未対応の Stripe イベントを受信", {
@@ -188,12 +187,16 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
     logger.error("Stripe webhook 処理エラー", { error, eventId: event.id, eventType: event.type });
     res.status(500).send("Webhook processing failed");
   }
-});
+  });
 
-export const createStripeCheckoutSession = functions.https.onCall(async (data, context) => {
+export const createStripeCheckoutSession = functions
+  .runWith({ secrets: [stripeSecretKey] })
+  .https.onCall(async (data, context) => {
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "ログインが必要です。");
   }
+
+  const stripe = createStripeClient(stripeSecretKey.value());
   if (!stripe) {
     throw new functions.https.HttpsError("failed-precondition", "Stripe の設定が未完了です。");
   }
@@ -201,7 +204,8 @@ export const createStripeCheckoutSession = functions.https.onCall(async (data, c
   const plan = parsePlan(data?.plan);
   const successUrl = parseRequiredUrl(data?.successUrl, "successUrl");
   const cancelUrl = parseRequiredUrl(data?.cancelUrl, "cancelUrl");
-  const priceId = STRIPE_PRICE_BY_PLAN[plan];
+  const priceByPlan = stripePriceByPlan();
+  const priceId = priceByPlan[plan];
   const tickets = TICKETS_BY_PLAN[plan];
 
   if (!priceId) {
@@ -281,7 +285,7 @@ export const createStripeCheckoutSession = functions.https.onCall(async (data, c
     sessionId: session.id,
     url: session.url,
   };
-});
+  });
 
 /**
  * 例外返金など: 管理者のみ。チケット数を増減（通常は負数）し、0 なら entitlements を none に戻す。
@@ -373,7 +377,9 @@ export const adminAdjustBillingTickets = functions.https.onCall(async (data, con
  * 管理者のみ。Stripe へ返金を作成する。成功後は charge.refunded Webhook でチケットが按分減算される。
  * 手動の adminAdjustBillingTickets（負数）と同一購入に対して併用しないこと（二重減算）。
  */
-export const adminCreateStripeRefund = functions.https.onCall(async (data, context) => {
+export const adminCreateStripeRefund = functions
+  .runWith({ secrets: [stripeSecretKey] })
+  .https.onCall(async (data, context) => {
   const callerUid = context.auth?.uid;
   if (!callerUid) {
     throw new functions.https.HttpsError("unauthenticated", "ログインが必要です。");
@@ -381,6 +387,8 @@ export const adminCreateStripeRefund = functions.https.onCall(async (data, conte
   if (!isAdminUid(callerUid)) {
     throw new functions.https.HttpsError("permission-denied", "管理者のみ実行できます。");
   }
+
+  const stripe = createStripeClient(stripeSecretKey.value());
   if (!stripe) {
     throw new functions.https.HttpsError("failed-precondition", "Stripe の設定が未完了です。");
   }
@@ -527,10 +535,10 @@ export const adminCreateStripeRefund = functions.https.onCall(async (data, conte
         : "Stripe API の呼び出しに失敗しました。";
     throw new functions.https.HttpsError("internal", `Stripe error: ${stripeMessage}`);
   }
-});
+  });
 
 async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = resendApiKey.value().trim();
   const from = resendFromAddress();
   if (!apiKey) {
     logger.info("RESEND_API_KEY 未設定のためウェルカムメールをスキップします", { uid });
@@ -590,7 +598,9 @@ async function maybeSendWelcomeEmail(uid: string, email: string | undefined): Pr
  * ログイン済みユーザー本人がウェルカムメール送信を再試行する。
  * onCreate 時に RESEND が無かった場合でも、Functions に設定後や Resend のドメイン検証後に届けられるようにする。
  */
-export const welcomeEmailRetry = functions.https.onCall(async (_data: unknown, context) => {
+export const welcomeEmailRetry = functions
+  .runWith({ secrets: [resendApiKey] })
+  .https.onCall(async (_data: unknown, context) => {
   if (!context.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "ログインが必要です。");
   }
@@ -636,7 +646,7 @@ export const welcomeEmailRetry = functions.https.onCall(async (_data: unknown, c
     return { ok: true as const, sent: true as const };
   }
   return { ok: true as const, sent: false as const, reason: "skipped_or_resend_failed" as const };
-});
+  });
 
 function paymentIntentIdFromSession(session: {
   payment_intent?: string | { id?: string } | null;
@@ -741,8 +751,8 @@ async function handleCheckoutCompleted(
  */
 async function handleChargeRefunded(
   event: { id: string; type: string; data: { object: unknown } },
+  stripe: StripeClient,
 ): Promise<void> {
-  if (!stripe) return;
 
   const chargeRaw = event.data.object as {
     id: string;
@@ -930,17 +940,7 @@ function resolveTicketAmount(session: {
   return 0;
 }
 
-function lookupTicketsByPriceId(priceId: string): number {
-  const table: Record<string, number> = {
-    [STRIPE_PRICE_BY_PLAN.t10]: TICKETS_BY_PLAN.t10,
-    [STRIPE_PRICE_BY_PLAN.t30]: TICKETS_BY_PLAN.t30,
-    [STRIPE_PRICE_BY_PLAN.t60]: TICKETS_BY_PLAN.t60,
-    [STRIPE_PRICE_BY_PLAN.t120]: TICKETS_BY_PLAN.t120,
-  };
-  return table[priceId] ?? 0;
-}
-
-function parsePlan(value: unknown): keyof typeof STRIPE_PRICE_BY_PLAN {
+function parsePlan(value: unknown): BillingPlan {
   if (value === "t10" || value === "t30" || value === "t60" || value === "t120") {
     return value;
   }
