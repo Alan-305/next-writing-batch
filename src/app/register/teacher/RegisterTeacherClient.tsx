@@ -111,7 +111,7 @@ export function RegisterTeacherClient() {
         <h1>教員としてテナントを作成</h1>
         <p className="muted">すでに教員として登録されています。</p>
         <p>
-          <Link href={safeNext}>運用画面へ（{safeNext}）</Link>
+          <Link href={safeNext}>運用画面へ</Link>
         </p>
       </main>
     );
