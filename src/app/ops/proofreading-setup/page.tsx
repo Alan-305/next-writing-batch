@@ -15,8 +15,8 @@ import {
 import type { RegisteredTaskSummary } from "@/lib/registered-tasks-list";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 
-function defaultFilename(school: string): string {
-  const s = (school || "設定").trim().slice(0, 18).replace(/[/\\:*?"<>|]/g, "_");
+function defaultFilename(label: string): string {
+  const s = (label || "設定").trim().slice(0, 18).replace(/[/\\:*?"<>|]/g, "_");
   const d = new Date();
   const y = d.getFullYear();
   const mo = String(d.getMonth() + 1).padStart(2, "0");
@@ -105,7 +105,7 @@ export default function ProofreadingSetupPage() {
     const blob = new Blob([JSON.stringify(setup, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = defaultFilename(setup.school_name);
+    a.download = defaultFilename(setup.problem_memo || setup.task_id);
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -317,86 +317,66 @@ export default function ProofreadingSetupPage() {
         <h2>設定・問題</h2>
 
         <label className="field">
-          <span>先生のお名前（本名）</span>
-          <input
-            value={setup.teacher_name ?? ""}
-            onChange={(e) => patchSetup({ teacher_name: e.target.value })}
-            placeholder="例: 山田 花子"
-          />
-        </label>
-
-        <label className="field">
-          <span>メールアドレス（任意）</span>
-          <input
-            type="email"
-            value={setup.teacher_email ?? ""}
-            onChange={(e) => patchSetup({ teacher_email: e.target.value })}
-            placeholder="例: name@school.jp"
-            autoComplete="email"
-          />
-        </label>
-
-        <label className="field">
-          <span>学校名</span>
-          <input
-            value={setup.school_name ?? ""}
-            onChange={(e) => patchSetup({ school_name: e.target.value })}
-            placeholder="例: 河合塾 北大３クラス（提出プルダウンに表示されます）"
-          />
-          <span className="muted" style={{ fontSize: "0.9em", display: "block", marginTop: 4 }}>
-            課題IDに含めたい日本語（学校・塾・クラス名など）はここに書いてください。JSON ダウンロード時のファイル名にも使われます。
-          </span>
-        </label>
-
-        <label className="field">
-          <span>課題ID（taskId）</span>
+          <span>課題ID</span>
           <input
             value={setup.task_id ?? ""}
             onChange={(e) => patchSetup({ task_id: e.target.value })}
-            placeholder="例: 2026_kawai_hokudai3_matsuo（半角英数字と ._- のみ）"
+            placeholder="例: 2026_english_essay_02（半角英数字と ._- のみ）"
             autoComplete="off"
           />
           <span className="muted" style={{ fontSize: "0.9em", display: "block", marginTop: 4 }}>
-            <strong>半角の英数字と ._-（ドット・アンダースコア・ハイフン）のみ</strong>です。納品 ZIP やファイル名と衝突しないよう、日本語は「学校名」「問題メモ」へ分けてください。
-            生徒の提出画面では<strong>登録済み課題のプルダウン</strong>にこの ID が出ます。「サーバーに保存」で <code>data/task-problems/</code> のマスタも更新されます。バッチの <code>--task-id</code> もこの ID と揃えてください。
+            半角の英数字と <strong>._-</strong> のみ。生徒の提出画面の課題一覧にも使われます。
           </span>
         </label>
 
-        <label className="field">
-          <span>登録済み課題から課題IDを選ぶ（任意）</span>
-          <select
-            value={loadTaskSelectValue}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v) patchSetup({ task_id: v });
-            }}
-            disabled={registryLoading}
-          >
-            <option value="">（一覧から選ばず、上の入力欄の課題IDを使う）</option>
-            {registryTasks.map((t) => (
-              <option key={t.taskId} value={t.taskId}>
-                {t.displayLabel} — {t.taskId}
-              </option>
-            ))}
-          </select>
-          <span className="muted" style={{ fontSize: "0.9em", display: "block", marginTop: 4 }}>
-            選ぶと上の「課題ID（taskId）」が上書きされます。続けて「サーバー保存済みJSONを読み込む」で取得できます。
-            {registryLoading && registryTasks.length === 0 ? " 一覧を取得中…" : null}
-          </span>
-        </label>
+        <div className="field">
+          <label>
+            <span>登録済みの課題IDを選ぶ</span>
+            <select
+              value={loadTaskSelectValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v) patchSetup({ task_id: v });
+              }}
+              disabled={registryLoading}
+              style={{ width: "100%", maxWidth: "100%" }}
+            >
+              <option value="">（新規作成・上の欄に直接入力）</option>
+              {registryTasks.map((t) => (
+                <option key={t.taskId} value={t.taskId}>
+                  {t.displayLabel} — {t.taskId}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={() => void onLoadFromServer()}
+              disabled={loadingServer || !setup.task_id.trim()}
+            >
+              {loadingServer ? "読み込み中…" : "課題を読み込む"}
+            </button>
+            {registryLoading && registryTasks.length === 0 ? (
+              <span className="muted" style={{ fontSize: "0.9em" }}>
+                一覧を取得中…
+              </span>
+            ) : null}
+          </div>
+        </div>
 
         <label className="field">
-          <span>問題メモ（任意）</span>
+          <span>課題の表示名（任意）</span>
           <input
             type="text"
             maxLength={120}
             value={setup.problem_memo ?? ""}
             onChange={(e) => patchSetup({ problem_memo: e.target.value })}
-            placeholder="例: 2026 北大３ 松尾先生担当 英作文第2回"
+            placeholder="例: 2026 英作文 第2回"
             autoComplete="off"
           />
           <span className="muted" style={{ fontSize: "0.9em", display: "block", marginTop: 4 }}>
-            提出プルダウンでは「学校名 · 問題メモ」のように表示されます。課題マスタの設問タイトル（単一設問時）にも使われます。添削プロンプトの問題文そのものではありません。
+            生徒の課題選択プルダウンに表示される名前です。
           </span>
         </label>
 
@@ -433,14 +413,7 @@ export default function ProofreadingSetupPage() {
         </div>
 
         <TextareaWithFileDrop
-          label="問題文（課題）— JSON 保存に必須"
-          hint={
-            <span>
-              画像・PDF の読み取りは <strong>Gemini</strong>（サーバの <code>GEMINI_API_KEY</code>）を使います。キーが無い場合はブラウザ内の
-              Tesseract / PDF 取り込みにフォールバックします。教員用の設定 JSON を1ファイルだけドロップすると、
-              <strong>フォーム全体</strong>をその内容で置き換えます。
-            </span>
-          }
+          label="問題文（課題）"
           rows={10}
           placeholder="Write your opinion in about 80 words ... など"
           value={setup.question ?? ""}
@@ -457,10 +430,7 @@ export default function ProofreadingSetupPage() {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
           <button type="button" onClick={onSaveToServer} disabled={savingServer}>
-            {savingServer ? "サーバーに保存中…" : "サーバーに保存（課題ID）"}
-          </button>
-          <button type="button" onClick={onLoadFromServer} disabled={loadingServer}>
-            {loadingServer ? "サーバーから読込中…" : "サーバー保存済みJSONを読み込む"}
+            {savingServer ? "保存中…" : "サーバーに保存"}
           </button>
           <button type="button" onClick={onSaveJson}>
             JSON をダウンロード

@@ -2,18 +2,15 @@ import { NextResponse } from "next/server";
 
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
 import { requireTeacherOrAllowlistAdmin } from "@/lib/auth/require-teacher-or-allowlist";
-import { countEnglishWords } from "@/lib/english-word-count";
 import {
   normalizeEssayForCompare,
   sanitizeFinalEssayArtifactText,
 } from "@/lib/student-final-essay-display";
 import { buildStudentReleaseFromPatch, type StudentReleasePatchBody } from "@/lib/student-release";
-import { splitExplanationIntoContentGrammarSections } from "@/lib/student-release";
 import { submissionNotFoundBody } from "@/lib/submission-not-found-response";
 import { findSubmissionForTenant } from "@/lib/submission-tenant-assert";
 import { updateSubmissionById } from "@/lib/submissions-store";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
-import { postAnalysisPhase1ToAppsScript } from "@/lib/nexus-support";
 import { persistTaskRubricDefaultScores } from "@/lib/task-rubric-default-scores";
 
 type RouteContext = { params: Promise<{ submissionId: string }> };
@@ -144,29 +141,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     await persistTaskRubricDefaultScores(orgId, submission.taskId, master, release.scores);
   } catch (e) {
     console.warn("[student-release] persistTaskRubricDefaultScores failed (submission already saved):", e);
-  }
-
-  const prevFinalizedAt = String(submission.studentRelease?.operatorFinalizedAt ?? "").trim();
-  const nextFinalizedAt = String(release.operatorFinalizedAt ?? "").trim();
-  const finalizedNow = Boolean(nextFinalizedAt) && nextFinalizedAt !== prevFinalizedAt;
-  if (finalizedNow) {
-    const sections = splitExplanationIntoContentGrammarSections(release.explanation || "");
-    const analysisOk = await postAnalysisPhase1ToAppsScript({
-      taskId: submission.taskId,
-      submissionId: sid,
-      problemMemo: (submission.problemMemo ?? "").trim(),
-      evaluation: release.evaluation,
-      explanationContent: sections.contentComment,
-      explanationGrammar: sections.grammarComment,
-      contentDeduction: release.contentDeduction,
-      grammarDeduction: release.grammarDeduction,
-      scoreTotal: release.scoreTotal,
-      wordCount: countEnglishWords(release.finalText || ""),
-      source: "ops",
-    });
-    if (!analysisOk) {
-      console.warn("[student-release] analysis_phase1 post failed:", sid);
-    }
   }
 
   return NextResponse.json({ ok: true, studentRelease: updated.studentRelease ?? release });

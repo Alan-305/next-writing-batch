@@ -1,35 +1,30 @@
 import { NextResponse } from "next/server";
 
 import {
-  buildGasSupportContent,
-  buildSupportEmailBody,
-  postSupportToAppsScript,
-  sendSupportNotificationEmail,
-} from "@/lib/nexus-support";
+  buildTenantRoster,
+  resolvePrimaryTeacherEmailForOrganization,
+} from "@/lib/admin/tenant-roster";
+import { loadUserProfileAdmin } from "@/lib/auth/load-user-profile-admin";
+import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
+import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
+import { getAdminAuth } from "@/lib/firebase/admin-app";
+import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
+import { buildSupportEmailBody, sendStudentSupportInquiryEmail } from "@/lib/nexus-support";
+import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 
 export const runtime = "nodejs";
 
-const MAX_TASK = 200;
-const MAX_STUDENT_ID = 80;
-const MAX_NAME = 120;
-const MAX_EMAIL = 254;
 const MAX_INQUIRY = 10_000;
-
-function basicEmailOk(s: string): boolean {
-  const t = s.trim();
-  if (t.length > MAX_EMAIL || !t.includes("@")) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
-}
 
 type Body = {
   taskId?: unknown;
-  studentId?: unknown;
-  studentName?: unknown;
-  email?: unknown;
   content?: unknown;
 };
 
 export async function POST(request: Request) {
+  const auth = await verifyBearerUidAndOrganization(request);
+  if (!auth.ok) return auth.response;
+
   let body: Body;
   try {
     body = (await request.json()) as Body;
@@ -38,28 +33,17 @@ export async function POST(request: Request) {
   }
 
   const taskId = typeof body.taskId === "string" ? body.taskId.trim() : "";
-  const studentId = typeof body.studentId === "string" ? body.studentId.trim() : "";
-  const studentName = typeof body.studentName === "string" ? body.studentName.trim() : "";
-  const email = typeof body.email === "string" ? body.email.trim() : "";
   const content = typeof body.content === "string" ? body.content.trim() : "";
 
-  if (!taskId || !studentId || !studentName || !email || !content) {
+  if (!taskId || !content) {
     return NextResponse.json(
-      { ok: false, code: "VALIDATION", message: "すべての項目を入力してください。" },
+      { ok: false, code: "VALIDATION", message: "課題IDとお問い合わせ内容を入力してください。" },
       { status: 422 },
     );
   }
-  if (taskId.length > MAX_TASK || studentId.length > MAX_STUDENT_ID || studentName.length > MAX_NAME) {
-    return NextResponse.json(
-      { ok: false, code: "VALIDATION", message: "課題ID・学籍番号・氏名の長さを短くしてください。" },
-      { status: 422 },
-    );
-  }
-  if (!basicEmailOk(email)) {
-    return NextResponse.json(
-      { ok: false, code: "VALIDATION", message: "メールアドレスの形式をご確認ください。" },
-      { status: 422 },
-    );
+  const tidErr = validateTaskIdForStorage(taskId);
+  if (tidErr) {
+    return NextResponse.json({ ok: false, code: "VALIDATION", message: tidErr }, { status: 422 });
   }
   if (content.length > MAX_INQUIRY) {
     return NextResponse.json(
@@ -68,42 +52,103 @@ export async function POST(request: Request) {
     );
   }
 
-  const gasContent = buildGasSupportContent(taskId, studentId, content);
-  const mailBody = buildSupportEmailBody({ taskId, studentId, studentName, email, inquiry: content });
+  const profile = await loadUserProfileAdmin(auth.uid);
+  const roles = profile ? normalizeRoles(profile.roles) : [];
 
-  const [sheetOk, mailOk] = await Promise.all([
-    postSupportToAppsScript({ studentName, email, content: gasContent }),
-    sendSupportNotificationEmail({ studentName, email, body: mailBody }),
-  ]);
+  if (isTeacherByRoles(roles)) {
+    return NextResponse.json(
+      { ok: false, code: "FORBIDDEN", message: "このお問い合わせは生徒向けです。" },
+      { status: 403 },
+    );
+  }
 
-  if (sheetOk && mailOk) {
-    return NextResponse.json({ ok: true, sheetOk: true, mailOk: true, message: "送信しました。ありがとうございます。" });
+  const profileOrg = String(profile?.organizationId ?? "").trim();
+  if (!profileOrg || profileOrg !== auth.organizationId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "FORBIDDEN",
+        message: "クラス（テナント）の確認に失敗しました。招待リンクから再度登録してください。",
+      },
+      { status: 403 },
+    );
   }
-  if (sheetOk && !mailOk) {
-    return NextResponse.json({
-      ok: true,
-      partial: true,
-      sheetOk: true,
-      mailOk: false,
-      message:
-        "お問い合わせは記録しました。（メール通知のみ失敗しました。事務局までお電話等でご連絡ください。）",
-    });
+
+  const roster = await buildTenantRoster(auth.organizationId);
+  if (!roster.students.some((s) => s.uid === auth.uid)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "FORBIDDEN",
+        message: "このクラスに登録された生徒のみお問い合わせできます。",
+      },
+      { status: 403 },
+    );
   }
-  if (mailOk && !sheetOk) {
-    return NextResponse.json({
-      ok: true,
-      partial: true,
-      sheetOk: false,
-      mailOk: true,
-      message: "事務局へのメールは送信しましたが、スプレッドシートへの記録に失敗しました。お手数ですが再度お試しください。",
-    });
+
+  const master = await loadTaskProblemsMaster(auth.organizationId, taskId);
+  if (!master) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "UNKNOWN_TASK",
+        message: "この課題は、あなたのクラスに登録されていません。リストから選び直してください。",
+      },
+      { status: 422 },
+    );
+  }
+
+  let authEmail = "";
+  try {
+    const authUser = await getAdminAuth().getUser(auth.uid);
+    authEmail = (authUser.email ?? "").trim();
+  } catch {
+    authEmail = "";
+  }
+  if (!authEmail.includes("@")) {
+    return NextResponse.json(
+      { ok: false, message: "Google ログインのメールアドレスが取得できません。再ログインしてください。" },
+      { status: 422 },
+    );
+  }
+
+  const studentId = String(profile?.studentNumber ?? "").trim();
+  const studentName = String(profile?.nickname ?? "").trim() || "—";
+
+  const teacherEmail = await resolvePrimaryTeacherEmailForOrganization(auth.organizationId);
+  if (!teacherEmail) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "担当の先生のメールが見つかりませんでした。しばらくしてから再度お試しください。",
+      },
+      { status: 502 },
+    );
+  }
+
+  const mailBody = buildSupportEmailBody({
+    organizationId: auth.organizationId,
+    taskId,
+    studentId,
+    studentName,
+    email: authEmail,
+    inquiry: content,
+  });
+
+  const mailOk = await sendStudentSupportInquiryEmail({
+    teacherEmail,
+    studentName,
+    replyToEmail: authEmail,
+    body: mailBody,
+  });
+
+  if (mailOk) {
+    return NextResponse.json({ ok: true, message: "送信しました。担当の先生に届きます。ありがとうございます。" });
   }
 
   return NextResponse.json(
     {
       ok: false,
-      sheetOk: false,
-      mailOk: false,
       message: "送信に失敗しました。しばらくしてから再度お試しください。",
     },
     { status: 502 },

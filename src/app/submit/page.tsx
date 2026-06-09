@@ -172,7 +172,7 @@ export default function SubmitPage() {
           gap: 12,
         }}
       >
-        <h1 style={{ margin: 0 }}>解答提出フォーム</h1>
+        <h1 style={{ margin: 0 }}>提出・受け取り・質問</h1>
         {user && (profile?.studentNumber || profile?.nickname || isTeacherByRoles(roles)) ? (
           <div
             className="muted"

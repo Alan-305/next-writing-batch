@@ -1,20 +1,22 @@
 /**
- * Nexus Learning と同じ経路（GAS support シート + 運営宛メール）。
- * GAS は変更しないため、課題ID・学籍番号は content 先頭に含める。
- * 環境変数名は既存運用（apps_script / notify）と揃える。
+ * サポート・お問い合わせのメール送信。
+ * 環境変数名は既存運用（notify）と揃える。
  */
 
 import nodemailer from "nodemailer";
 
 const DEFAULT_BRAND_EMAIL = "support@nexus-learning.com";
-const DEFAULT_SUPPORT_TIMEOUT_MS = 45_000;
+
+/** 生徒サポート問い合わせの事務局 CC（固定） */
+export const STUDENT_SUPPORT_OFFICE_CC = "support@nexus-learning.com";
 const DEFAULT_LOG_TIMEOUT_MS = 12_000;
 
 function env(name: string): string {
   return (process.env[name] ?? "").trim();
 }
 
-function supportNotifyTo(): string {
+/** 事務局 CC 用（未設定時は EMAIL_SENDER） */
+export function supportOfficeEmail(): string {
   const sender = env("EMAIL_SENDER") || DEFAULT_BRAND_EMAIL;
   return env("SUPPORT_NOTIFY_EMAIL") || sender;
 }
@@ -38,146 +40,42 @@ function resendFrom(): string {
   return "Nexus Learning <onboarding@resend.dev>";
 }
 
-function supportTimeoutMs(): number {
-  const raw = env("APPS_SCRIPT_SUPPORT_TIMEOUT");
-  if (!raw) return DEFAULT_SUPPORT_TIMEOUT_MS;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return DEFAULT_SUPPORT_TIMEOUT_MS;
-  return Math.max(5000, n * 1000);
-}
-
-async function postAppsScriptJson(args: {
-  endpointName: "support" | "inquiry" | "analysis";
-  body: Record<string, unknown>;
-}): Promise<boolean> {
-  const url = env("APPS_SCRIPT_SUPPORT_URL");
-  if (!url) return false;
-  const token = env("APPS_SCRIPT_TOKEN");
-  const payload: Record<string, unknown> = { ...args.body };
-  if (token) payload.token = token;
-
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), supportTimeoutMs());
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    if (r.status !== 200) {
-      console.warn(
-        `[postAppsScriptJson:${args.endpointName}] HTTP`,
-        r.status,
-        (await r.text()).slice(0, 500),
-      );
-      return false;
-    }
-    const text = await r.text();
-    try {
-      const data = JSON.parse(text) as { status?: string };
-      if (data && typeof data === "object" && data.status === "error") {
-        console.warn(`[postAppsScriptJson:${args.endpointName}] GAS error JSON:`, text.slice(0, 500));
-        return false;
-      }
-    } catch {
-      /* 非 JSON 応答は成功扱い */
-    }
-    return true;
-  } catch (e) {
-    console.warn(`[postAppsScriptJson:${args.endpointName}] request failed:`, e);
-    return false;
-  } finally {
-    clearTimeout(t);
+function normalizeEmailList(addresses: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of addresses) {
+    const t = raw.trim();
+    if (!t.includes("@")) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
   }
-}
-
-/** Python の _post と同等: JSON POST、token 付与、200 + JSON status error チェック */
-export async function postSupportToAppsScript(args: {
-  studentName: string;
-  email: string;
-  content: string;
-}): Promise<boolean> {
-  return postAppsScriptJson({
-    endpointName: "support",
-    body: {
-      kind: "support_student",
-      // 互換: 旧 GAS 実装が読む可能性のあるキーも残す
-      studentName: args.studentName,
-      student_name: args.studentName,
-      email: args.email,
-      content: args.content,
-    },
-  });
-}
-
-export async function postTeacherInquiryToAppsScript(args: {
-  name: string;
-  email: string;
-  message: string;
-  channel?: string;
-}): Promise<boolean> {
-  return postAppsScriptJson({
-    endpointName: "inquiry",
-    body: {
-      kind: "inquiry_teacher",
-      name: args.name,
-      email: args.email,
-      channel: (args.channel ?? "").trim() || "tensaku_top",
-      content: args.message,
-    },
-  });
-}
-
-export async function postAnalysisPhase1ToAppsScript(args: {
-  taskId: string;
-  submissionId: string;
-  problemMemo?: string;
-  evaluation: string;
-  explanationContent?: string;
-  explanationGrammar?: string;
-  contentDeduction?: number;
-  grammarDeduction?: number;
-  scoreTotal?: number;
-  wordCount?: number;
-  source?: string;
-}): Promise<boolean> {
-  return postAppsScriptJson({
-    endpointName: "analysis",
-    body: {
-      kind: "analysis_phase1",
-      taskId: args.taskId,
-      submissionId: args.submissionId,
-      problemMemo: args.problemMemo ?? "",
-      evaluation: args.evaluation,
-      explanationContent: args.explanationContent ?? "",
-      explanationGrammar: args.explanationGrammar ?? "",
-      contentDeduction: args.contentDeduction,
-      grammarDeduction: args.grammarDeduction,
-      scoreTotal: args.scoreTotal,
-      wordCount: args.wordCount,
-      source: args.source ?? "ops",
-    },
-  });
+  return out;
 }
 
 async function sendViaResend(args: {
-  to: string;
+  to: string[];
+  cc?: string[];
   subject: string;
   text: string;
   replyTo?: string;
 }): Promise<boolean> {
   const apiKey = env("RESEND_API_KEY");
   if (!apiKey) return false;
-  const to = args.to.trim();
-  if (!to || !to.includes("@")) return false;
+  const to = normalizeEmailList(args.to);
+  if (to.length === 0) return false;
+  const cc = normalizeEmailList(args.cc ?? []).filter(
+    (addr) => !to.some((t) => t.toLowerCase() === addr.toLowerCase()),
+  );
   const fromAddr = resendFrom();
   const payload: Record<string, unknown> = {
     from: fromAddr,
-    to: [to],
+    to,
     subject: args.subject,
     text: args.text,
   };
+  if (cc.length > 0) payload.cc = cc;
   if (args.replyTo?.trim().includes("@")) {
     payload.reply_to = args.replyTo.trim();
   }
@@ -193,7 +91,7 @@ async function sendViaResend(args: {
     });
     if (r.ok) return true;
     const detail = (await r.text()).slice(0, 2000);
-    console.error("[sendViaResend] HTTP", r.status, detail, { from: fromAddr, to });
+    console.error("[sendViaResend] HTTP", r.status, detail, { from: fromAddr, to, cc });
     return false;
   } catch (e) {
     console.warn("[sendViaResend] failed:", e);
@@ -202,7 +100,8 @@ async function sendViaResend(args: {
 }
 
 async function sendViaSmtp(args: {
-  to: string;
+  to: string[];
+  cc?: string[];
   subject: string;
   text: string;
   replyTo?: string;
@@ -213,6 +112,11 @@ async function sendViaSmtp(args: {
     console.warn("[sendViaSmtp] EMAIL_PASSWORD unset; cannot use SMTP");
     return false;
   }
+  const to = normalizeEmailList(args.to);
+  if (to.length === 0) return false;
+  const cc = normalizeEmailList(args.cc ?? []).filter(
+    (addr) => !to.some((t) => t.toLowerCase() === addr.toLowerCase()),
+  );
   try {
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -222,7 +126,8 @@ async function sendViaSmtp(args: {
     });
     await transporter.sendMail({
       from: sender,
-      to: args.to,
+      to: to.join(", "),
+      ...(cc.length > 0 ? { cc: cc.join(", ") } : {}),
       subject: args.subject,
       text: args.text,
       ...(args.replyTo?.trim().includes("@") ? { replyTo: args.replyTo.trim() } : {}),
@@ -234,41 +139,63 @@ async function sendViaSmtp(args: {
   }
 }
 
-/** 運営受信箱（SUPPORT_NOTIFY_EMAIL）へ。Resend 優先・未設定時は SMTP。 */
+async function sendEmail(args: {
+  to: string[];
+  cc?: string[];
+  subject: string;
+  text: string;
+  replyTo?: string;
+}): Promise<boolean> {
+  if (env("RESEND_API_KEY")) {
+    return sendViaResend(args);
+  }
+  console.warn(
+    "[sendEmail] RESEND_API_KEY unset; using Gmail SMTP. Set RESEND_API_KEY for production.",
+  );
+  return sendViaSmtp(args);
+}
+
+/** 運営受信箱（SUPPORT_NOTIFY_EMAIL）へ。添削革命サイトの問い合わせ等。 */
 async function sendToSupportInbox(args: {
   subject: string;
   text: string;
   replyTo?: string;
 }): Promise<boolean> {
-  const toAddr = supportNotifyTo();
-  if (env("RESEND_API_KEY")) {
-    return sendViaResend({
-      to: toAddr,
-      subject: args.subject,
-      text: args.text,
-      replyTo: args.replyTo,
-    });
-  }
-  console.warn(
-    "[sendToSupportInbox] RESEND_API_KEY unset; using Gmail SMTP. Set RESEND_API_KEY for production.",
-  );
-  return sendViaSmtp({
-    to: toAddr,
+  const office = supportOfficeEmail();
+  return sendEmail({
+    to: [office],
     subject: args.subject,
     text: args.text,
     replyTo: args.replyTo,
   });
 }
 
-/** services/notify.send_support_notification と同じ宛先・件名・Reply-To */
-export async function sendSupportNotificationEmail(args: {
+/**
+ * 生徒のサポート問い合わせ: 担当教師 1 名を To、support@nexus-learning.com を CC。
+ */
+export async function sendStudentSupportInquiryEmail(args: {
+  teacherEmail: string;
   studentName: string;
-  email: string;
+  replyToEmail: string;
   body: string;
 }): Promise<boolean> {
-  const subject = `【Nexus Learning】サポートお問い合わせ: ${args.studentName || "氏名なし"}`;
-  const reply = args.email.trim().includes("@") ? args.email.trim() : undefined;
-  return sendToSupportInbox({ subject, text: args.body, replyTo: reply });
+  const teacher = args.teacherEmail.trim();
+  if (!teacher.includes("@")) return false;
+
+  const subject = `【添削革命】生徒からのお問い合わせ: ${args.studentName || "氏名なし"}`;
+  const reply = args.replyToEmail.trim().includes("@") ? args.replyToEmail.trim() : undefined;
+  const cc =
+    teacher.toLowerCase() === STUDENT_SUPPORT_OFFICE_CC.toLowerCase()
+      ? []
+      : [STUDENT_SUPPORT_OFFICE_CC];
+
+  return sendEmail({
+    to: [teacher],
+    cc,
+    subject,
+    text: args.body,
+    replyTo: reply,
+  });
 }
 
 /** 添削革命サイトの「サポート・ご相談」（課題IDなし）。notify と同じ環境変数。 */
@@ -290,13 +217,9 @@ export async function sendTensakuKakumeiContactEmail(args: {
   return sendToSupportInbox({ subject, text, replyTo: reply });
 }
 
-/** GAS の「内容」列用。氏名・メールは別列のため本文のみ前置情報＋お問い合わせ */
-export function buildGasSupportContent(taskId: string, studentId: string, inquiry: string): string {
-  return [`課題ID: ${taskId}`, `学籍番号: ${studentId}`, "", inquiry.trim()].join("\n");
-}
-
-/** メール本文（運営向け・全項目） */
+/** メール本文（教師・事務局向け） */
 export function buildSupportEmailBody(args: {
+  organizationId: string;
   taskId: string;
   studentId: string;
   studentName: string;
@@ -304,9 +227,10 @@ export function buildSupportEmailBody(args: {
   inquiry: string;
 }): string {
   return [
+    `テナントID: ${args.organizationId}`,
     `課題ID: ${args.taskId}`,
-    `学籍番号: ${args.studentId}`,
-    `氏名: ${args.studentName}`,
+    `学籍番号: ${args.studentId || "—"}`,
+    `氏名: ${args.studentName || "—"}`,
     `メール: ${args.email}`,
     "",
     "お問い合わせ内容:",

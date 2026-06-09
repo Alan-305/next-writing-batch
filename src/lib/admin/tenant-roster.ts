@@ -126,3 +126,31 @@ export async function buildTenantRoster(organizationId: string): Promise<TenantR
     note,
   };
 }
+
+/**
+ * テナントの担当教師 1 名のメール（roles に teacher を持つユーザーを優先。org_{uid} ならその uid）。
+ * 1 テナント 1 教師の運用向け。
+ */
+export async function resolvePrimaryTeacherEmailForOrganization(
+  organizationId: string,
+): Promise<string | null> {
+  const oid = (organizationId ?? "").trim();
+  if (!oid) return null;
+
+  const roster = await buildTenantRoster(oid);
+  const withTeacherRole = roster.teachers.filter((t) =>
+    t.roles.some((r) => r.toLowerCase() === "teacher"),
+  );
+  const candidates = withTeacherRole.length > 0 ? withTeacherRole : roster.teachers;
+  if (candidates.length === 0) return null;
+
+  let pick = candidates[0];
+  const ownerMatch = /^org_(.+)$/i.exec(oid);
+  if (ownerMatch) {
+    const owner = candidates.find((t) => t.uid === ownerMatch[1]);
+    if (owner) pick = owner;
+  }
+
+  const email = (pick.email ?? "").trim();
+  return email.includes("@") ? email : null;
+}

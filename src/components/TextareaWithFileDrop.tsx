@@ -465,7 +465,7 @@ export function TextareaWithFileDrop({
                 wordBreak: "normal",
               }}
             >
-              グラフ・表を含むお題を、<strong>指示文＋表形式</strong>で読み取る（複数枚可・Gemini）
+              グラフ・表がある問題はこちら（写真を複数枚つけられます）
             </span>
           </label>
         </div>
@@ -495,28 +495,7 @@ export function TextareaWithFileDrop({
         }}
       >
         <p className="muted" style={{ margin: "0 0 10px", lineHeight: 1.55 }}>
-          写真・スクリーンショット（画像）、<strong>PDF</strong>、テキスト（.txt / .md など）を
-          <strong>ドラッグ＆ドロップ</strong>するか、下のボタンで選べます。
-          {structuredProblemReading ? (
-            <>
-              {" "}
-              <strong>デフォルトはオフ</strong>です。オフのときは画像1件（複数なら先頭のみ）を{" "}
-              <strong>Gemini</strong> が通常プロンプトで読み取ります。オンにするとカスタム自由英作文の{" "}
-              <code>problem_structured</code> と同じ形式です。
-            </>
-          ) : null}
-          {jsonDropBehavior === "setup-full" ? (
-            <>
-              {" "}
-              教員用の<strong>設定 JSON</strong>を1つだけドロップした場合は、フォーム全体を読み込みます。
-            </>
-          ) : null}
-          {jsonDropBehavior === "extract-question-only" ? (
-            <>
-              {" "}
-              教員用設定 <strong>JSON</strong> を1つドロップすると、中の<strong>問題文だけ</strong>を取り込みます。
-            </>
-          ) : null}
+          写真・<strong>PDF</strong>・テキストを、この枠に<strong>ドラッグ＆ドロップ</strong>するか、下のボタンで選べます。
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
           <button
@@ -531,7 +510,7 @@ export function TextareaWithFileDrop({
                 処理中…
               </>
             ) : (
-              "ファイルを選ぶ"
+              "カメラ・ファイルを選ぶ"
             )}
           </button>
         </div>
@@ -551,9 +530,6 @@ export function TextareaWithFileDrop({
             <span>{status}</span>
           </p>
         ) : null}
-        <p className="muted" style={{ margin: "0 0 0", fontSize: "0.85rem" }}>
-          この枠内（テキスト欄を含む）にドラッグ＆ドロップできます。
-        </p>
         <textarea
           id={inputId}
           rows={rows}
