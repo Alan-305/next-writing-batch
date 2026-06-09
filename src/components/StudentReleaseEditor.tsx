@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
@@ -118,6 +117,8 @@ type Props = {
   taskRubricDefaults: Record<string, number>;
   /** 課題・添削設定（サーバー保存）から来る既定付け点（content / grammar） */
   teacherSetupScoreDefaults: Record<string, number>;
+  /** 確定・公開後に親でデータ再取得（フルリロードの代わり） */
+  onReloadComplete?: (scrollToId?: string) => void;
 };
 
 export function StudentReleaseEditor({
@@ -131,8 +132,8 @@ export function StudentReleaseEditor({
   day4Error,
   taskRubricDefaults,
   teacherSetupScoreDefaults,
+  onReloadComplete,
 }: Props) {
-  const router = useRouter();
   const { user } = useFirebaseAuthContext();
   const seeded = useMemo(() => {
     if (initialRelease) return initialRelease;
@@ -317,6 +318,17 @@ export function StudentReleaseEditor({
     return true;
   };
 
+  const completeReload = (scrollToId?: string) => {
+    if (onReloadComplete) {
+      onReloadComplete(scrollToId);
+      return;
+    }
+    if (scrollToId) {
+      window.location.hash = scrollToId;
+    }
+    window.location.reload();
+  };
+
   const runDay4Only = async () => {
     setBusy(true);
     setMessage("");
@@ -333,8 +345,8 @@ export function StudentReleaseEditor({
       const idToken = await user.getIdToken();
       const ok = await invokeRunDay4Api(idToken, hasDay4Pdf);
       if (!ok) return;
-      setMessage("Day4 を再生成しました。画面を再読み込みします。");
-      window.location.reload();
+      setMessage("Day4 を再生成しました。");
+      completeReload("student-release-actions");
     } catch (e) {
       console.error("[StudentReleaseEditor] runDay4Only", e);
       const detail = e instanceof Error ? e.message : String(e);
@@ -402,7 +414,9 @@ export function StudentReleaseEditor({
       }
 
       setMessage(opts.successMessage);
-      window.location.reload();
+      const scrollToId =
+        opts.runDay4After || opts.operatorFinalized ? "student-release-actions" : undefined;
+      completeReload(scrollToId);
     } catch (e) {
       console.error("[StudentReleaseEditor] patchRelease", e);
       const detail = e instanceof Error ? e.message : String(e);
@@ -565,7 +579,10 @@ export function StudentReleaseEditor({
         {finalizedAt && !canPublish ? " Day4 の PDF が揃うまで公開できません。" : null}
       </p>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+      <div
+        id="student-release-actions"
+        style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}
+      >
         <button
           type="button"
           disabled={busy || !proofread}

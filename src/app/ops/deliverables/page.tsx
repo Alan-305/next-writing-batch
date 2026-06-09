@@ -3,6 +3,7 @@ import Link from "next/link";
 import { DeliverablesZipRowActions } from "@/components/DeliverablesZipRowActions";
 import { formatDateTimeMs } from "@/lib/format-date";
 import { listDeliverableZips } from "@/lib/deliverables-store";
+import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 
 /** output/zips を実行時に読むため SSG にしない（ビルド後に ZIP が増える） */
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export default async function DeliverablesPage() {
         <strong>課題ID</strong>列はファイル名先頭から推定します。
       </p>
       <p>
-        <Link href="/ops">運用ハブへ</Link>
+        <Link href="/ops">{OPS_DASHBOARD_LABEL}</Link>
         {" · "}
         <Link href="/ops/submissions">提出一覧</Link>
       </p>

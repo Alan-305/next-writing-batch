@@ -13,6 +13,7 @@ import {
   type ProofreadingSetupJson,
 } from "@/lib/proofreading-setup-json";
 import type { RegisteredTaskSummary } from "@/lib/registered-tasks-list";
+import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 import { validateTaskIdForStorage } from "@/lib/task-id-policy";
 
 function defaultFilename(label: string): string {
@@ -310,7 +311,7 @@ export default function ProofreadingSetupPage() {
     <main>
       <h1>課題・添削設定</h1>
       <p>
-        <Link href="/ops">運用トップ</Link> · <Link href="/submit">提出（生徒）</Link>
+        <Link href="/ops">{OPS_DASHBOARD_LABEL}</Link> · <Link href="/submit">提出（生徒）</Link>
       </p>
 
       <div className="card">

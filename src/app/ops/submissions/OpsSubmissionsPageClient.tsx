@@ -8,6 +8,7 @@ import { OpsPackageZipTaskPanel } from "@/components/OpsPackageZipTaskPanel";
 import { OpsSubmissionsSummary } from "@/components/ops/OpsSubmissionsSummary";
 import { OpsSubmissionsTable } from "@/components/OpsSubmissionsTable";
 import { RunProofreadPanel } from "@/components/RunProofreadPanel";
+import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 import { OPS_COPY } from "@/lib/ops/submission-status-labels";
 import type { Submission } from "@/lib/submissions-store";
 
@@ -173,7 +174,7 @@ export function OpsSubmissionsPageClient() {
         <h1>{OPS_COPY.pageTitle}</h1>
         <p className="error">{loadErr}</p>
         <p>
-          <Link href="/ops">運用トップ</Link>
+          <Link href="/ops">{OPS_DASHBOARD_LABEL}</Link>
         </p>
       </main>
     );
@@ -187,7 +188,7 @@ export function OpsSubmissionsPageClient() {
           <p className="ops-page-header__lead">{OPS_COPY.pageLead}</p>
         </div>
         <nav className="ops-page-nav" aria-label="関連ページ">
-          <Link href="/ops">運用トップ</Link>
+          <Link href="/ops">{OPS_DASHBOARD_LABEL}</Link>
           <Link href="/ops/deliverables">納品ZIP</Link>
           <Link href="/submit">提出画面</Link>
         </nav>

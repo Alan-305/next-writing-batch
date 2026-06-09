@@ -12,6 +12,8 @@ export type StudentBranding = {
   productTitle: string;
   /** バッジ文言（既定: 生徒用） */
   badgeLabel: string;
+  /** 教員・運用画面ヘッダーのバッジ（既定: 教員・運用） */
+  teacherBadgeLabel: string;
   /** ヘッダーに表示する学校名など（空なら非表示） */
   schoolDisplayName: string;
   /** 見出し・ブランド文字・ボタン終端色の基調 */
@@ -27,6 +29,7 @@ export type StudentBranding = {
 export const DEFAULT_STUDENT_BRANDING: StudentBranding = {
   productTitle: "添削革命",
   badgeLabel: "生徒用",
+  teacherBadgeLabel: "教員・運用",
   schoolDisplayName: "",
   primaryColor: "#0369a1",
   accentColor: "#0ea5e9",
@@ -41,11 +44,16 @@ export function mergeStudentBranding(raw: unknown): StudentBranding {
   const productTitle =
     typeof o.productTitle === "string" && o.productTitle.trim() ? o.productTitle.trim() : d.productTitle;
   const badgeLabel = typeof o.badgeLabel === "string" && o.badgeLabel.trim() ? o.badgeLabel.trim() : d.badgeLabel;
+  const teacherBadgeLabel =
+    typeof o.teacherBadgeLabel === "string" && o.teacherBadgeLabel.trim()
+      ? o.teacherBadgeLabel.trim()
+      : d.teacherBadgeLabel;
   const schoolDisplayName =
     typeof o.schoolDisplayName === "string" ? o.schoolDisplayName.trim() : d.schoolDisplayName;
   return {
     productTitle,
     badgeLabel,
+    teacherBadgeLabel,
     schoolDisplayName,
     primaryColor: safeHex(o.primaryColor, d.primaryColor),
     accentColor: safeHex(o.accentColor, d.accentColor),

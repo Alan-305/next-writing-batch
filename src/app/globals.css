@@ -962,6 +962,98 @@ a.ops-btn {
   border-radius: 4px;
 }
 
+.app-shell-header--student .app-shell-nav {
+  margin-left: 0;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.app-shell-header--student .app-shell-nav a {
+  color: color-mix(in srgb, var(--student-primary, #0369a1) 88%, #0f172a);
+}
+
+.app-shell-header--student .app-shell-nav a:hover {
+  color: var(--student-accent, #0ea5e9);
+}
+
+.app-shell-header--student .app-shell-nav a[aria-current="page"] {
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.app-shell-header--student .auth-toolbar--teacher .auth-toolbar-email {
+  color: color-mix(in srgb, var(--student-primary, #0369a1) 88%, #0f172a);
+}
+
+.app-shell-header--student .auth-toolbar--teacher .auth-toolbar-meta,
+.app-shell-header--student .auth-toolbar--teacher .auth-toolbar-tenant-id {
+  color: #64748b;
+}
+
+.app-shell-header--student .auth-toolbar--teacher .auth-toolbar-tenant-id code {
+  color: color-mix(in srgb, var(--student-primary, #0369a1) 92%, #0f172a);
+  background: color-mix(in srgb, var(--student-accent, #0ea5e9) 14%, #fff);
+  border: 1px solid color-mix(in srgb, var(--student-accent, #0ea5e9) 35%, #e2e8f0);
+}
+
+.app-shell-header--student .auth-toolbar--teacher button {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  background: linear-gradient(
+    180deg,
+    var(--student-accent, #0ea5e9),
+    var(--student-primary, #0284c7)
+  );
+  border: none;
+  color: #fff;
+}
+
+.app-shell-header--student .auth-toolbar--teacher button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.app-shell--teacher.app-shell--ops-branded {
+  min-height: 100vh;
+  background: linear-gradient(
+    180deg,
+    var(--student-surface-start, #f0f9ff) 0%,
+    #fff 28%,
+    var(--student-surface-end, #fffbeb) 100%
+  );
+}
+
+.app-shell--teacher.app-shell--ops-branded h1 {
+  color: color-mix(in srgb, var(--student-primary, #0c4a6e) 92%, #0f172a);
+}
+
+.app-shell--teacher.app-shell--ops-branded h2 {
+  color: color-mix(in srgb, var(--student-primary, #0c4a6e) 88%, #0f172a);
+}
+
+.app-shell--teacher.app-shell--ops-branded .card {
+  border: 2px solid color-mix(in srgb, var(--student-accent, #bae6fd) 50%, #e2e8f0);
+  box-shadow: 0 4px 20px rgba(14, 116, 144, 0.07);
+}
+
+.app-shell--teacher.app-shell--ops-branded button {
+  background: linear-gradient(
+    180deg,
+    var(--student-accent, #0ea5e9),
+    var(--student-primary, #0284c7)
+  );
+}
+
+.app-shell--teacher.app-shell--ops-branded button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.app-shell--teacher.app-shell--ops-branded .field > span:first-child {
+  font-weight: 800;
+  color: color-mix(in srgb, var(--student-primary, #0c4a6e) 90%, #0f172a);
+}
+
 .auth-toolbar--teacher {
   margin-left: auto;
   display: flex;

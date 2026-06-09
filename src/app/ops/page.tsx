@@ -1,13 +1,12 @@
 import Link from "next/link";
 
+import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
+
 export default function OpsHomePage() {
   return (
     <main className="ops-home">
       <header className="ops-home-hero card">
-        <h1>教員・運用ホーム</h1>
-        <p className="muted">
-          ここは、日々の運用作業を始めるためのページです。必要な操作だけを大きなボタンにまとめています。
-        </p>
+        <h1>{OPS_DASHBOARD_LABEL}</h1>
       </header>
 
       <section className="ops-home-grid" aria-label="主要作業">
@@ -53,8 +52,10 @@ export default function OpsHomePage() {
           <span className="ops-home-action-icon" aria-hidden>
             🎨
           </span>
-          <span className="ops-home-action-title">生徒画面設定</span>
-          <span className="ops-home-action-desc">色や学校名など、生徒が見る画面のトーンを組織単位で変えます。</span>
+          <span className="ops-home-action-title">教師・生徒画面設定</span>
+          <span className="ops-home-action-desc">
+            色や学校名など、教員画面と生徒画面の見た目を組織単位でそろえます。
+          </span>
           <span className="ops-home-action-cta">設定を開く</span>
         </Link>
 

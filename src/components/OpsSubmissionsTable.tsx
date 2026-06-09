@@ -104,7 +104,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [sort, setSort] = useState<SortKey>("status_pending_first");
+  const [sort, setSort] = useState<SortKey>("submitted_desc");
   const [pageSize, setPageSize] = useState<number>(50);
   const [page, setPage] = useState(1);
   const [zipSelected, setZipSelected] = useState<Set<string>>(() => new Set());

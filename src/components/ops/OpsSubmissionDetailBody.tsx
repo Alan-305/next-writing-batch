@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { OpsSubmissionNextSteps } from "@/components/ops/OpsSubmissionNextSteps";
 import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEditor";
 import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
@@ -17,6 +18,7 @@ type Props = {
   /** API がサーバー側で解決した再生 URL（クライアント単体では env が無いため必須） */
   day4AudioPlayUrl?: string;
   day4AudioQrUrl?: string;
+  onReloadComplete?: (scrollToId?: string) => void;
 };
 
 export function OpsSubmissionDetailBody({
@@ -26,6 +28,7 @@ export function OpsSubmissionDetailBody({
   teacherSetupDefaults,
   day4AudioPlayUrl = "",
   day4AudioQrUrl = "",
+  onReloadComplete,
 }: Props) {
   const day4 = submission.day4;
   const hasDay4Pdf = Boolean(String(day4?.pdf_path ?? "").trim()) && !day4?.error;
@@ -40,6 +43,8 @@ export function OpsSubmissionDetailBody({
     day4AudioQrUrl.trim() || (audioUrl ? resolveDay4AudioQrUrl(audioUrl) : "");
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
+  const finalized = Boolean(submission.studentRelease?.operatorFinalizedAt);
+  const readyToPublish = finalized && !published && hasDay4Pdf;
   const taskMismatch = submissionProofreadTaskMismatch(submission);
 
   return (
@@ -48,6 +53,12 @@ export function OpsSubmissionDetailBody({
       <p>
         <Link href="/ops/submissions">一覧に戻る</Link>
       </p>
+
+      <OpsSubmissionNextSteps
+        submissionId={submission.submissionId}
+        readyToPublish={readyToPublish}
+        hasDay4Pdf={hasDay4Pdf}
+      />
 
       <div className="card">
         {taskMismatch.mismatched ? (
@@ -174,6 +185,7 @@ export function OpsSubmissionDetailBody({
             day4Error={day4Error}
             taskRubricDefaults={taskRubricDefaults}
             teacherSetupScoreDefaults={teacherSetupDefaults}
+            onReloadComplete={onReloadComplete}
           />
         ) : (
           <p className="error">
@@ -183,7 +195,7 @@ export function OpsSubmissionDetailBody({
         )}
       </div>
 
-      <div className="card">
+      <div className="card" id="day4-deliverables">
         <h2>成果物（Day4）</h2>
         {submission.day4?.error ? (
           <div className="error" style={{ marginBottom: 12 }}>

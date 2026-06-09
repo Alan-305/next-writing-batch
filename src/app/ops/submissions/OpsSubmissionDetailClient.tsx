@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { OpsSubmissionDetailBody } from "@/components/ops/OpsSubmissionDetailBody";
@@ -28,6 +28,14 @@ export function OpsSubmissionDetailClient() {
   const { user, authLoading } = useFirebaseAuthContext();
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [err, setErr] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pendingScrollRef = useRef<string | null>(null);
+
+  const handleReloadComplete = useCallback((scrollToId?: string) => {
+    if (scrollToId) pendingScrollRef.current = scrollToId;
+    setReloadToken((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     if (!submissionId || authLoading) return;
@@ -38,7 +46,9 @@ export function OpsSubmissionDetailClient() {
     let cancelled = false;
     void (async () => {
       setErr("");
-      setBundle(null);
+      const isInitialLoad = reloadToken === 0;
+      if (isInitialLoad) setBundle(null);
+      else setRefreshing(true);
       try {
         const token = await user.getIdToken();
         const res = await fetch(`/api/ops/submissions/${encodeURIComponent(submissionId)}`, {
@@ -57,14 +67,23 @@ export function OpsSubmissionDetailClient() {
           return;
         }
         setBundle(json);
+        const scrollId = pendingScrollRef.current;
+        if (scrollId) {
+          pendingScrollRef.current = null;
+          window.setTimeout(() => {
+            document.getElementById(scrollId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 80);
+        }
       } catch {
         if (!cancelled) setErr("通信エラーが発生しました。");
+      } finally {
+        if (!cancelled) setRefreshing(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [submissionId, user, authLoading]);
+  }, [submissionId, user, authLoading, reloadToken]);
 
   if (!submissionId) {
     return (
@@ -98,13 +117,21 @@ export function OpsSubmissionDetailClient() {
   }
 
   return (
-    <OpsSubmissionDetailBody
-      submission={bundle.submission}
-      master={bundle.master ?? null}
-      taskRubricDefaults={bundle.taskRubricDefaults ?? {}}
-      teacherSetupDefaults={bundle.teacherSetupDefaults ?? {}}
-      day4AudioPlayUrl={bundle.day4AudioPlayUrl ?? ""}
-      day4AudioQrUrl={bundle.day4AudioQrUrl ?? ""}
-    />
+    <>
+      {refreshing ? (
+        <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.92rem" }} role="status">
+          内容を更新しています…
+        </p>
+      ) : null}
+      <OpsSubmissionDetailBody
+        submission={bundle.submission}
+        master={bundle.master ?? null}
+        taskRubricDefaults={bundle.taskRubricDefaults ?? {}}
+        teacherSetupDefaults={bundle.teacherSetupDefaults ?? {}}
+        day4AudioPlayUrl={bundle.day4AudioPlayUrl ?? ""}
+        day4AudioQrUrl={bundle.day4AudioQrUrl ?? ""}
+        onReloadComplete={handleReloadComplete}
+      />
+    </>
   );
 }

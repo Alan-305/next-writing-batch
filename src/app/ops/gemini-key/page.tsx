@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 
 type Status = {
   configured: boolean;
@@ -112,7 +113,7 @@ export default function OpsGeminiKeyPage() {
     <main>
       <h1>Gemini API キー</h1>
       <p>
-        <Link href="/ops">運用ハブ</Link> · <Link href="/ops/submissions">提出一覧</Link>
+        <Link href="/ops">{OPS_DASHBOARD_LABEL}</Link> · <Link href="/ops/submissions">提出一覧</Link>
       </p>
 
       {!authLoading && !user ? (

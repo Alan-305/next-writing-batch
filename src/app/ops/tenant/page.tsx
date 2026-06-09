@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 
 type TenantPayload = {
   ok?: boolean;
@@ -85,12 +86,12 @@ export default function OpsTenantPage() {
   return (
     <main>
       <p className="muted" style={{ marginTop: 0 }}>
-        <Link href="/ops">← 運用ホーム</Link>
+        <Link href="/ops">← {OPS_DASHBOARD_LABEL}</Link>
       </p>
       <h1>テナント（検証）</h1>
       <p className="muted">
         API とディスクは <code>{"users/{uid}.organizationId"}</code> を正規化した値で{" "}
-        <code>{"data/orgs/{id}/"}</code> に分離されます。色・文言の変更は「生徒画面の見た目」でテナントごとに別ファイルになります。
+        <code>{"data/orgs/{id}/"}</code> に分離されます。色・文言の変更は「教師・生徒画面設定」でテナントごとに保存されます。
       </p>
 
       {loading ? (
