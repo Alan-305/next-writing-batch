@@ -314,10 +314,10 @@ export default function ProofreadingSetupPage() {
       </p>
 
       <div className="card">
-        <h2>設定・問題</h2>
+        <h2>課題設定</h2>
 
         <label className="field">
-          <span>課題ID</span>
+          <span>新規課題ID</span>
           <input
             value={setup.task_id ?? ""}
             onChange={(e) => patchSetup({ task_id: e.target.value })}
@@ -341,7 +341,7 @@ export default function ProofreadingSetupPage() {
               disabled={registryLoading}
               style={{ width: "100%", maxWidth: "100%" }}
             >
-              <option value="">（新規作成・上の欄に直接入力）</option>
+              <option value="">プルダウンで選択</option>
               {registryTasks.map((t) => (
                 <option key={t.taskId} value={t.taskId}>
                   {t.displayLabel} — {t.taskId}
@@ -366,7 +366,7 @@ export default function ProofreadingSetupPage() {
         </div>
 
         <label className="field">
-          <span>課題の表示名（任意）</span>
+          <span>課題内容メモ（任意）</span>
           <input
             type="text"
             maxLength={120}
@@ -454,8 +454,7 @@ export default function ProofreadingSetupPage() {
       <div className="card">
         <h2>サーバー登録の削除</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          不要になった課題を<strong>サーバー上から削除</strong>すると、生徒の提出画面の<strong>プルダウン</strong>からも消えます（
-          <code>data/task-problems/</code> と <code>data/teacher-proofreading-setup/</code>）。既存の提出データは削除されません。
+          不要になった課題を<strong>サーバー上から削除</strong>すると、生徒の提出画面の<strong>プルダウン</strong>からも消えます。既存の提出データは削除されません。
         </p>
         <label className="field">
           <span>登録済み課題から選ぶ</span>
