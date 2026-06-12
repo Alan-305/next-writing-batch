@@ -75,7 +75,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, message: "提出が見つかりません。" }, { status: 404 });
       }
       if (String(row.day4TicketChargedAt ?? "").trim()) continue;
-      if (!String(row.submittedByUid ?? "").trim()) continue;
       needTickets += 1;
     }
     if (needTickets > 0) {
@@ -139,14 +138,6 @@ export async function POST(request: Request) {
       const row = await getSubmissionByIdInOrganization(auth.organizationId, sid);
       if (!row) continue;
       if (String(row.day4TicketChargedAt ?? "").trim()) continue;
-
-      const submitterUid = String(row.submittedByUid ?? "").trim();
-      if (!submitterUid) {
-        ticketChargeWarning =
-          (ticketChargeWarning ? `${ticketChargeWarning} ` : "") +
-          `${sid}: ログイン提出ではないため請求記録のみスキップしました（教員チケットは消費していません）。`;
-        continue;
-      }
 
       const consumed = await consumeProofreadTickets(teacherUid, 1, "day4_finalize");
       if (!consumed.ok) {

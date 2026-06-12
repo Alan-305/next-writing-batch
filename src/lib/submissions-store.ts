@@ -18,6 +18,8 @@ export type Submission = SubmissionInput & {
   organizationId?: string;
   /** 提出 API が検証した Firebase Auth uid（ログイン提出時） */
   submittedByUid?: string;
+  /** 匿名提出の引換ID（結果照会にニックネームとセットで使用） */
+  redeemId?: string;
   status: "pending" | "queued" | "processing" | "done" | "failed";
   /** 非同期添削キュー（Phase 1） */
   proofreadJobId?: string;
@@ -277,6 +279,25 @@ export async function findLatestSubmissionByStudentLookup(
   return matches[0] ?? null;
 }
 
+export async function findSubmissionByRedeemLookup(
+  organizationId: string,
+  args: { displayNick: string; redeemId: string },
+): Promise<Submission | null> {
+  const nick = normalizeLookupToken(args.displayNick);
+  const redeem = normalizeLookupToken(args.redeemId);
+  if (!nick || !redeem) return null;
+
+  const submissions = await getSubmissions(organizationId);
+  const matches = submissions.filter((s) => {
+    const rowNick = normalizeLookupToken(s.studentName);
+    const rowRedeem = normalizeLookupToken(String(s.redeemId ?? ""));
+    return rowNick === nick && rowRedeem === redeem;
+  });
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  return matches[0] ?? null;
+}
+
 export async function findLatestSubmissionByUidAndTask(
   organizationId: string,
   uid: string,
@@ -345,7 +366,7 @@ export async function updateSubmissionById(
 export async function addSubmission(
   organizationId: string,
   input: SubmissionInput,
-  opts?: { submittedByUid?: string },
+  opts?: { submittedByUid?: string; redeemId?: string; displayNick?: string },
 ): Promise<Submission> {
   const q = (input.question ?? "").trim();
   const memo = (input.problemMemo ?? "").trim();
@@ -354,6 +375,8 @@ export async function addSubmission(
     Array.isArray(input.essayParts) &&
     input.essayParts.length >= 2;
   const pid = (input.problemId ?? "").trim();
+  const displayNick = (opts?.displayNick ?? input.studentName ?? "").trim();
+  const redeemId = (opts?.redeemId ?? "").trim();
 
   const submission: Submission = {
     submissionId: randomUUID(),
@@ -362,9 +385,10 @@ export async function addSubmission(
     status: "pending",
     taskId: input.taskId.trim(),
     studentId: input.studentId.trim(),
-    studentName: input.studentName.trim(),
+    studentName: displayNick,
     essayText: input.essayText.trim(),
     ...(opts?.submittedByUid ? { submittedByUid: opts.submittedByUid } : {}),
+    ...(redeemId ? { redeemId } : {}),
     ...(q ? { question: q } : {}),
     ...(memo ? { problemMemo: memo } : {}),
     ...(pid ? { problemId: pid } : {}),

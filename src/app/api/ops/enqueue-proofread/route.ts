@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import {
-  allProofreadTargetsAreSelfSubmitted,
   assertTeacherHasTicketsForProofread,
 } from "@/lib/billing/proofread-ticket-firestore";
 import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organization";
@@ -119,8 +118,7 @@ export async function POST(request: Request) {
   });
 
   const skipTicketGate = (process.env.NWB_SKIP_PROOFREAD_TICKET_GATE ?? "").trim() === "true";
-  const teacherSelfServiceProofread = allProofreadTargetsAreSelfSubmitted(targetRows, auth.uid);
-  if (!skipTicketGate && !teacherSelfServiceProofread && !Boolean(body.forceRedo)) {
+  if (!skipTicketGate && !Boolean(body.forceRedo)) {
     const canStart = await assertTeacherHasTicketsForProofread(auth.uid, targetRowCount);
     if (!canStart.ok) {
       return NextResponse.json(
@@ -158,7 +156,6 @@ export async function POST(request: Request) {
       batchId: result.batchId,
       enqueued: result.enqueued,
       skipped: result.skipped,
-      teacherSelfServiceProofread,
     },
     { status: 202 },
   );

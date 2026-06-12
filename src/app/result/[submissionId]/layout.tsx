@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { StudentAppShellLayout } from "@/components/student/StudentAppShellLayout";
+import { StudentPublicShellLayout } from "@/components/student/StudentPublicShellLayout";
 
 export default function ResultLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <StudentAppShellLayout>{children}</StudentAppShellLayout>;
+  return <StudentPublicShellLayout>{children}</StudentPublicShellLayout>;
 }

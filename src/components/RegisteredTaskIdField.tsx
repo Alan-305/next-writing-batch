@@ -18,6 +18,8 @@ type Props = {
   onProblemIdChange?: (problemId: string) => void;
   /** 課題レジストリ取得時に付与する Firebase ID トークン（テナント分離用） */
   getAccessToken?: () => Promise<string | null>;
+  /** 匿名提出（招待 org）— ログインなしで課題一覧を取得 */
+  publicOrganizationId?: string;
 };
 
 /**
@@ -31,6 +33,7 @@ export function RegisteredTaskIdField({
   problemId,
   onProblemIdChange,
   getAccessToken,
+  publicOrganizationId,
 }: Props) {
   const [tasks, setTasks] = useState<RegistryTaskRow[] | null>(null);
   const [fetchErr, setFetchErr] = useState("");
@@ -39,7 +42,19 @@ export function RegisteredTaskIdField({
     let cancelled = false;
     void (async () => {
       try {
+        const org = (publicOrganizationId ?? "").trim();
         const headers: Record<string, string> = {};
+        if (org) {
+          const r = await fetch(`/api/tasks/registry/public?org=${encodeURIComponent(org)}`, { headers });
+          const j = (await r.json()) as { ok?: boolean; tasks?: RegistryTaskRow[]; message?: string };
+          if (cancelled) return;
+          if (j.ok && Array.isArray(j.tasks)) {
+            setTasks(j.tasks);
+          } else {
+            setFetchErr(j.message || "課題一覧を読めませんでした。");
+          }
+          return;
+        }
         const token = await getAccessToken?.();
         if (token) headers.Authorization = `Bearer ${token}`;
         const r = await fetch("/api/tasks/registry", { headers });
@@ -57,7 +72,7 @@ export function RegisteredTaskIdField({
     return () => {
       cancelled = true;
     };
-  }, [getAccessToken]);
+  }, [getAccessToken, publicOrganizationId]);
 
   const selected = useMemo(() => tasks?.find((t) => t.taskId === value), [tasks, value]);
   const hasTasks = Array.isArray(tasks) && tasks.length > 0;

@@ -4,6 +4,7 @@ import { verifyBearerUidAndOrganization } from "@/lib/auth/resolve-bearer-organi
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { essayOcrProviderMode, runEssayHandwritingIngest } from "@/lib/essay-handwriting-ingest";
 import { resolveEffectiveGeminiApiKey } from "@/lib/gemini-key-store";
+import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 import { normalizeVisionImagePartForApi } from "@/lib/vision-ingest-normalize-heif";
 
 export const runtime = "nodejs";
@@ -37,8 +38,27 @@ function isMediaFile(file: File): boolean {
  * 既定は Gemini のみ（ESSAY_OCR_PROVIDER=gemini-only）。添削は Claude 専用。
  */
 export async function POST(request: Request) {
+  let organizationId: string | null = null;
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return NextResponse.json({ error: "フォームデータの解析に失敗しました。" }, { status: 400 });
+  }
+
+  const orgFromForm = sanitizeOrganizationIdForPath(String(form.get("organizationId") ?? "").trim());
   const auth = await verifyBearerUidAndOrganization(request);
-  if (!auth.ok) return auth.response;
+  if (auth.ok) {
+    organizationId = auth.organizationId;
+  } else if (orgFromForm) {
+    organizationId = orgFromForm;
+  } else {
+    return NextResponse.json(
+      { error: "ログインするか、招待リンク（organizationId）付きでアクセスしてください。" },
+      { status: 401 },
+    );
+  }
 
   const claudeKey = resolveEffectiveAnthropicApiKey();
   const geminiKey = resolveEffectiveGeminiApiKey();
@@ -62,12 +82,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "フォームデータの解析に失敗しました。" }, { status: 400 });
-  }
+  void organizationId;
 
   const files = form.getAll("files").filter((x): x is File => x instanceof File && x.size > 0);
 

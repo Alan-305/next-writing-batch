@@ -15,7 +15,11 @@ import {
   type StudentBranding,
 } from "@/lib/student-branding";
 
-type Props = { children: ReactNode };
+type Props = {
+  children: ReactNode;
+  publicOrganizationId?: string;
+  allowAnonymous?: boolean;
+};
 
 function SettingsGearLink({ active }: { active: boolean }) {
   return (
@@ -53,17 +57,29 @@ function SettingsGearLink({ active }: { active: boolean }) {
   );
 }
 
-export function StudentAppShellLayout({ children }: Props) {
+export function StudentAppShellLayout({
+  children,
+  publicOrganizationId,
+  allowAnonymous = false,
+}: Props) {
   const pathname = usePathname() || "";
   const settingsActive = pathname === "/settings" || pathname.startsWith("/settings/");
   const { user, authLoading } = useFirebaseAuthContext();
   const [branding, setBranding] = useState<StudentBranding>(DEFAULT_STUDENT_BRANDING);
 
   useEffect(() => {
-    if (!user || authLoading) return;
     let cancelled = false;
     void (async () => {
       try {
+        const org = (publicOrganizationId ?? "").trim();
+        if (allowAnonymous && org) {
+          const res = await fetch(`/api/branding/public?org=${encodeURIComponent(org)}`);
+          if (!res.ok) return;
+          const data: unknown = await res.json();
+          if (!cancelled) setBranding(mergeStudentBranding(data));
+          return;
+        }
+        if (!user || authLoading) return;
         const token = await user.getIdToken();
         const res = await fetch("/api/branding", { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
@@ -76,7 +92,7 @@ export function StudentAppShellLayout({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading, pathname]);
+  }, [user, authLoading, pathname, publicOrganizationId, allowAnonymous]);
 
   const shellStyle = useMemo(() => studentBrandingStyle(branding), [branding]);
   const school = branding.schoolDisplayName.trim();
@@ -91,12 +107,17 @@ export function StudentAppShellLayout({ children }: Props) {
           </div>
           <span className="app-shell-badge-student">{branding.badgeLabel}</span>
           <div className="app-shell-header-actions">
-            <SettingsGearLink active={settingsActive} />
-            <AuthToolbar variant="student" />
+            {!allowAnonymous ? <SettingsGearLink active={settingsActive} /> : null}
+            {!allowAnonymous ? <AuthToolbar variant="student" /> : null}
+            {allowAnonymous && !user ? (
+              <Link href="/sign-in?next=/ops" className="muted" style={{ fontSize: "0.9rem" }}>
+                教員ログイン
+              </Link>
+            ) : null}
           </div>
         </div>
       </header>
-      <RequireAuth>{children}</RequireAuth>
+      {allowAnonymous ? children : <RequireAuth>{children}</RequireAuth>}
     </div>
   );
 }

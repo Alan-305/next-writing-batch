@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useState } from "react";
 
-import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { RegisteredTaskIdField } from "@/components/RegisteredTaskIdField";
 import { formatExplanationForPublicView } from "@/lib/student-release";
 
@@ -17,6 +16,7 @@ type LookupResult =
       submittedAt: string;
       phase: Phase;
       publishedAt?: string;
+      displayNick?: string;
       resultSummary?: {
         scoreTotal: number;
         evaluation: string;
@@ -26,17 +26,20 @@ type LookupResult =
       pdfHref?: string;
     };
 
-const emptyLookup = { taskId: "", studentId: "", studentName: "" };
+type Props = {
+  /** 招待リンクの org（匿名提出・照会） */
+  organizationId?: string;
+};
+
 function buildDownloadBody(
-  meta: { taskId: string; studentId: string; studentName: string; submissionId: string; publishedAt?: string },
+  meta: { displayNick: string; redeemId: string; submissionId: string; publishedAt?: string },
   r: NonNullable<Extract<LookupResult, { found: true }>["resultSummary"]>,
 ): string {
   const lines = [
     "添削結果（確定版・テキスト）",
     "",
-    `課題ID: ${meta.taskId}`,
-    `学籍番号: ${meta.studentId}`,
-    `氏名: ${meta.studentName}`,
+    `ニックネーム: ${meta.displayNick}`,
+    `引換ID: ${meta.redeemId}`,
     `受付番号: ${meta.submissionId}`,
     ...(meta.publishedAt ? [`公開日時: ${meta.publishedAt}`] : []),
     "",
@@ -68,40 +71,39 @@ function downloadTextFile(filename: string, body: string) {
   URL.revokeObjectURL(url);
 }
 
-export function StudentCorrectionLookup() {
+export function StudentCorrectionLookup({ organizationId = "" }: Props) {
   const router = useRouter();
-  const { user, profile } = useFirebaseAuthContext();
-  const getAccessToken = useCallback(async () => {
-    if (!user) return null;
-    return user.getIdToken();
-  }, [user]);
-  const [form, setForm] = useState(emptyLookup);
-  /** ログイン提出以前のデータ用（課題＋学籍＋氏名） */
-  const [legacyMode, setLegacyMode] = useState(false);
+  const org = organizationId.trim();
+  const anonymousMode = Boolean(org);
+
+  const [displayNick, setDisplayNick] = useState("");
+  const [redeemId, setRedeemId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<LookupResult | null>(null);
-  /** 照会成功時点の課題ID・学籍番号・氏名（ダウンロード文面用） */
-  const [metaAtLookup, setMetaAtLookup] = useState<typeof emptyLookup | null>(null);
+  const [metaAtLookup, setMetaAtLookup] = useState<{ displayNick: string; redeemId: string } | null>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!anonymousMode) {
+      setMessage("招待リンク（?org=テナントID）からアクセスしてください。");
+      return;
+    }
     setLoading(true);
     setMessage("");
     setResult(null);
     setMetaAtLookup(null);
-    const snapshot = { ...form };
+    const nickSnapshot = displayNick.trim();
+    const redeemSnapshot = redeemId.trim();
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      const token = await getAccessToken();
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const payload = legacyMode
-        ? form
-        : { taskId: form.taskId, studentId: "", studentName: "" };
-      const response = await fetch("/api/submissions/lookup", {
+      const response = await fetch("/api/submissions/redeem-lookup", {
         method: "POST",
-        headers,
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: org,
+          displayNick: nickSnapshot,
+          redeemId: redeemSnapshot,
+        }),
       });
       const json = await response.json();
 
@@ -115,20 +117,14 @@ export function StudentCorrectionLookup() {
         return;
       }
 
-      const metaSnapshot = legacyMode
-        ? snapshot
-        : {
-            taskId: snapshot.taskId,
-            studentId: profile?.studentNumber?.trim() ?? "",
-            studentName: profile?.nickname?.trim() ?? "",
-          };
-      setMetaAtLookup(metaSnapshot);
+      setMetaAtLookup({ displayNick: nickSnapshot, redeemId: redeemSnapshot });
       setResult({
         found: true,
         submissionId: json.submissionId,
         submittedAt: json.submittedAt,
         phase: json.phase,
         publishedAt: json.publishedAt,
+        displayNick: json.displayNick,
         resultSummary: json.resultSummary,
         pdfHref: json.pdfHref,
       });
@@ -142,79 +138,53 @@ export function StudentCorrectionLookup() {
   const canDownloadText =
     result?.found && result.phase === "published" && result.resultSummary && metaAtLookup;
 
+  if (!anonymousMode) {
+    return (
+      <section aria-labelledby="correction-lookup-heading">
+        <h2 id="correction-lookup-heading">添削結果の確認</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          先生から共有された<strong>招待リンク</strong>からこのページを開くと、ニックネームと引換IDで結果を確認できます。
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section aria-labelledby="correction-lookup-heading">
       <h2 id="correction-lookup-heading">添削結果の確認</h2>
       <p className="muted" style={{ marginTop: 0 }}>
-        {legacyMode ? (
-          <>
-            <b>旧形式</b>の提出を照会する場合は、提出時と同じ<b>課題</b>・<b>学籍番号</b>・<b>氏名</b>を入力してください。
-          </>
-        ) : (
-          <>
-            ログイン中のアカウントで提出した答案を、<b>課題</b>だけ選んで照会します（学籍・氏名の入力は不要です）。
-          </>
-        )}
-        運用が公開するまで「添削中」と表示されます。公開後は「添削完了」と、詳細ページ・ダウンロードから結果を確認できます。
-      </p>
-
-      <p style={{ marginBottom: 12 }}>
-        <label style={{ cursor: "pointer", userSelect: "none" }}>
-          <input
-            type="checkbox"
-            checked={legacyMode}
-            disabled={loading}
-            onChange={(e) => {
-              setLegacyMode(e.target.checked);
-              setForm(emptyLookup);
-              setResult(null);
-              setMetaAtLookup(null);
-            }}
-          />{" "}
-          学籍番号・氏名で照会する（ログイン前の古い提出用）
-        </label>
+        提出時にお渡しした<b>ニックネーム</b>と<b>引換ID</b>の両方を入力してください。運用が公開するまで「添削中」と表示されます。
       </p>
 
       <form className="card" onSubmit={onSubmit}>
-        <RegisteredTaskIdField
-          value={form.taskId}
-          onTaskIdChange={(tid) => {
-            setForm((p) => ({ ...p, taskId: tid }));
-          }}
-          disabled={loading}
-          getAccessToken={getAccessToken}
-        />
-        {legacyMode ? (
-          <>
-            <label className="field">
-              <span>学籍番号</span>
-              <input
-                value={form.studentId}
-                onChange={(e) => setForm((p) => ({ ...p, studentId: e.target.value }))}
-                placeholder="提出時と同じ学籍番号"
-                disabled={loading}
-                autoComplete="off"
-              />
-            </label>
-            <label className="field">
-              <span>氏名</span>
-              <input
-                value={form.studentName}
-                onChange={(e) => setForm((p) => ({ ...p, studentName: e.target.value }))}
-                placeholder="提出時と同じ氏名"
-                disabled={loading}
-                autoComplete="name"
-              />
-            </label>
-          </>
-        ) : null}
+        <label className="field">
+          <span>ニックネーム（提出時の表示名）</span>
+          <input
+            value={displayNick}
+            onChange={(e) => setDisplayNick(e.target.value)}
+            placeholder="提出完了画面に表示された名前"
+            disabled={loading}
+            autoComplete="off"
+            maxLength={24}
+          />
+        </label>
+        <label className="field">
+          <span>引換ID</span>
+          <input
+            value={redeemId}
+            onChange={(e) => setRedeemId(e.target.value)}
+            placeholder="提出完了画面に表示された ID"
+            disabled={loading}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
         <button type="submit" disabled={loading}>
           {loading ? "照会中..." : "添削状況を照会"}
         </button>
       </form>
 
       {message ? <p className="error">{message}</p> : null}
-
       {result && !result.found ? <p className="muted">{result.message}</p> : null}
 
       {result?.found ? (
@@ -227,8 +197,12 @@ export function StudentCorrectionLookup() {
             )}
           </p>
           <p className="muted" style={{ marginBottom: 0 }}>
-            受付番号: {result.submissionId}
-            <br />
+            {result.displayNick ? (
+              <>
+                ニックネーム: {result.displayNick}
+                <br />
+              </>
+            ) : null}
             提出日時: {result.submittedAt}
             {result.phase === "published" && result.publishedAt ? (
               <>
@@ -255,9 +229,8 @@ export function StudentCorrectionLookup() {
                     if (!summary) return;
                     const body = buildDownloadBody(
                       {
-                        taskId: metaAtLookup.taskId.trim(),
-                        studentId: metaAtLookup.studentId.trim(),
-                        studentName: metaAtLookup.studentName.trim(),
+                        displayNick: metaAtLookup.displayNick,
+                        redeemId: metaAtLookup.redeemId,
                         submissionId: result.submissionId,
                         publishedAt: result.publishedAt,
                       },

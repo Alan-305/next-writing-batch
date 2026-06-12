@@ -93,8 +93,13 @@ export function OpsSubmissionDetailBody({
           <b>studentId</b>: {submission.studentId}
         </p>
         <p>
-          <b>studentName</b>: {submission.studentName}
+          <b>studentName</b>（ニックネーム）: {submission.studentName}
         </p>
+        {submission.redeemId ? (
+          <p>
+            <b>引換ID</b>: <code>{submission.redeemId}</code>
+          </p>
+        ) : null}
         <p>
           <b>submittedAt</b>: {formatDateTimeIso(submission.submittedAt)}
         </p>

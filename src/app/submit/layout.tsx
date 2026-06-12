@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { StudentAppShellLayout } from "@/components/student/StudentAppShellLayout";
+import { SubmitLayoutClient } from "@/components/student/SubmitLayoutClient";
 
 export const metadata: Metadata = {
   title: "提出・受け取り・質問",
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function SubmitLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <StudentAppShellLayout>{children}</StudentAppShellLayout>;
+  return <SubmitLayoutClient>{children}</SubmitLayoutClient>;
 }

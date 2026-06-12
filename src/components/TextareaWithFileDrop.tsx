@@ -52,6 +52,8 @@ export type TextareaWithFileDropProps = {
    * 提出の英文欄向け: 画像・PDF を先に Claude で転記（手書き向き）。API キーがないか失敗時は Tesseract にフォールバック。
    */
   geminiHandwritingOcr?: boolean;
+  /** 匿名提出（招待 org）向け OCR */
+  organizationIdForIngest?: string;
 };
 
 const FILE_ACCEPT =
@@ -91,6 +93,7 @@ async function normalizeGeminiMediaFiles(files: File[]): Promise<File[]> {
 async function fetchGeminiEssayImageIngest(
   mediaFiles: File[],
   idToken: string | null,
+  organizationIdForIngest?: string,
 ): Promise<{
   text: string;
   noApiKey: boolean;
@@ -103,6 +106,8 @@ async function fetchGeminiEssayImageIngest(
   for (const f of mediaFiles) {
     fd.append("files", f);
   }
+  const org = (organizationIdForIngest ?? "").trim();
+  if (org) fd.append("organizationId", org);
   const headers: Record<string, string> = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
   const res = await fetch("/api/essay-image-ingest", { method: "POST", headers, body: fd });
@@ -194,6 +199,7 @@ export function TextareaWithFileDrop({
   structuredProblemReading,
   tesseractLang,
   geminiHandwritingOcr,
+  organizationIdForIngest,
 }: TextareaWithFileDropProps) {
   const inputId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -271,7 +277,7 @@ export function TextareaWithFileDrop({
             setStatus("手書き・画像を読み取り中…");
             const normalizedMedia = await normalizeGeminiMediaFiles(geminiMedia);
             const { text: ocrText, noApiKey, clientError, needLogin, provider, usedFallback } =
-              await fetchGeminiEssayImageIngest(normalizedMedia, idToken);
+              await fetchGeminiEssayImageIngest(normalizedMedia, idToken, organizationIdForIngest);
             if (needLogin) {
               setStatus("");
               onNotify?.("手書きの読み取りにはログインが必要です。ログインするか、下のファイル取り込み（ローカル）をご利用ください。", "error");
@@ -399,6 +405,7 @@ export function TextareaWithFileDrop({
       structuredProblemReading,
       tesseractLang,
       geminiHandwritingOcr,
+      organizationIdForIngest,
       value,
       user,
     ],

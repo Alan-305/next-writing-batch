@@ -61,15 +61,13 @@ function OpsTicketsPageInner() {
   );
   const inviteUrl =
     typeof window !== "undefined" && data?.organizationId
-      ? `${window.location.origin}/sign-in?next=${encodeURIComponent("/submit")}&org=${encodeURIComponent(
-          data.organizationId,
-        )}`
+      ? `${window.location.origin}/submit?org=${encodeURIComponent(data.organizationId)}`
       : "";
   const inviteMailTo = inviteUrl
     ? `mailto:?subject=${encodeURIComponent("添削革命 招待リンク")}&body=${encodeURIComponent(
-        `以下のリンクからログインしてください。\n\n${inviteUrl}\n\n※Googleアカウントでログインしてください。`,
+        `以下のリンクから英文を提出してください（ログイン不要）。\n\n${inviteUrl}\n\n提出後に表示される「ニックネーム」と「引換ID」を必ず保存してください。`,
       )}`
-    : "";
+      : "";
   const inviteQrUrl = inviteUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
     : "";
@@ -204,10 +202,10 @@ function OpsTicketsPageInner() {
 
       <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
         <h2 className="admin-roster-subheading" style={{ marginTop: 0 }}>
-          生徒招待リンク（テナント参加）
+          生徒招待リンク（提出画面）
         </h2>
         <p className="muted admin-tenant-roster-lead">
-          生徒にこのリンクを共有すると、ログイン時に現在のテナント（organizationId）へ紐づきます。
+          生徒にこのリンクを共有すると、<strong>Google ログイン不要</strong>で英文を提出できます。提出後に表示されるニックネームと引換IDで結果を確認します。
         </p>
         <p style={{ wordBreak: "break-all", marginTop: 0 }}>
           <code>{inviteUrl || "読み込み中..."}</code>
