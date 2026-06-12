@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
-import { resolveEffectiveOrganizationIdForApi } from "@/lib/auth/resolve-effective-organization";
+import { resolveOrganizationIdForTenantUid } from "@/lib/auth/resolve-effective-organization";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const organizationId = await resolveEffectiveOrganizationIdForApi(auth.uid, request);
+    const organizationId = await resolveOrganizationIdForTenantUid(auth.uid);
     const db = getAdminFirestore();
     const snap = await db.collection("users").where("organizationId", "==", organizationId).get();
     const uids = snap.docs.map((d) => d.id);

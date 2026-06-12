@@ -79,17 +79,9 @@ async function ensureTeacherOrganizationId(uid: string): Promise<string> {
 }
 
 /**
- * API 用の組織 ID。管理者 allowlist かつ代理 Cookie があればそれを優先し、それ以外は Firestore の users/{uid}.organizationId。
+ * 教員・生徒向け API 用。Firestore `users/{uid}.organizationId` のみ（管理者の代理 Cookie は使わない）。
  */
-export async function resolveEffectiveOrganizationIdForApi(uid: string, request: Request): Promise<string> {
-  if (isAllowlistedAdminUid(uid)) {
-    const acting = getAdminActingOrganizationIdFromRequest(request);
-    if (acting) return acting;
-    const resolved = await describeOrganizationIdForUid(uid);
-    if (!resolved.usedFallback) return resolved.resolvedOrganizationId;
-    return ensureTeacherOrganizationId(uid);
-  }
-
+export async function resolveOrganizationIdForTenantUid(uid: string): Promise<string> {
   const resolved = await describeOrganizationIdForUid(uid);
   if (!resolved.usedFallback) return resolved.resolvedOrganizationId;
 
@@ -105,4 +97,15 @@ export async function resolveEffectiveOrganizationIdForApi(uid: string, request:
   }
 
   return resolveOrganizationIdForUid(uid);
+}
+
+/**
+ * 管理画面 API 用。allowlist 管理者かつ代理 Cookie があればそれを優先し、それ以外は {@link resolveOrganizationIdForTenantUid}。
+ */
+export async function resolveEffectiveOrganizationIdForApi(uid: string, request: Request): Promise<string> {
+  if (isAllowlistedAdminUid(uid)) {
+    const acting = getAdminActingOrganizationIdFromRequest(request);
+    if (acting) return acting;
+  }
+  return resolveOrganizationIdForTenantUid(uid);
 }

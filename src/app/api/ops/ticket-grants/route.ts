@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { NextResponse } from "next/server";
 
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
-import { resolveEffectiveOrganizationIdForApi } from "@/lib/auth/resolve-effective-organization";
+import { resolveOrganizationIdForTenantUid } from "@/lib/auth/resolve-effective-organization";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "自分自身への配布はできません。" }, { status: 400 });
   }
 
-  const organizationId = await resolveEffectiveOrganizationIdForApi(auth.uid, request);
+  const organizationId = await resolveOrganizationIdForTenantUid(auth.uid);
   const db = getAdminFirestore();
   const fromRef = db.collection("users").doc(auth.uid);
   const toRef = db.collection("users").doc(targetUid);

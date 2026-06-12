@@ -9,6 +9,8 @@ import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 type TenantPayload = {
   ok?: boolean;
   resolvedOrganizationId?: string;
+  effectiveOrganizationId?: string;
+  adminActingOrganizationId?: string | null;
   firestoreRaw?: string | null;
   usedFallback?: boolean;
   fallbackOrganizationId?: string;
@@ -102,11 +104,34 @@ export default function OpsTenantPage() {
         </p>
       ) : data ? (
         <>
+          {data.adminActingOrganizationId &&
+          data.adminActingOrganizationId !== data.effectiveOrganizationId ? (
+            <div
+              role="status"
+              className="card"
+              style={{
+                maxWidth: 640,
+                marginBottom: 16,
+                padding: "14px 18px",
+                borderColor: "#f59e0b",
+                background: "#fffbeb",
+                color: "#78350f",
+              }}
+            >
+              <strong>管理画面の「代理テナント」が残っています</strong>
+              <p style={{ margin: "8px 0 0", lineHeight: 1.55 }}>
+                管理画面で <code>{data.adminActingOrganizationId}</code> を選んだ状態の Cookie
+                があります。教員ダッシュボード（/ops）では Firestore のテナント{" "}
+                <code>{data.effectiveOrganizationId}</code> のみを使います。管理画面で別テナントを見る場合は
+                /admin から切り替えてください。
+              </p>
+            </div>
+          ) : null}
           <div className="card" style={{ maxWidth: 640, padding: "18px 20px" }}>
             <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>現在の解決結果</h2>
             <dl style={{ margin: 0, display: "grid", gap: "10px 16px", gridTemplateColumns: "auto 1fr" }}>
               <dt className="muted">実際に使うテナント ID</dt>
-              <dd style={{ margin: 0, fontWeight: 700 }}>{data.resolvedOrganizationId}</dd>
+              <dd style={{ margin: 0, fontWeight: 700 }}>{data.effectiveOrganizationId ?? data.resolvedOrganizationId}</dd>
               <dt className="muted">Firestore の値（生）</dt>
               <dd style={{ margin: 0 }}>{data.firestoreRaw === null ? "（未設定）" : String(data.firestoreRaw)}</dd>
               <dt className="muted">フォールバックを使っているか</dt>
