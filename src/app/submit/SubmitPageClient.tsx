@@ -14,6 +14,7 @@ import {
 } from "@/lib/english-word-count";
 import { RegisteredTaskIdField } from "@/components/RegisteredTaskIdField";
 import { StudentCorrectionLookup } from "@/components/StudentCorrectionLookup";
+import { StudentSupportMailbox } from "@/components/StudentSupportMailbox";
 import { SubmitGradingConfirmDialog } from "@/components/SubmitGradingConfirmDialog";
 import { TextareaWithFileDrop } from "@/components/TextareaWithFileDrop";
 
@@ -87,6 +88,14 @@ export default function SubmitPageClient() {
   }, [user]);
 
   useEffect(() => {
+    if (!submitSuccess) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("submit-success-credentials")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [submitSuccess]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (isAnonymousInvite) return;
     if (!user) return;
@@ -108,13 +117,14 @@ export default function SubmitPageClient() {
     setSubmitSuccess(null);
 
     const pid = problemId.trim();
+    const problemMemoField = isAnonymousInvite ? {} : { problemMemo: form.problemMemo };
     const body =
       answerMode === "multipart"
         ? {
             taskId: form.taskId,
             studentId: "",
             studentName: "",
-            problemMemo: form.problemMemo,
+            ...problemMemoField,
             ...(pid ? { problemId: pid } : {}),
             essayMultipart: true,
             essayParts,
@@ -124,7 +134,7 @@ export default function SubmitPageClient() {
             taskId: form.taskId,
             studentId: "",
             studentName: "",
-            problemMemo: form.problemMemo,
+            ...problemMemoField,
             ...(pid ? { problemId: pid } : {}),
             essayText: form.essayText,
             essayMultipart: false,
@@ -225,32 +235,58 @@ export default function SubmitPageClient() {
 
       {submitSuccess ? (
         <div
+          id="submit-success-credentials"
           className="card"
           role="status"
           style={{
             marginBottom: 20,
-            borderColor: "#86efac",
-            background: "linear-gradient(180deg, #f0fdf4 0%, #fff 100%)",
-            padding: "20px 22px",
+            border: "3px solid #f97316",
+            background: "linear-gradient(135deg, #fff7ed 0%, #fef3c7 45%, #fff 100%)",
+            padding: "22px 24px",
+            boxShadow: "0 8px 28px rgba(249, 115, 22, 0.35)",
           }}
         >
-          <h2 style={{ marginTop: 0, fontSize: "1.15rem" }}>提出が完了しました</h2>
-          <p style={{ margin: "0 0 14px", lineHeight: 1.6 }}>
-            以下を<strong>必ずメモまたはスクリーンショット</strong>で保存してください。再表示できません。
+          <p
+            style={{
+              margin: "0 0 10px",
+              fontWeight: 800,
+              fontSize: "1.05rem",
+              color: "#c2410c",
+              letterSpacing: "0.02em",
+            }}
+          >
+            ⚠ 必ず保存してください — 再表示できません
+          </p>
+          <h2 style={{ marginTop: 0, fontSize: "1.25rem", color: "#9a3412" }}>提出が完了しました</h2>
+          <p style={{ margin: "0 0 16px", lineHeight: 1.6, fontWeight: 600 }}>
+            以下の<strong>ニックネーム</strong>と<strong>引換ID</strong>をメモまたはスクリーンショットで保存してください。
           </p>
           <dl
             style={{
               margin: "0 0 16px",
               display: "grid",
-              gap: 10,
+              gap: 12,
               gridTemplateColumns: "auto 1fr",
-              fontSize: "1.05rem",
+              fontSize: "1.2rem",
+              padding: "14px 16px",
+              borderRadius: 10,
+              background: "#fff",
+              border: "2px dashed #fb923c",
             }}
           >
-            <dt className="muted">ニックネーム</dt>
-            <dd style={{ margin: 0, fontWeight: 700 }}>{submitSuccess.displayNick}</dd>
-            <dt className="muted">引換ID</dt>
-            <dd style={{ margin: 0, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.04em" }}>
+            <dt style={{ color: "#9a3412", fontWeight: 700 }}>ニックネーム</dt>
+            <dd style={{ margin: 0, fontWeight: 800, color: "#ea580c" }}>{submitSuccess.displayNick}</dd>
+            <dt style={{ color: "#9a3412", fontWeight: 700 }}>引換ID</dt>
+            <dd
+              style={{
+                margin: 0,
+                fontWeight: 800,
+                fontFamily: "monospace",
+                letterSpacing: "0.08em",
+                color: "#dc2626",
+                fontSize: "1.35rem",
+              }}
+            >
               {submitSuccess.redeemId}
             </dd>
           </dl>
@@ -306,19 +342,21 @@ export default function SubmitPageClient() {
           </label>
         ) : null}
 
-        <label className="field">
-          <span>問題メモ（任意・目安20字）</span>
-          <input
-            type="text"
-            maxLength={30}
-            value={form.problemMemo}
-            onChange={(e) => setForm((p) => ({ ...p, problemMemo: e.target.value }))}
-            placeholder="例: Week3 自由英作文"
-            disabled={submitting}
-            autoComplete="off"
-          />
-          {errors.problemMemo ? <span className="error">{errors.problemMemo}</span> : null}
-        </label>
+        {!isAnonymousInvite ? (
+          <label className="field">
+            <span>問題メモ（任意・目安20字）</span>
+            <input
+              type="text"
+              maxLength={30}
+              value={form.problemMemo}
+              onChange={(e) => setForm((p) => ({ ...p, problemMemo: e.target.value }))}
+              placeholder="例: Week3 自由英作文"
+              disabled={submitting}
+              autoComplete="off"
+            />
+            {errors.problemMemo ? <span className="error">{errors.problemMemo}</span> : null}
+          </label>
+        ) : null}
 
         <fieldset className="field" style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px" }}>
           <legend style={{ padding: "0 6px" }}>解答の提出形式</legend>
@@ -423,6 +461,14 @@ export default function SubmitPageClient() {
       {message ? <p className="error">{message}</p> : null}
 
       <StudentCorrectionLookup organizationId={isAnonymousInvite ? inviteOrg : undefined} />
+
+      {isAnonymousInvite ? (
+        <StudentSupportMailbox
+          organizationId={inviteOrg}
+          initialDisplayNick={submitSuccess?.displayNick ?? ""}
+          initialRedeemId={submitSuccess?.redeemId ?? ""}
+        />
+      ) : null}
     </main>
   );
 }

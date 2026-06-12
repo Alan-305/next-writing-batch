@@ -59,6 +59,15 @@ export default function OpsHomePage() {
           <span className="ops-home-action-cta">設定を開く</span>
         </Link>
 
+        <Link href="/ops/student-support" className="ops-home-action ops-home-action--inquiry">
+          <span className="ops-home-action-icon" aria-hidden>
+            💬
+          </span>
+          <span className="ops-home-action-title">生徒サポート</span>
+          <span className="ops-home-action-desc">匿名生徒からの質問に返信します（返信は生徒のメッセージボックスへ）。</span>
+          <span className="ops-home-action-cta">受信箱を開く</span>
+        </Link>
+
         <Link href="/tensaku-kakumei#support" className="ops-home-action ops-home-action--inquiry">
           <span className="ops-home-action-icon" aria-hidden>
             ✉

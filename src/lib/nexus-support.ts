@@ -217,6 +217,30 @@ export async function sendTensakuKakumeiContactEmail(args: {
   return sendToSupportInbox({ subject, text, replyTo: reply });
 }
 
+/** 匿名生徒のサポート問い合わせ（メール本文） */
+export function buildAnonymousSupportEmailBody(args: {
+  organizationId: string;
+  displayNick: string;
+  redeemId: string;
+  taskId?: string;
+  inquiry: string;
+  opsInboxUrl?: string;
+}): string {
+  return [
+    `テナントID: ${args.organizationId}`,
+    `ニックネーム: ${args.displayNick || "—"}`,
+    `引換ID: ${args.redeemId || "—"}`,
+    ...(args.taskId?.trim() ? [`課題ID: ${args.taskId.trim()}`] : []),
+    "",
+    "お問い合わせ内容:",
+    args.inquiry.trim(),
+    "",
+    "※ 返信は管理画面の「生徒サポート」から行うと、生徒のメッセージボックスに届きます。",
+    ...(args.opsInboxUrl?.trim() ? [`管理画面: ${args.opsInboxUrl.trim()}`] : []),
+    "",
+  ].join("\n");
+}
+
 /** メール本文（教師・事務局向け） */
 export function buildSupportEmailBody(args: {
   organizationId: string;
