@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import {
@@ -14,6 +14,18 @@ import {
 import { buildRubricScoresForEditor } from "@/lib/build-rubric-scores-for-editor";
 import { computeScoreTotal, type TaskProblemsMaster } from "@/lib/task-problems-core";
 import { sanitizeFinalEssayArtifactText } from "@/lib/student-final-essay-display";
+
+const DAY4_TICKET_NOTICE_KEY = "nwb_day4_ticket_notice";
+
+function buildDay4TicketNotice(
+  charged: Array<{ submissionId: string; remainingAfter: number }> | undefined,
+): string | null {
+  if (!charged?.length) return null;
+  const count = charged.length;
+  const remaining = charged[charged.length - 1]?.remainingAfter;
+  if (typeof remaining !== "number" || !Number.isFinite(remaining)) return null;
+  return `チケットを${count}枚消費しました。残りは${remaining}枚です。`;
+}
 
 type ProofreadSeed = {
   evaluation?: string;
@@ -220,6 +232,26 @@ export function StudentReleaseEditor({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(DAY4_TICKET_NOTICE_KEY);
+      if (!stored?.trim()) return;
+      sessionStorage.removeItem(DAY4_TICKET_NOTICE_KEY);
+      setMessage(stored.trim());
+    } catch {
+      /* sessionStorage 不可 */
+    }
+  }, []);
+
+  const persistDay4TicketNotice = (notice: string | null) => {
+    if (!notice) return;
+    try {
+      sessionStorage.setItem(DAY4_TICKET_NOTICE_KEY, notice);
+    } catch {
+      /* sessionStorage 不可 */
+    }
+  };
+
   const reimportFromProofread = () => {
     if (!proofread) return;
     const mergedFmt = proofreadExplanationLooksSectionMerged(String(proofread.explanation ?? ""));
@@ -275,7 +307,10 @@ export function StudentReleaseEditor({
   /** 確定済み・未公開で Day4 未完了またはエラー */
   const needsDay4Retry = Boolean(finalizedAt) && !publishedAt && !canPublish;
 
-  const invokeRunDay4Api = async (idToken: string, day4Force: boolean) => {
+  const invokeRunDay4Api = async (
+    idToken: string,
+    day4Force: boolean,
+  ): Promise<{ ok: true; ticketNotice: string | null } | { ok: false }> => {
     const d4 = await fetch("/api/ops/run-day4", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
@@ -290,6 +325,7 @@ export function StudentReleaseEditor({
       ok?: boolean;
       message?: string;
       ticketChargeWarning?: string;
+      day4TicketsCharged?: Array<{ submissionId: string; remainingAfter: number }>;
       stdout?: string;
       stderr?: string;
     };
@@ -309,13 +345,13 @@ export function StudentReleaseEditor({
       setError(
         `${d4detail}${extra}。ターミナルから batch/run_day4_tts_qr_pdf.py を実行することもできます。`.trim(),
       );
-      return false;
+      return { ok: false };
     }
     if (typeof d4json?.ticketChargeWarning === "string" && d4json.ticketChargeWarning.trim()) {
       setError(String(d4json.ticketChargeWarning));
-      return false;
+      return { ok: false };
     }
-    return true;
+    return { ok: true, ticketNotice: buildDay4TicketNotice(d4json.day4TicketsCharged) };
   };
 
   const completeReload = (scrollToId?: string) => {
@@ -343,9 +379,12 @@ export function StudentReleaseEditor({
         return;
       }
       const idToken = await user.getIdToken();
-      const ok = await invokeRunDay4Api(idToken, hasDay4Pdf);
-      if (!ok) return;
-      setMessage("Day4 を再生成しました。");
+      const d4Result = await invokeRunDay4Api(idToken, hasDay4Pdf);
+      if (!d4Result.ok) return;
+      const combined = d4Result.ticketNotice
+        ? `Day4 を再生成しました。 ${d4Result.ticketNotice}`
+        : "Day4 を再生成しました。";
+      persistDay4TicketNotice(combined);
       completeReload("student-release-actions");
     } catch (e) {
       console.error("[StudentReleaseEditor] runDay4Only", e);
@@ -409,11 +448,16 @@ export function StudentReleaseEditor({
       }
 
       if (opts.runDay4After) {
-        const d4Ok = await invokeRunDay4Api(idToken, Boolean(opts.day4Force));
-        if (!d4Ok) return;
+        const d4Result = await invokeRunDay4Api(idToken, Boolean(opts.day4Force));
+        if (!d4Result.ok) return;
+        const combined = d4Result.ticketNotice
+          ? `${opts.successMessage} ${d4Result.ticketNotice}`
+          : opts.successMessage;
+        persistDay4TicketNotice(combined);
+      } else {
+        setMessage(opts.successMessage);
       }
 
-      setMessage(opts.successMessage);
       const scrollToId =
         opts.runDay4After || opts.operatorFinalized ? "student-release-actions" : undefined;
       completeReload(scrollToId);

@@ -109,11 +109,6 @@ export function StudentAppShellLayout({
           <div className="app-shell-header-actions">
             {!allowAnonymous ? <SettingsGearLink active={settingsActive} /> : null}
             {!allowAnonymous ? <AuthToolbar variant="student" /> : null}
-            {allowAnonymous && !user ? (
-              <Link href="/sign-in?next=/ops" className="muted" style={{ fontSize: "0.9rem" }}>
-                教員ログイン
-              </Link>
-            ) : null}
           </div>
         </div>
       </header>
