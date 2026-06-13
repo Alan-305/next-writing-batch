@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { createStripeCheckoutSession, type BillingPlan } from "@/lib/billing/create-checkout-session";
 import { getFirebaseAuth } from "@/lib/firebase/client";
+import { formatRegisteredTaskDropdownLabel } from "@/lib/registered-tasks-list";
 
 type TicketRow = {
   uid: string;
@@ -24,7 +25,7 @@ type Payload = {
   teacherCount?: number;
   studentCount?: number;
   anonymousSubmissionTotal?: number;
-  submissionCountsByTaskId?: Array<{ taskId: string; count: number; latestSubmittedAt: string }>;
+  submissionCountsByTaskId?: Array<{ taskId: string; displayLabel: string; count: number; latestSubmittedAt: string }>;
   note?: string;
   message?: string;
 };
@@ -45,6 +46,41 @@ function formatIso(iso: string | null): string {
   }
 }
 
+const SUBMISSION_SORT_OPTIONS = [
+  { value: "count_desc", label: "提出件数（多い順）" },
+  { value: "count_asc", label: "提出件数（少ない順）" },
+  { value: "latest_desc", label: "最終提出（新しい順）" },
+  { value: "latest_asc", label: "最終提出（古い順）" },
+  { value: "task_asc", label: "課題ID（昇順）" },
+] as const;
+
+type SubmissionSort = (typeof SUBMISSION_SORT_OPTIONS)[number]["value"];
+
+function sortSubmissionRows(
+  rows: NonNullable<Payload["submissionCountsByTaskId"]>,
+  sort: SubmissionSort,
+) {
+  const copy = [...rows];
+  switch (sort) {
+    case "count_desc":
+      return copy.sort((a, b) => b.count - a.count || a.taskId.localeCompare(b.taskId, "ja"));
+    case "count_asc":
+      return copy.sort((a, b) => a.count - b.count || a.taskId.localeCompare(b.taskId, "ja"));
+    case "latest_desc":
+      return copy.sort(
+        (a, b) => b.latestSubmittedAt.localeCompare(a.latestSubmittedAt) || b.count - a.count,
+      );
+    case "latest_asc":
+      return copy.sort(
+        (a, b) => a.latestSubmittedAt.localeCompare(b.latestSubmittedAt) || a.taskId.localeCompare(b.taskId, "ja"),
+      );
+    case "task_asc":
+      return copy.sort((a, b) => a.taskId.localeCompare(b.taskId, "ja"));
+    default:
+      return copy;
+  }
+}
+
 function OpsTicketsPageInner() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +90,7 @@ function OpsTicketsPageInner() {
   const [checkoutError, setCheckoutError] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
   const [tenantIdCopied, setTenantIdCopied] = useState(false);
+  const [submissionSort, setSubmissionSort] = useState<SubmissionSort>("count_desc");
   const searchParams = useSearchParams();
   const tenantCreatedWelcome = searchParams.get("tenantCreated") === "1";
 
@@ -73,6 +110,11 @@ function OpsTicketsPageInner() {
   const inviteQrUrl = inviteUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl)}`
     : "";
+
+  const sortedSubmissionRows = useMemo(() => {
+    const rows = data?.submissionCountsByTaskId ?? [];
+    return sortSubmissionRows(rows, submissionSort);
+  }, [data?.submissionCountsByTaskId, submissionSort]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,7 +219,7 @@ function OpsTicketsPageInner() {
 
   return (
     <main>
-      <h1>テナントのチケット状況</h1>
+      <h1>リンク・チケット・提出状況</h1>
 
       {tenantCreatedWelcome ? (
         <p className="success" style={{ marginBottom: 16 }}>
@@ -303,29 +345,58 @@ function OpsTicketsPageInner() {
             </div>
 
             <div style={{ marginTop: 24 }}>
-              <h2 className="admin-roster-subheading">
-                匿名提出（課題別・累計）{" "}
-                <span className="admin-roster-count">{data.anonymousSubmissionTotal ?? 0} 件</span>
-              </h2>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <h2 className="admin-roster-subheading" style={{ margin: 0 }}>
+                  匿名提出（課題別・累計）{" "}
+                  <span className="admin-roster-count">{data.anonymousSubmissionTotal ?? 0} 件</span>
+                </h2>
+                {(data.submissionCountsByTaskId ?? []).length > 0 ? (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.95rem" }}>
+                    <span className="muted">並べ替え</span>
+                    <select
+                      value={submissionSort}
+                      onChange={(e) => setSubmissionSort(e.target.value as SubmissionSort)}
+                      style={{ minHeight: 40, padding: "6px 10px" }}
+                    >
+                      {SUBMISSION_SORT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
               {(data.submissionCountsByTaskId ?? []).length === 0 ? (
                 <p className="muted" style={{ marginBottom: 0 }}>
                   まだ提出はありません。
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 320 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
                     <thead>
                       <tr>
-                        <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>課題ID</th>
+                        <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>
+                          課題（登録一覧と同じ表示）
+                        </th>
                         <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>提出件数</th>
                         <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>最終提出</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(data.submissionCountsByTaskId ?? []).map((row) => (
+                      {sortedSubmissionRows.map((row) => (
                         <tr key={row.taskId}>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
-                            <code>{row.taskId}</code>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", lineHeight: 1.5 }}>
+                            {formatRegisteredTaskDropdownLabel(row.taskId, row.displayLabel)}
                           </td>
                           <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right", fontWeight: 700 }}>
                             {row.count}

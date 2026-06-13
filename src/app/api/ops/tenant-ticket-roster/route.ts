@@ -6,6 +6,7 @@ import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { countSubmissionsByTaskId } from "@/lib/submissions-store";
+import { listRegisteredTasks } from "@/lib/registered-tasks-list";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -120,7 +121,13 @@ export async function GET(request: Request) {
 
     const teachers = rows.filter((r) => r.kind === "teacher").sort((a, b) => a.displayLabel.localeCompare(b.displayLabel, "ja"));
     const students = rows.filter((r) => r.kind === "student").sort((a, b) => a.displayLabel.localeCompare(b.displayLabel, "ja"));
-    const submissionCountsByTaskId = await countSubmissionsByTaskId(organizationId);
+    const submissionCountsRaw = await countSubmissionsByTaskId(organizationId);
+    const registeredTasks = await listRegisteredTasks(organizationId);
+    const labelByTaskId = new Map(registeredTasks.map((t) => [t.taskId, t.displayLabel]));
+    const submissionCountsByTaskId = submissionCountsRaw.map((row) => ({
+      ...row,
+      displayLabel: labelByTaskId.get(row.taskId) ?? row.taskId,
+    }));
     const anonymousSubmissionTotal = submissionCountsByTaskId.reduce((sum, row) => sum + row.count, 0);
 
     return NextResponse.json({

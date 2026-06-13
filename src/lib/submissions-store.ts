@@ -212,6 +212,8 @@ export async function getSubmissions(organizationId: string): Promise<Submission
 
 export type TaskSubmissionCount = {
   taskId: string;
+  /** 教員設定に基づくプルダウン表示ラベル（学校名 · 問題メモ 等） */
+  displayLabel: string;
   count: number;
   latestSubmittedAt: string;
 };
@@ -234,7 +236,12 @@ export async function countSubmissionsByTaskId(organizationId: string): Promise<
     }
   }
   return Array.from(map.entries())
-    .map(([taskId, v]) => ({ taskId, count: v.count, latestSubmittedAt: v.latestSubmittedAt }))
+    .map(([taskId, v]) => ({
+      taskId,
+      displayLabel: taskId,
+      count: v.count,
+      latestSubmittedAt: v.latestSubmittedAt,
+    }))
     .sort((a, b) => b.latestSubmittedAt.localeCompare(a.latestSubmittedAt));
 }
 

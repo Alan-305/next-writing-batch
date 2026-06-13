@@ -41,9 +41,9 @@ export default function OpsHomePage() {
           <span className="ops-home-action-icon" aria-hidden>
             🎟
           </span>
-          <span className="ops-home-action-title">招待QRとチケット状況</span>
+          <span className="ops-home-action-title">リンク・チケット・提出状況</span>
           <span className="ops-home-action-desc">
-            テナント ID の確認、生徒招待リンク、チケット購入と残数の確認を行います。
+            テナント ID の確認、生徒招待リンク、チケット購入と残数、課題別の提出件数を確認します。
           </span>
           <span className="ops-home-action-cta">開く</span>
         </Link>
