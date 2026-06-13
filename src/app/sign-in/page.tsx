@@ -16,6 +16,7 @@ import {
 import { shouldRedirectStudentToOnboarding } from "@/lib/student-profile-gate";
 import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
+import { IDLE_LOGOUT_MESSAGE, IDLE_LOGOUT_REASON_KEY } from "@/lib/auth/idle-session-timeout";
 import { useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { resetRedirectResultCacheForNewFlow } from "@/lib/firebase/redirect-result-once";
@@ -37,6 +38,7 @@ function SignInInner() {
   const publicHome = signInPublicHomePath(hostname || undefined);
   const safeNext = resolveSignInNextPath(nextRaw, hostname || undefined);
   const inviteOrg = (params.get("org") ?? "").trim();
+  const idleLogout = params.get("reason") === "idle";
   /** 教員の既存テナント参加（URL の teacherOrg）。画面には特別な案内は出さない */
   const teacherOrg = (params.get("teacherOrg") ?? "").trim();
   const avoidRedirectAuth = shouldAvoidGoogleRedirectAuth();
@@ -55,11 +57,16 @@ function SignInInner() {
       if (msg) {
         sessionStorage.removeItem(AUTH_REDIRECT_ERROR_KEY);
         setError(msg);
+        return;
+      }
+      if (idleLogout || sessionStorage.getItem(IDLE_LOGOUT_REASON_KEY)) {
+        sessionStorage.removeItem(IDLE_LOGOUT_REASON_KEY);
+        setError(IDLE_LOGOUT_MESSAGE);
       }
     } catch {
       /* sessionStorage 不可 */
     }
-  }, []);
+  }, [idleLogout]);
 
   const startGoogleRedirect = useCallback(async () => {
     const auth = getFirebaseAuth();

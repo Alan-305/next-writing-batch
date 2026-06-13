@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
 import { onSnapshot } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,8 @@ import {
 } from "@/lib/firebase/config";
 import { AUTH_REDIRECT_ERROR_KEY, AUTH_REDIRECT_NEXT_KEY } from "@/lib/firebase/auth-redirect";
 import { formatFirebaseAuthError } from "@/lib/firebase/format-auth-error";
+import { IDLE_LOGOUT_REASON_KEY } from "@/lib/auth/idle-session-timeout";
+import { useIdleSessionLogout } from "@/lib/auth/use-idle-session-logout";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase/client";
 import {
   getRedirectResultOnce,
@@ -65,6 +67,7 @@ export function FirebaseAuthProvider({
   const [profileLoading, setProfileLoading] = useState(false);
   const [entitlement, setEntitlement] = useState<EntitlementDoc | null>(null);
   const [entitlementLoading, setEntitlementLoading] = useState(false);
+  const idleLogoutPendingRef = useRef(false);
 
   useEffect(() => {
     if (!configured) {
@@ -265,6 +268,32 @@ export function FirebaseAuthProvider({
     await firebaseSignOut(auth);
     resetRedirectResultCacheForNewFlow();
   }, []);
+
+  const signOutForIdle = useCallback(async () => {
+    if (idleLogoutPendingRef.current) return;
+    const auth = getFirebaseAuth();
+    if (!auth?.currentUser) return;
+    idleLogoutPendingRef.current = true;
+    try {
+      sessionStorage.setItem(IDLE_LOGOUT_REASON_KEY, "1");
+    } catch {
+      /* sessionStorage 不可 */
+    }
+    await firebaseSignOut(auth);
+    resetRedirectResultCacheForNewFlow();
+    router.replace("/sign-in?reason=idle");
+  }, [router]);
+
+  useEffect(() => {
+    if (user) idleLogoutPendingRef.current = false;
+  }, [user]);
+
+  useIdleSessionLogout({
+    active: configured && user !== null,
+    onIdle: () => {
+      void signOutForIdle();
+    },
+  });
 
   const roles = profile?.roles ?? [];
 
