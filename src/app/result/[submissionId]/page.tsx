@@ -3,12 +3,29 @@ import { headers } from "next/headers";
 
 import { StudentResultPublishedBody } from "@/components/StudentResultPublishedBody";
 import { loadStudentResultPublishedView } from "@/lib/student-result-published-view";
+import { studentSubmitPagePath } from "@/lib/student-submit-page-path";
 
 function requestOriginFromHeaders(h: Headers): string {
   const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(",")[0]?.trim() ?? "";
   if (!host) return "";
   const proto = (h.get("x-forwarded-proto") ?? "https").split(",")[0]?.trim() ?? "https";
   return `${proto}://${host}`;
+}
+
+function BackToSubmitLink({ organizationId }: { organizationId: string }) {
+  const href = studentSubmitPagePath(organizationId);
+  if (!href) {
+    return (
+      <p className="muted no-print" style={{ marginBottom: 0 }}>
+        提出・受け取り画面へは、先生から共有された招待リンクから開いてください。
+      </p>
+    );
+  }
+  return (
+    <p className="no-print" style={{ marginBottom: 0 }}>
+      <Link href={href}>提出・受け取りへ戻る</Link>
+    </p>
+  );
 }
 
 export const dynamic = "force-dynamic";
@@ -28,8 +45,8 @@ export default async function StudentResultPage({ params }: Props) {
       <main>
         <h1>添削結果</h1>
         <p>該当する提出が見つかりませんでした。</p>
-        <p>
-          <Link href="/submit">提出画面へ</Link>
+        <p className="muted" style={{ marginBottom: 0 }}>
+          提出・受け取り画面へは、先生から共有された招待リンクから開いてください。
         </p>
       </main>
     );
@@ -44,9 +61,7 @@ export default async function StudentResultPage({ params }: Props) {
           でご確認ください。
         </p>
         <p className="muted">受付番号: {loaded.submissionId}</p>
-        <p>
-          <Link href="/submit">提出画面へ</Link>
-        </p>
+        <BackToSubmitLink organizationId={loaded.organizationId} />
       </main>
     );
   }
@@ -67,11 +82,7 @@ export default async function StudentResultPage({ params }: Props) {
           </p>
         </div>
       }
-      bottomSlot={
-        <p className="no-print">
-          <Link href={`/submit?org=${encodeURIComponent(loaded.organizationId)}`}>提出・受け取りへ戻る</Link>
-        </p>
-      }
+      bottomSlot={<BackToSubmitLink organizationId={loaded.organizationId} />}
     />
   );
 }

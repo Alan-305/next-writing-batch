@@ -6,6 +6,7 @@ import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-di
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
 import { findSubmissionAcrossOrganizations } from "@/lib/submissions-store";
+import { organizationIdFromSubmissionHit } from "@/lib/student-submit-page-path";
 import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
 
 export type StudentResultPublishedModel = {
@@ -27,7 +28,7 @@ export type StudentResultPublishedModel = {
 
 export type StudentResultPublishedLoadResult =
   | { kind: "missing" }
-  | { kind: "unpublished"; submissionId: string }
+  | { kind: "unpublished"; submissionId: string; organizationId: string }
   | { kind: "ok"; organizationId: string; model: StudentResultPublishedModel };
 
 export async function loadStudentResultPublishedView(
@@ -41,10 +42,13 @@ export async function loadStudentResultPublishedView(
   const raw = hit?.submission ?? null;
   if (!raw) return { kind: "missing" };
   const submission = await enrichSubmissionWithResolvedStudentFields(raw);
+  const organizationId = hit
+    ? organizationIdFromSubmissionHit(hit.organizationId, submission)
+    : organizationIdFromSubmissionHit("", submission);
 
   const sr = submission.studentRelease;
   if (!sr?.operatorApprovedAt) {
-    return { kind: "unpublished", submissionId: submission.submissionId };
+    return { kind: "unpublished", submissionId: submission.submissionId, organizationId };
   }
 
   const qrPath = submission.day4?.qr_path?.trim() ?? "";
@@ -62,7 +66,7 @@ export async function loadStudentResultPublishedView(
   });
   const finalEssayHtml = finalEssayHtmlPlainBlack(finalRevised);
 
-  const orgForMaster = hit?.organizationId ?? "";
+  const orgForMaster = organizationId;
   const taskMaster = await loadTaskProblemsMaster(orgForMaster, submission.taskId);
   const scoreInline = taskMaster
     ? formatRubricEvaluationInline(taskMaster, sr.scores ?? {}, sr.scoreTotal)
