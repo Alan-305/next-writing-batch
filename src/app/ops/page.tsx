@@ -37,15 +37,37 @@ export default function OpsHomePage() {
           <span className="ops-home-action-cta">納品 ZIP を開く</span>
         </Link>
 
+        <Link href="/ops/invite" className="ops-home-action ops-home-action--invite">
+          <span className="ops-home-action-icon" aria-hidden>
+            🔗
+          </span>
+          <span className="ops-home-action-title">生徒招待リンク</span>
+          <span className="ops-home-action-desc">
+            テナント ID の確認と、Google ログイン不要の提出用リンク・QRコードを共有します。
+          </span>
+          <span className="ops-home-action-cta">招待リンクを開く</span>
+        </Link>
+
         <Link href="/ops/tickets" className="ops-home-action ops-home-action--tickets">
           <span className="ops-home-action-icon" aria-hidden>
             🎟
           </span>
-          <span className="ops-home-action-title">リンク・チケット・提出状況</span>
+          <span className="ops-home-action-title">チケット購入</span>
           <span className="ops-home-action-desc">
-            テナント ID の確認、生徒招待リンク、チケット購入と残数、課題別の提出件数を確認します。
+            添削用チケットの購入と、教員アカウントの残枚数を確認します。
           </span>
-          <span className="ops-home-action-cta">開く</span>
+          <span className="ops-home-action-cta">購入・残数を開く</span>
+        </Link>
+
+        <Link href="/ops/submission-counts" className="ops-home-action ops-home-action--submission-counts">
+          <span className="ops-home-action-icon" aria-hidden>
+            📊
+          </span>
+          <span className="ops-home-action-title">提出状況（課題別）</span>
+          <span className="ops-home-action-desc">
+            匿名招待リンクからの提出件数を、課題ごとに確認します。
+          </span>
+          <span className="ops-home-action-cta">提出状況を開く</span>
         </Link>
 
         <Link href="/ops/student-appearance" className="ops-home-action ops-home-action--appearance">

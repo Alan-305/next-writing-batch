@@ -1911,6 +1911,36 @@ a.ops-btn {
   background: #fef3c7;
 }
 
+.ops-home-action--invite {
+  background: linear-gradient(180deg, #faf5ff 0%, #f3e8ff 100%);
+  border-color: #d8b4fe;
+}
+
+.ops-home-action--invite .ops-home-action-icon {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+}
+
+.ops-home-action--invite .ops-home-action-cta {
+  color: #5b21b6;
+  background: #ede9fe;
+}
+
+.ops-home-action--submission-counts {
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #86efac;
+}
+
+.ops-home-action--submission-counts .ops-home-action-icon {
+  background: #bbf7d0;
+  border-color: #4ade80;
+}
+
+.ops-home-action--submission-counts .ops-home-action-cta {
+  color: #166534;
+  background: #bbf7d0;
+}
+
 .ops-home-action--tickets {
   background: linear-gradient(180deg, #f8fafc 0%, #ecfdf5 100%);
   border-color: #a7f3d0;

@@ -18,7 +18,7 @@ export function isTeacherEntryPath(next: string): boolean {
 }
 
 export function teacherRegisterPath(next: string): string {
-  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/ops/tickets";
+  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/ops/invite";
   return `/register/teacher?next=${encodeURIComponent(safe)}`;
 }
 

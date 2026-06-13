@@ -13,7 +13,7 @@ export function RegisterTeacherClient() {
   const params = useSearchParams();
   const nextRaw = (params.get("next") ?? "").trim();
   const safeNext =
-    nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/ops/tickets";
+    nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/ops/invite";
 
   const { user, authLoading, profileLoading, roles, profile } = useFirebaseAuthContext();
   const [busy, setBusy] = useState(false);

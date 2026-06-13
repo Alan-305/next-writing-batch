@@ -24,7 +24,7 @@ export default function SettingsPage() {
           <h2>チケットについて</h2>
           <p className="muted student-settings-billing-lead" style={{ marginBottom: 0 }}>
             添削のチケットは<strong>教員が購入・管理</strong>します。生徒本人による購入はありません。残数や購入は教員向けの{" "}
-            <Link href="/ops/tickets">招待QRとチケット状況</Link> をご利用ください。
+            <Link href="/ops/tickets">チケット購入</Link> をご利用ください。
           </p>
         </section>
 
