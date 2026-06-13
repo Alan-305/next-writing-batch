@@ -217,6 +217,24 @@ export async function sendTensakuKakumeiContactEmail(args: {
   return sendToSupportInbox({ subject, text, replyTo: reply });
 }
 
+/** 教員向け「生徒サポート」画面の公開 URL（メール内リンク用） */
+export function resolveOpsStudentSupportUrl(fallbackOrigin?: string): string {
+  const fromEnv = (
+    process.env.NWB_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_NWB_PUBLIC_APP_URL ??
+    ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+  let base = fromEnv;
+  if (!base) {
+    base = (fallbackOrigin ?? "").trim().replace(/\/$/, "");
+  }
+  if (!base) return "";
+  const root = base.startsWith("http") ? base : `https://${base}`;
+  return `${root}/ops/student-support`;
+}
+
 /** 匿名生徒のサポート問い合わせ（メール本文） */
 export function buildAnonymousSupportEmailBody(args: {
   organizationId: string;
@@ -224,8 +242,9 @@ export function buildAnonymousSupportEmailBody(args: {
   redeemId: string;
   taskId?: string;
   inquiry: string;
-  opsInboxUrl?: string;
+  opsStudentSupportUrl?: string;
 }): string {
+  const supportUrl = (args.opsStudentSupportUrl ?? "").trim();
   return [
     `テナントID: ${args.organizationId}`,
     `ニックネーム: ${args.displayNick || "—"}`,
@@ -235,8 +254,8 @@ export function buildAnonymousSupportEmailBody(args: {
     "お問い合わせ内容:",
     args.inquiry.trim(),
     "",
-    "※ 返信は管理画面の「生徒サポート」から行うと、生徒のメッセージボックスに届きます。",
-    ...(args.opsInboxUrl?.trim() ? [`管理画面: ${args.opsInboxUrl.trim()}`] : []),
+    "※ 返信は下記「生徒サポート」画面から行ってください。返信は生徒のメッセージボックスに届きます。",
+    ...(supportUrl ? [`生徒サポート（返信）: ${supportUrl}`] : []),
     "",
   ].join("\n");
 }

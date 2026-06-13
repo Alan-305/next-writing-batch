@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolvePrimaryTeacherEmailForOrganization } from "@/lib/admin/tenant-roster";
 import { normalizeRedeemLookupToken } from "@/lib/anonymous-redeem";
-import { buildAnonymousSupportEmailBody, sendStudentSupportInquiryEmail } from "@/lib/nexus-support";
+import { buildAnonymousSupportEmailBody, resolveOpsStudentSupportUrl, sendStudentSupportInquiryEmail } from "@/lib/nexus-support";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 import {
   appendStudentSupportMessage,
@@ -111,14 +111,14 @@ export async function POST(request: Request) {
 
   const teacherEmail = await resolvePrimaryTeacherEmailForOrganization(organizationId);
   if (teacherEmail) {
-    const origin = new URL(request.url).origin;
+    const requestOrigin = new URL(request.url).origin;
     const mailBody = buildAnonymousSupportEmailBody({
       organizationId,
       displayNick,
       redeemId,
       taskId: taskId || undefined,
       inquiry: content,
-      opsInboxUrl: `${origin}/ops/student-support`,
+      opsStudentSupportUrl: resolveOpsStudentSupportUrl(requestOrigin),
     });
     void sendStudentSupportInquiryEmail({
       teacherEmail,
