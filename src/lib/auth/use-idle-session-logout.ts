@@ -22,7 +22,7 @@ export function useIdleSessionLogout({ active, onIdle, timeoutMs = IDLE_SESSION_
     if (!active) return;
 
     let lastActivity = Date.now();
-    let timer: ReturnType<typeof window.setTimeout> | null = null;
+    let timer: number | null = null;
 
     const fireIdle = () => {
       onIdleRef.current();
