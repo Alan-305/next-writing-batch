@@ -217,8 +217,8 @@ export async function sendTensakuKakumeiContactEmail(args: {
   return sendToSupportInbox({ subject, text, replyTo: reply });
 }
 
-/** 教員向け「生徒サポート」画面の公開 URL（メール内リンク用） */
-export function resolveOpsStudentSupportUrl(fallbackOrigin?: string): string {
+/** 教員向け「生徒サポート」ログイン URL（メール内リンク用・ログイン後に画面へ） */
+export function resolveOpsStudentSupportSignInUrl(fallbackOrigin?: string): string {
   const fromEnv = (
     process.env.NWB_PUBLIC_APP_URL ??
     process.env.NEXT_PUBLIC_NWB_PUBLIC_APP_URL ??
@@ -232,7 +232,8 @@ export function resolveOpsStudentSupportUrl(fallbackOrigin?: string): string {
   }
   if (!base) return "";
   const root = base.startsWith("http") ? base : `https://${base}`;
-  return `${root}/ops/student-support`;
+  const next = encodeURIComponent("/ops/student-support");
+  return `${root}/sign-in?next=${next}`;
 }
 
 /** 匿名生徒のサポート問い合わせ（メール本文） */
@@ -254,8 +255,9 @@ export function buildAnonymousSupportEmailBody(args: {
     "お問い合わせ内容:",
     args.inquiry.trim(),
     "",
-    "※ 返信は下記「生徒サポート」画面から行ってください。返信は生徒のメッセージボックスに届きます。",
-    ...(supportUrl ? [`生徒サポート（返信）: ${supportUrl}`] : []),
+    "※ 返信手順: 下記URLを開き「Google でログイン（推奨）」からログインしてください（Safari ではポップアップを許可）。",
+    "※ ログイン後、生徒サポート画面が開きます。返信は生徒のメッセージボックスに届きます。",
+    ...(supportUrl ? ["", supportUrl] : []),
     "",
   ].join("\n");
 }

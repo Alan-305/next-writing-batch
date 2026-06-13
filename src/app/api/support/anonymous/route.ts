@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolvePrimaryTeacherEmailForOrganization } from "@/lib/admin/tenant-roster";
 import { normalizeRedeemLookupToken } from "@/lib/anonymous-redeem";
-import { buildAnonymousSupportEmailBody, resolveOpsStudentSupportUrl, sendStudentSupportInquiryEmail } from "@/lib/nexus-support";
+import { buildAnonymousSupportEmailBody, resolveOpsStudentSupportSignInUrl, sendStudentSupportInquiryEmail } from "@/lib/nexus-support";
 import { sanitizeOrganizationIdForPath } from "@/lib/organization-id";
 import {
   appendStudentSupportMessage,
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       redeemId,
       taskId: taskId || undefined,
       inquiry: content,
-      opsStudentSupportUrl: resolveOpsStudentSupportUrl(requestOrigin),
+      opsStudentSupportUrl: resolveOpsStudentSupportSignInUrl(requestOrigin),
     });
     void sendStudentSupportInquiryEmail({
       teacherEmail,

@@ -20,6 +20,7 @@ import { useFirebaseEmulators } from "@/lib/firebase/config";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { resetRedirectResultCacheForNewFlow } from "@/lib/firebase/redirect-result-once";
 import { resolveSignInNextPath, signInPublicHomePath } from "@/lib/auth/sign-in-navigation";
+import { shouldAvoidGoogleRedirectAuth } from "@/lib/auth/prefer-popup-auth";
 
 function isPopupBlocked(e: unknown): boolean {
   return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "auth/popup-blocked";
@@ -38,6 +39,7 @@ function SignInInner() {
   const inviteOrg = (params.get("org") ?? "").trim();
   /** 教員の既存テナント参加（URL の teacherOrg）。画面には特別な案内は出さない */
   const teacherOrg = (params.get("teacherOrg") ?? "").trim();
+  const avoidRedirectAuth = shouldAvoidGoogleRedirectAuth();
   const emulatorMode = useFirebaseEmulators();
   const { configured, user, authLoading, authRedirectHint, profile, profileLoading, roles } =
     useFirebaseAuthContext();
@@ -165,8 +167,12 @@ function SignInInner() {
       router.replace(safeNext);
     } catch (e: unknown) {
       if (isPopupBlocked(e)) {
-        if (emulatorMode) {
-          setError("ポップアップがブロックされました。ブラウザ設定でポップアップを許可してください。");
+        if (emulatorMode || avoidRedirectAuth) {
+          setError(
+            avoidRedirectAuth
+              ? "ポップアップがブロックされました。Safari の設定でポップアップを許可し、「Google でログイン（推奨）」をもう一度押してください。"
+              : "ポップアップがブロックされました。ブラウザ設定でポップアップを許可してください。",
+          );
           return;
         }
         try {
@@ -176,8 +182,12 @@ function SignInInner() {
           setError(formatFirebaseAuthError(e2));
         }
       } else if (e instanceof FirebaseError && e.code === "auth/popup-closed-by-user") {
-        if (emulatorMode) {
-          setError("ポップアップが閉じられました。閉じずにアカウント選択まで進めてください。");
+        if (emulatorMode || avoidRedirectAuth) {
+          setError(
+            avoidRedirectAuth
+              ? "ログイン画面が閉じられました。「Google でログイン（推奨）」をもう一度押し、ポップアップを閉じずに完了してください。"
+              : "ポップアップが閉じられました。閉じずにアカウント選択まで進めてください。",
+          );
           return;
         }
         try {
@@ -201,6 +211,7 @@ function SignInInner() {
     router,
     safeNext,
     startGoogleRedirect,
+    avoidRedirectAuth,
   ]);
 
   useEffect(() => {
@@ -365,7 +376,7 @@ function SignInInner() {
             {busy ? "処理中…" : "Google でログイン（推奨）"}
           </button>
         </p>
-        {emulatorMode ? null : (
+        {emulatorMode || avoidRedirectAuth ? null : (
           <p>
             <button
               type="button"
@@ -383,6 +394,12 @@ function SignInInner() {
             </button>
           </p>
         )}
+        {avoidRedirectAuth ? (
+          <p className="muted" style={{ marginBottom: 0, lineHeight: 1.6 }}>
+            Safari / iPhone では「Google でログイン（推奨）」の<strong>ポップアップ方式</strong>
+            をお使いください。リダイレクト方式はログイン結果を受け取れないことがあります。
+          </p>
+        ) : null}
         <p className="muted" style={{ marginBottom: 0 }}>
           <Link href={publicHome}>キャンセルして戻る</Link>
         </p>
