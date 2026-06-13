@@ -23,6 +23,8 @@ type Payload = {
   students?: TicketRow[];
   teacherCount?: number;
   studentCount?: number;
+  anonymousSubmissionTotal?: number;
+  submissionCountsByTaskId?: Array<{ taskId: string; count: number; latestSubmittedAt: string }>;
   note?: string;
   message?: string;
 };
@@ -278,7 +280,7 @@ function OpsTicketsPageInner() {
         {!loading && !error && data?.ok ? (
           <>
             <p className="muted admin-tenant-roster-lead">
-              テナント <code>{data.organizationId ?? "—"}</code> の教員（チケット残高）と登録生徒です。
+              テナント <code>{data.organizationId ?? "—"}</code> の教員（チケット残高）と、匿名提出の累計です。
             </p>
             <div className="admin-roster-columns">
               <div>
@@ -290,11 +292,53 @@ function OpsTicketsPageInner() {
               </div>
               <div>
                 <h2 className="admin-roster-subheading">
-                  生徒（想定）{" "}
+                  登録生徒（Google）{" "}
                   <span className="admin-roster-count">{data.studentCount ?? data.students?.length ?? 0} 名</span>
                 </h2>
+                <p className="muted" style={{ marginTop: 0, lineHeight: 1.6 }}>
+                  匿名招待リンクから提出した生徒はここに表示されません（ログイン登録なし）。
+                </p>
                 {renderList(data.students ?? [], "student")}
               </div>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <h2 className="admin-roster-subheading">
+                匿名提出（課題別・累計）{" "}
+                <span className="admin-roster-count">{data.anonymousSubmissionTotal ?? 0} 件</span>
+              </h2>
+              {(data.submissionCountsByTaskId ?? []).length === 0 ? (
+                <p className="muted" style={{ marginBottom: 0 }}>
+                  まだ提出はありません。
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 320 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>課題ID</th>
+                        <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>提出件数</th>
+                        <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e2e8f0" }}>最終提出</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.submissionCountsByTaskId ?? []).map((row) => (
+                        <tr key={row.taskId}>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                            <code>{row.taskId}</code>
+                          </td>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right", fontWeight: 700 }}>
+                            {row.count}
+                          </td>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }} className="muted">
+                            {formatIso(row.latestSubmittedAt)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
             {data.note ? (
               <p className="muted admin-tenant-roster-note" style={{ marginBottom: 0 }}>

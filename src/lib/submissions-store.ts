@@ -210,6 +210,34 @@ export async function getSubmissions(organizationId: string): Promise<Submission
   return rows.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
 }
 
+export type TaskSubmissionCount = {
+  taskId: string;
+  count: number;
+  latestSubmittedAt: string;
+};
+
+/** 課題IDごとの提出件数（累計） */
+export async function countSubmissionsByTaskId(organizationId: string): Promise<TaskSubmissionCount[]> {
+  const submissions = await getSubmissions(organizationId);
+  const map = new Map<string, { count: number; latestSubmittedAt: string }>();
+  for (const s of submissions) {
+    const taskId = s.taskId.trim();
+    if (!taskId) continue;
+    const existing = map.get(taskId);
+    if (!existing) {
+      map.set(taskId, { count: 1, latestSubmittedAt: s.submittedAt });
+      continue;
+    }
+    existing.count += 1;
+    if (s.submittedAt > existing.latestSubmittedAt) {
+      existing.latestSubmittedAt = s.submittedAt;
+    }
+  }
+  return Array.from(map.entries())
+    .map(([taskId, v]) => ({ taskId, count: v.count, latestSubmittedAt: v.latestSubmittedAt }))
+    .sort((a, b) => b.latestSubmittedAt.localeCompare(a.latestSubmittedAt));
+}
+
 export async function getSubmissionByIdInOrganization(
   organizationId: string,
   submissionId: string,

@@ -5,6 +5,7 @@ import { resolveOrganizationIdForTenantUid } from "@/lib/auth/resolve-effective-
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import { countSubmissionsByTaskId } from "@/lib/submissions-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -119,6 +120,8 @@ export async function GET(request: Request) {
 
     const teachers = rows.filter((r) => r.kind === "teacher").sort((a, b) => a.displayLabel.localeCompare(b.displayLabel, "ja"));
     const students = rows.filter((r) => r.kind === "student").sort((a, b) => a.displayLabel.localeCompare(b.displayLabel, "ja"));
+    const submissionCountsByTaskId = await countSubmissionsByTaskId(organizationId);
+    const anonymousSubmissionTotal = submissionCountsByTaskId.reduce((sum, row) => sum + row.count, 0);
 
     return NextResponse.json({
       ok: true,
@@ -127,7 +130,9 @@ export async function GET(request: Request) {
       students,
       teacherCount: teachers.length,
       studentCount: students.length,
-      note: "消費履歴は現状『直近1回分』のみ（billing.lastProofreadTicketConsume / lastProofreadTicketAt）。",
+      anonymousSubmissionTotal,
+      submissionCountsByTaskId,
+      note: "匿名提出の生徒は Google 登録しないため「登録生徒」は 0 名のままです。課題別の提出件数（累計）を参照してください。消費履歴は現状『直近1回分』のみ（billing.lastProofreadTicketConsume / lastProofreadTicketAt）。",
     });
   } catch (e) {
     return NextResponse.json(
