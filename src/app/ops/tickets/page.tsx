@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 import { createStripeCheckoutSession, type BillingPlan } from "@/lib/billing/create-checkout-session";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { formatRegisteredTaskDropdownLabel } from "@/lib/registered-tasks-list";
+import { formatRegisteredTaskDropdownLabel } from "@/lib/registered-task-display";
 
 type TicketRow = {
   uid: string;
