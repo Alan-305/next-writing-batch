@@ -69,9 +69,7 @@ export default async function StudentResultPage({ params }: Props) {
       }
       bottomSlot={
         <p className="no-print">
-          <Link href="/submit">提出画面へ戻る</Link>
-          {" · "}
-          <Link href="/">開発用トップ</Link>
+          <Link href={`/submit?org=${encodeURIComponent(loaded.organizationId)}`}>提出・受け取りへ戻る</Link>
         </p>
       }
     />
