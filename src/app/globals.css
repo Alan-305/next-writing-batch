@@ -1244,6 +1244,20 @@ a.ops-btn {
   font-size: 0.82rem;
 }
 
+.ops-ticket-balance {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ops-ticket-balance__count {
+  color: #dc2626;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
 .admin-tenant-roster-note {
   margin-top: 14px;
   font-size: 0.85rem;

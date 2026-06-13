@@ -194,22 +194,23 @@ function OpsTicketsPageInner() {
       <ul className="admin-roster-list">
         {items.map((m) => (
           <li key={m.uid}>
-            <span>
-              {m.displayLabel}{" "}
-              <span className="muted admin-roster-meta">
-                <code>{m.uid.slice(0, 8)}…</code>
-                {m.email ? ` · ${m.email}` : ""}
-                {role === "teacher" ? (
-                  <>
-                    {" · "}
-                    残り <strong>{m.tickets}</strong>
-                    {m.lastProofreadTicketConsume != null ? ` · 直近消費 ${m.lastProofreadTicketConsume}` : ""}
-                    {m.lastProofreadTicketAt ? ` · ${formatIso(m.lastProofreadTicketAt)}` : ""}
-                  </>
-                ) : (
-                  <span> · 添削の確定ごとに教員のチケットから消費されます</span>
-                )}
+            <span>{m.displayLabel}</span>
+            {role === "teacher" ? (
+              <span className="ops-ticket-balance" aria-label={`チケット残${m.tickets}枚`}>
+                チケット残<span className="ops-ticket-balance__count">{m.tickets}</span>枚
               </span>
+            ) : null}
+            <span className="muted admin-roster-meta">
+              <code>{m.uid.slice(0, 8)}…</code>
+              {m.email ? ` · ${m.email}` : ""}
+              {role === "teacher" ? (
+                <>
+                  {m.lastProofreadTicketConsume != null ? ` · 直近消費 ${m.lastProofreadTicketConsume}` : ""}
+                  {m.lastProofreadTicketAt ? ` · ${formatIso(m.lastProofreadTicketAt)}` : ""}
+                </>
+              ) : (
+                <span> · 添削の確定ごとに教員のチケットから消費されます</span>
+              )}
             </span>
           </li>
         ))}
