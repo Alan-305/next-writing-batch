@@ -5,6 +5,7 @@ import {
   type OpsTenantRosterPayload,
   type OpsTicketRow,
 } from "@/lib/ops/tenant-ticket-roster-client";
+import { formatTicketExpiryJa } from "@/lib/billing/ticket-lots";
 
 type Props = {
   data: OpsTenantRosterPayload;
@@ -17,8 +18,22 @@ function renderTeacherList(items: OpsTicketRow[]) {
       {items.map((m) => (
         <li key={m.uid}>
           <span>{m.displayLabel}</span>
-          <span className="ops-ticket-balance" aria-label={`チケット残${m.tickets}枚`}>
-            チケット残<span className="ops-ticket-balance__count">{m.tickets}</span>枚
+          <span
+            className="ops-ticket-balance"
+            aria-label={
+              m.ticketExpiresAt
+                ? `チケット残${m.tickets}枚、有効期限${formatTicketExpiryJa(m.ticketExpiresAt)}まで`
+                : `チケット残${m.tickets}枚`
+            }
+          >
+            <span className="ops-ticket-balance__main">
+              チケット残<span className="ops-ticket-balance__count">{m.tickets}</span>枚
+            </span>
+            {m.ticketExpiresAt ? (
+              <span className="ops-ticket-balance__expiry">
+                有効期限 {formatTicketExpiryJa(m.ticketExpiresAt)}まで
+              </span>
+            ) : null}
           </span>
           <span className="muted admin-roster-meta">
             <code>{m.uid.slice(0, 8)}…</code>

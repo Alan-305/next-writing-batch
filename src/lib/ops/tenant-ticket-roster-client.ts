@@ -10,6 +10,7 @@ export type OpsTicketRow = {
   email: string | null;
   kind: "teacher" | "student";
   tickets: number;
+  ticketExpiresAt: string | null;
   lastProofreadTicketConsume: number | null;
   lastProofreadTicketAt: string | null;
 };

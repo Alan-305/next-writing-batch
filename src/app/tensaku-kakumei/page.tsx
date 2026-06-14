@@ -29,6 +29,9 @@ export default async function TensakuKakumeiPage() {
           </h1>
           <p className="tensaku-hero-lead tensaku-en">Put down the red pen. Face your students.</p>
           <p className="tensaku-hero-sub">赤ペンを置いて、生徒と向き合おう。</p>
+          <p className="tensaku-hero-offer">
+            初回無料特典として30日間有効のチケットを5枚プレゼントいたします。
+          </p>
         </div>
       </header>
 

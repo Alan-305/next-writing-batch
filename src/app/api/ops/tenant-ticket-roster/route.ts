@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { resolveOrganizationIdForTenantUid } from "@/lib/auth/resolve-effective-organization";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
+import { nearestTicketExpiryIso, resolveBillingTicketLots, sumTicketLots } from "@/lib/billing/ticket-lots";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { countSubmissionsByTaskId } from "@/lib/submissions-store";
@@ -17,6 +18,7 @@ type TicketRow = {
   email: string | null;
   kind: "teacher" | "student";
   tickets: number;
+  ticketExpiresAt: string | null;
   lastProofreadTicketConsume: number | null;
   lastProofreadTicketAt: string | null;
 };
@@ -59,9 +61,6 @@ async function fetchAuthLabels(uids: string[]): Promise<Map<string, { email: str
   return map;
 }
 
-function numberOrZero(raw: unknown): number {
-  return typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
-}
 
 function timestampToIso(raw: unknown): string | null {
   const maybe = raw as { toDate?: () => Date } | null;
@@ -101,7 +100,9 @@ export async function GET(request: Request) {
       /** 管理者の /api/admin/tenant-ticket-roster と同じ: Firestore の roles のみで分類 */
       const kind: "teacher" | "student" = isTeacherByRoles(roles) ? "teacher" : "student";
       const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
-      const tickets = Math.max(0, Math.floor(numberOrZero(billing["tickets"])));
+      const { lots } = resolveBillingTicketLots(billing);
+      const tickets = sumTicketLots(lots);
+      const ticketExpiresAt = tickets > 0 ? nearestTicketExpiryIso(lots) : null;
       const lastConsumeRaw = billing["lastProofreadTicketConsume"];
       const lastProofreadTicketConsume =
         typeof lastConsumeRaw === "number" && Number.isFinite(lastConsumeRaw) ? Math.floor(lastConsumeRaw) : null;
@@ -114,6 +115,7 @@ export async function GET(request: Request) {
         email: authLabel.email,
         kind,
         tickets,
+        ticketExpiresAt,
         lastProofreadTicketConsume,
         lastProofreadTicketAt,
       };

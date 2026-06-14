@@ -22,8 +22,8 @@ export const VALIDITY_DAYS_BY_PLAN: Record<BillingPlan, number> = {
   t120: 360,
 };
 
-/** 初回登録特典（5枚）の有効期限 — 10枚パックと同じ */
-export const WELCOME_FREE_TICKET_VALIDITY_DAYS = VALIDITY_DAYS_BY_PLAN.t10;
+/** 初回登録特典（5枚）の有効期限 */
+export const WELCOME_FREE_TICKET_VALIDITY_DAYS = 30;
 
 export function validityDaysForPlan(plan: BillingPlan): number {
   return VALIDITY_DAYS_BY_PLAN[plan];

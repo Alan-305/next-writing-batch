@@ -7,7 +7,7 @@ import {
   resolveBillingTicketLots,
   sumTicketLots,
 } from "@/lib/billing/ticket-lots";
-import { VALIDITY_DAYS_BY_PLAN } from "@/lib/legal/ticket-billing-plans";
+import { WELCOME_FREE_TICKET_VALIDITY_DAYS } from "@/lib/legal/ticket-billing-plans";
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import type { Submission } from "@/lib/submissions-store";
@@ -289,7 +289,7 @@ export function billingWithWelcomeFreeTickets(
   const { lots } = resolveBillingTicketLots(billing);
   const nextLots = grantTicketLot(lots, {
     count: grantCount,
-    validityDays: VALIDITY_DAYS_BY_PLAN.t10,
+    validityDays: WELCOME_FREE_TICKET_VALIDITY_DAYS,
     kind: "free",
   });
   return applyBillingLots(

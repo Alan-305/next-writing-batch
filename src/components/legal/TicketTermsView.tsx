@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { LEGAL_DOCUMENT_LABELS, LEGAL_PATHS } from "@/lib/legal/paths";
-import { TICKET_BILLING_PLANS, validityLabel } from "@/lib/legal/ticket-billing-plans";
+import { TICKET_BILLING_PLANS, validityLabel, WELCOME_FREE_TICKET_VALIDITY_DAYS } from "@/lib/legal/ticket-billing-plans";
 
 export function TicketTermsView() {
   return (
@@ -62,11 +62,17 @@ export function TicketTermsView() {
                   <td>{validityLabel(plan.validityDays)}</td>
                 </tr>
               ))}
+              <tr>
+                <td>初回登録特典（無料）</td>
+                <td>5枚</td>
+                <td>{validityLabel(WELCOME_FREE_TICKET_VALIDITY_DAYS)}</td>
+              </tr>
             </tbody>
           </table>
         </div>
         <p>
-          有効期限を経過したチケットは自動的に消滅し、払い戻しや補償は行われません。初回登録特典の無料チケット（5枚）の有効期限は、10枚パックと同じ{validityLabel(TICKET_BILLING_PLANS[0].validityDays)}とします。
+          有効期限を経過したチケットは自動的に消滅し、払い戻しや補償は行われません。初回登録特典の無料チケット（5枚）の有効期限は
+          {validityLabel(WELCOME_FREE_TICKET_VALIDITY_DAYS)}とします。
         </p>
       </section>
 

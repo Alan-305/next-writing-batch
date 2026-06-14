@@ -101,7 +101,7 @@ export async function notifyAdminNewTeacherRegistration(input: {
     `テナント ID: ${organizationId}`,
     `種別: ${input.createdNewTenant ? "新規テナント作成" : "既存テナントへの参加"}`,
     "",
-    "初回登録特典としてチケット 5 枚が付与されています。",
+    "初回登録特典として、有効期限30日のチケット 5 枚が付与されています。",
   ];
   if (adminHref) lines.push("", `管理画面: ${adminHref}`);
   lines.push("", "— 添削革命 / next-writing-batch");

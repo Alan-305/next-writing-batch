@@ -42,7 +42,7 @@ export function OpsTicketPurchaseCard() {
   return (
     <div className="card admin-tenant-roster-card" style={{ marginBottom: 16 }}>
       <p className="muted admin-tenant-roster-lead">
-        <strong>初回の教員登録時に 5 枚無料</strong>が付与されます。ここで購入したチケットは
+        <strong>初回の教員登録時に 5 枚無料</strong>（有効期限 30日）が付与されます。ここで購入したチケットは
         <strong>ログイン中の教員アカウント</strong>
         に付与されます。生徒の添削を公開・確定するたびに、この残数から 1 枚ずつ消費されます。
       </p>

@@ -164,3 +164,35 @@ export function resolveBillingTicketLots(
   const changed = nextTotal !== previousTotal || !hadLots;
   return { lots: purged, changed };
 }
+
+const LEGACY_EXPIRY_CUTOFF_MS = Date.parse("2090-01-01T00:00:00.000Z");
+
+/** 残チケットのうち、最も近い失効日（legacy ロットは除く） */
+export function nearestTicketExpiryIso(lots: TicketLot[], nowMs = Date.now()): string | null {
+  const active = purgeExpiredLots(lots, nowMs).filter((lot) => lot.count > 0);
+  if (active.length === 0) return null;
+
+  let nearest: string | null = null;
+  let nearestMs = Infinity;
+  for (const lot of active) {
+    const ms = Date.parse(lot.expiresAt);
+    if (!Number.isFinite(ms) || ms >= LEGACY_EXPIRY_CUTOFF_MS) continue;
+    if (ms < nearestMs) {
+      nearestMs = ms;
+      nearest = lot.expiresAt;
+    }
+  }
+  return nearest;
+}
+
+export function formatTicketExpiryJa(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
