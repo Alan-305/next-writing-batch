@@ -19,6 +19,13 @@ export const TICKETS_BY_PLAN: Record<BillingPlan, number> = {
   t120: 120,
 };
 
+export const VALIDITY_DAYS_BY_PLAN: Record<BillingPlan, number> = {
+  t10: 60,
+  t30: 120,
+  t60: 180,
+  t120: 360,
+};
+
 export function stripePriceByPlan(): Record<BillingPlan, string> {
   return {
     t10: stripePriceT10.value().trim(),

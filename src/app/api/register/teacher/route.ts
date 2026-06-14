@@ -8,6 +8,7 @@ import { notifyAdminNewTeacherRegistration } from "@/lib/notifications/teacher-n
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { ensureOrganizationDataDir } from "@/lib/org-data-layout";
 import { generateUniqueTenantOrganizationId, sanitizeOrganizationIdForPath } from "@/lib/organization-id";
+import { billingWithWelcomeFreeTickets } from "@/lib/billing/proofread-ticket-firestore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -86,10 +87,7 @@ export async function POST(request: Request) {
         {
           roles: FieldValue.arrayUnion("teacher"),
           organizationId,
-          billing: {
-            tickets: 5,
-            welcomeTicketsGranted: true,
-          },
+          billing: billingWithWelcomeFreeTickets({}, 5),
           createdAt: new Date().toISOString(),
         },
         { merge: true },
@@ -108,21 +106,13 @@ export async function POST(request: Request) {
 
     const existingBilling = (snap.get("billing") ?? {}) as Record<string, unknown>;
     const welcomeDone = existingBilling["welcomeTicketsGranted"] === true;
-    const curTickets =
-      typeof existingBilling["tickets"] === "number" && Number.isFinite(existingBilling["tickets"] as number)
-        ? Math.max(0, Math.floor(existingBilling["tickets"] as number))
-        : 0;
 
     t.set(
       userRef,
       {
         organizationId,
         roles: FieldValue.arrayUnion("teacher"),
-        billing: {
-          ...existingBilling,
-          tickets: welcomeDone ? curTickets : curTickets + 5,
-          welcomeTicketsGranted: true,
-        },
+        billing: welcomeDone ? existingBilling : billingWithWelcomeFreeTickets(existingBilling, 5),
       },
       { merge: true },
     );

@@ -1,5 +1,14 @@
 import { FieldValue } from "firebase-admin/firestore";
 
+import {
+  applyBillingLots,
+  consumeTicketLots,
+  deductPaidTicketLots,
+  grantTicketLot,
+  resolveBillingTicketLots,
+  sumTicketLots,
+} from "@/lib/billing/ticket-lots";
+import { VALIDITY_DAYS_BY_PLAN } from "@/lib/legal/ticket-billing-plans";
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 
@@ -74,19 +83,38 @@ export async function executeAdminAdjustBillingTickets(
     }
 
     const existingBilling = (userSnap.get("billing") ?? {}) as Record<string, unknown>;
-    const current =
-      typeof existingBilling["tickets"] === "number" ? (existingBilling["tickets"] as number) : 0;
-    nextTickets = Math.max(0, current + deltaTickets);
+    const { lots } = resolveBillingTicketLots(existingBilling);
+    let nextLots = lots;
+
+    if (deltaTickets > 0) {
+      nextLots = grantTicketLot(nextLots, {
+        count: deltaTickets,
+        validityDays: VALIDITY_DAYS_BY_PLAN.t120,
+        kind: "manual",
+      });
+    } else if (deltaTickets < 0) {
+      const { lots: deductedLots, deducted } = deductPaidTicketLots(nextLots, Math.abs(deltaTickets));
+      if (deducted < Math.abs(deltaTickets)) {
+        const { lots: consumedLots, consumed } = consumeTicketLots(deductedLots, Math.abs(deltaTickets) - deducted);
+        nextLots = consumedLots;
+      } else {
+        nextLots = deductedLots;
+      }
+    }
+
+    nextTickets = sumTicketLots(nextLots);
 
     tx.update(userRef, {
-      billing: {
-        ...existingBilling,
-        tickets: nextTickets,
-        lastManualTicketDelta: deltaTickets,
-        lastManualTicketReason: reason || null,
-        lastManualTicketByUid: callerUid.trim(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+      billing: applyBillingLots(
+        {
+          ...existingBilling,
+          lastManualTicketDelta: deltaTickets,
+          lastManualTicketReason: reason || null,
+          lastManualTicketByUid: callerUid.trim(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        nextLots,
+      ),
     });
 
     tx.set(

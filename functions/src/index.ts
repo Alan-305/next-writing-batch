@@ -11,9 +11,18 @@ import {
   stripeSecretKey,
   stripeWebhookSecret,
   TICKETS_BY_PLAN,
+  VALIDITY_DAYS_BY_PLAN,
   type BillingPlan,
 } from "./runtime-config";
 import { createStripeClient, type StripeClient } from "./stripe-client";
+import {
+  applyBillingLots,
+  consumeTicketLots,
+  deductPaidTicketLots,
+  grantTicketLot,
+  resolveBillingTicketLots,
+  sumTicketLots,
+} from "./ticket-lots.js";
 
 admin.initializeApp();
 
@@ -334,19 +343,41 @@ export const adminAdjustBillingTickets = functions.https.onCall(async (data, con
     }
 
     const existingBilling = (userSnap.get("billing") ?? {}) as Record<string, unknown>;
-    const current =
-      typeof existingBilling["tickets"] === "number" ? (existingBilling["tickets"] as number) : 0;
-    nextTickets = Math.max(0, current + deltaTickets);
+    const { lots } = resolveBillingTicketLots(existingBilling);
+    let nextLots = lots;
+
+    if (deltaTickets > 0) {
+      nextLots = grantTicketLot(nextLots, {
+        count: deltaTickets,
+        validityDays: VALIDITY_DAYS_BY_PLAN.t120,
+        kind: "manual",
+      });
+    } else if (deltaTickets < 0) {
+      const { lots: deductedLots, deducted } = deductPaidTicketLots(nextLots, Math.abs(deltaTickets));
+      if (deducted < Math.abs(deltaTickets)) {
+        const { lots: consumedLots } = consumeTicketLots(
+          deductedLots,
+          Math.abs(deltaTickets) - deducted,
+        );
+        nextLots = consumedLots;
+      } else {
+        nextLots = deductedLots;
+      }
+    }
+
+    nextTickets = sumTicketLots(nextLots);
 
     tx.update(userRef, {
-      billing: {
-        ...existingBilling,
-        tickets: nextTickets,
-        lastManualTicketDelta: deltaTickets,
-        lastManualTicketReason: reason || null,
-        lastManualTicketByUid: callerUid,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+      billing: applyBillingLots(
+        {
+          ...existingBilling,
+          lastManualTicketDelta: deltaTickets,
+          lastManualTicketReason: reason || null,
+          lastManualTicketByUid: callerUid,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        nextLots,
+      ),
     });
 
     tx.set(
@@ -708,27 +739,40 @@ async function handleCheckoutCompleted(
     }
 
     const existingBilling = (userSnap.get("billing") ?? {}) as Record<string, unknown>;
-    const existingTickets =
-      typeof existingBilling["tickets"] === "number" ? (existingBilling["tickets"] as number) : 0;
-    const nextTickets = existingTickets + ticketAmount;
+    const { lots } = resolveBillingTicketLots(existingBilling);
+    const planRaw = session.metadata?.plan;
+    const plan =
+      planRaw === "t10" || planRaw === "t30" || planRaw === "t60" || planRaw === "t120"
+        ? planRaw
+        : null;
+    const validityDays = plan ? VALIDITY_DAYS_BY_PLAN[plan] : VALIDITY_DAYS_BY_PLAN.t120;
+    const nextLots = grantTicketLot(lots, {
+      count: ticketAmount,
+      validityDays,
+      kind: "paid",
+      ...(plan ? { plan } : {}),
+    });
+    const nextTickets = sumTicketLots(nextLots);
     const lastPaymentIntentId = paymentIntentIdFromSession(session);
 
     tx.update(userRef, {
-      billing: {
-        ...existingBilling,
-        status: "active",
-        tickets: nextTickets,
-        stripeCustomerId: session.customer ?? null,
-        lastCheckoutSessionId: session.id,
-        ...(lastPaymentIntentId ? { lastPaymentIntentId } : {}),
-        lastTicketAdded: ticketAmount,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+      billing: applyBillingLots(
+        {
+          ...existingBilling,
+          status: "active",
+          stripeCustomerId: session.customer ?? null,
+          lastCheckoutSessionId: session.id,
+          ...(lastPaymentIntentId ? { lastPaymentIntentId } : {}),
+          lastTicketAdded: ticketAmount,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        nextLots,
+      ),
     });
     tx.set(
       entRef,
       {
-        status: "active",
+        status: nextTickets > 0 ? ("active" as const) : ("none" as const),
         source: "stripe",
         updatedAt: FieldValue.serverTimestamp(),
       },
@@ -875,19 +919,25 @@ async function handleChargeRefunded(
     }
 
     const existingBilling = (userSnap.get("billing") ?? {}) as Record<string, unknown>;
-    const currentTickets =
-      typeof existingBilling["tickets"] === "number" ? (existingBilling["tickets"] as number) : 0;
-    const nextTickets = Math.max(0, currentTickets - deductTickets);
+    const { lots } = resolveBillingTicketLots(existingBilling);
+    const { lots: deductedLots, deducted } = deductPaidTicketLots(lots, deductTickets);
+    const nextLots =
+      deducted < deductTickets
+        ? consumeTicketLots(deductedLots, deductTickets - deducted).lots
+        : deductedLots;
+    const nextTickets = sumTicketLots(nextLots);
 
     tx.update(userRef, {
-      billing: {
-        ...existingBilling,
-        tickets: nextTickets,
-        lastRefundChargeId: chargeId,
-        lastRefundTicketsDeducted: deductTickets,
-        lastRefundAmountDelta: deltaRefund,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
+      billing: applyBillingLots(
+        {
+          ...existingBilling,
+          lastRefundChargeId: chargeId,
+          lastRefundTicketsDeducted: deductTickets,
+          lastRefundAmountDelta: deltaRefund,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        nextLots,
+      ),
     });
 
     tx.set(

@@ -1,13 +1,47 @@
 import { FieldValue } from "firebase-admin/firestore";
 
+import {
+  applyBillingLots,
+  consumeTicketLots,
+  grantTicketLot,
+  resolveBillingTicketLots,
+  sumTicketLots,
+} from "@/lib/billing/ticket-lots";
+import { VALIDITY_DAYS_BY_PLAN } from "@/lib/legal/ticket-billing-plans";
 import { PRODUCT_ID_NEXT_WRITING_BATCH } from "@/lib/constants/nexus-products";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import type { Submission } from "@/lib/submissions-store";
 
 export type TicketConsumeReason = "day4_finalize" | "legacy_proofread_label";
 
+function ticketBalanceFromBilling(billing: Record<string, unknown>, nowMs = Date.now()): number {
+  const { lots } = resolveBillingTicketLots(billing, nowMs);
+  return sumTicketLots(lots);
+}
+
+function withConsumeAuditFields(
+  billing: Record<string, unknown>,
+  reason: TicketConsumeReason,
+  count: number,
+): Record<string, unknown> {
+  if (reason === "day4_finalize") {
+    return {
+      ...billing,
+      lastDay4FinalizeTicketConsume: count,
+      lastDay4FinalizeTicketAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+  }
+  return {
+    ...billing,
+    lastProofreadTicketConsume: count,
+    lastProofreadTicketAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+}
+
 /**
- * 単一 UID の `billing.tickets` を減算する。
+ * 単一 UID のチケットを減算する（有効期限・ロット順を反映）。
  * Day4 確定時は `day4_finalize` を指定し、証跡フィールドを lastDay4Finalize* に記録する。
  */
 export async function consumeProofreadTickets(
@@ -33,31 +67,22 @@ export async function consumeProofreadTickets(
         throw new Error("NO_USER");
       }
       const existingBilling = (snap.get("billing") ?? {}) as Record<string, unknown>;
-      const current =
-        typeof existingBilling["tickets"] === "number" ? (existingBilling["tickets"] as number) : 0;
-      if (current < c) {
+      const { lots } = resolveBillingTicketLots(existingBilling);
+      const available = sumTicketLots(lots);
+      if (available < c) {
         throw new Error("INSUFFICIENT");
       }
-      resultTickets = Math.max(0, current - c);
-      const nextBilling =
-        reason === "day4_finalize"
-          ? {
-              ...existingBilling,
-              tickets: resultTickets,
-              lastDay4FinalizeTicketConsume: c,
-              lastDay4FinalizeTicketAt: FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            }
-          : {
-              ...existingBilling,
-              tickets: resultTickets,
-              lastProofreadTicketConsume: c,
-              lastProofreadTicketAt: FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            };
-      tx.update(userRef, {
-        billing: nextBilling,
-      });
+      const { lots: nextLots, consumed } = consumeTicketLots(lots, c);
+      if (consumed < c) {
+        throw new Error("INSUFFICIENT");
+      }
+      resultTickets = sumTicketLots(nextLots);
+      const nextBilling = withConsumeAuditFields(
+        applyBillingLots(existingBilling, nextLots),
+        reason,
+        c,
+      );
+      tx.update(userRef, { billing: nextBilling });
       tx.set(
         entRef,
         {
@@ -80,11 +105,16 @@ export async function consumeProofreadTickets(
 export async function getTicketBalanceForUid(uid: string): Promise<number> {
   const u = (uid ?? "").trim();
   if (!u) return 0;
-  const snap = await getAdminFirestore().collection("users").doc(u).get();
+  const userRef = getAdminFirestore().collection("users").doc(u);
+  const snap = await userRef.get();
   if (!snap.exists) return 0;
-  const billing = (snap.get("billing") ?? {}) as Record<string, unknown>;
-  const t = billing["tickets"];
-  return typeof t === "number" && Number.isFinite(t) ? Math.max(0, Math.floor(t)) : 0;
+  const existingBilling = (snap.get("billing") ?? {}) as Record<string, unknown>;
+  const { lots, changed } = resolveBillingTicketLots(existingBilling);
+  const total = sumTicketLots(lots);
+  if (changed) {
+    await userRef.set({ billing: applyBillingLots(existingBilling, lots) }, { merge: true });
+  }
+  return total;
 }
 
 /**
@@ -129,8 +159,7 @@ export async function getTicketBalanceForOrganization(organizationId: string): P
   let total = 0;
   for (const doc of snap.docs) {
     const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
-    const t = billing["tickets"];
-    if (typeof t === "number" && Number.isFinite(t)) total += Math.max(0, Math.floor(t));
+    total += ticketBalanceFromBilling(billing);
   }
   return total;
 }
@@ -184,10 +213,9 @@ export async function consumeProofreadTicketsFromOrganization(
 
   const rows: Row[] = userSnap.docs.map((doc) => {
     const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
-    const t = billing["tickets"];
-    const current = typeof t === "number" && Number.isFinite(t) ? Math.max(0, Math.floor(t)) : 0;
-    const uid = doc.id;
-    return { uid, current, billing, tier: tierFor(uid) };
+    const { lots } = resolveBillingTicketLots(billing);
+    const current = sumTicketLots(lots);
+    return { uid: doc.id, current, billing, tier: tierFor(doc.id) };
   });
 
   const total = rows.reduce((acc, r) => acc + r.current, 0);
@@ -217,18 +245,22 @@ export async function consumeProofreadTicketsFromOrganization(
       const snap = await tx.get(ref);
       if (!snap.exists) throw new Error("NO_MEMBER");
       const existingBilling = (snap.get("billing") ?? {}) as Record<string, unknown>;
-      const current =
-        typeof existingBilling["tickets"] === "number" ? (existingBilling["tickets"] as number) : 0;
-      if (current < p.amount) throw new Error("INSUFFICIENT");
-      const next = Math.max(0, current - p.amount);
+      const { lots } = resolveBillingTicketLots(existingBilling);
+      const available = sumTicketLots(lots);
+      if (available < p.amount) throw new Error("INSUFFICIENT");
+      const { lots: nextLots, consumed } = consumeTicketLots(lots, p.amount);
+      if (consumed < p.amount) throw new Error("INSUFFICIENT");
+      const next = sumTicketLots(nextLots);
       tx.update(ref, {
-        billing: {
-          ...existingBilling,
-          tickets: next,
-          lastProofreadTicketConsume: p.amount,
-          lastProofreadTicketAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
+        billing: applyBillingLots(
+          {
+            ...existingBilling,
+            lastProofreadTicketConsume: p.amount,
+            lastProofreadTicketAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          nextLots,
+        ),
       });
       tx.set(
         ref.collection("entitlements").doc(PRODUCT_ID_NEXT_WRITING_BATCH),
@@ -247,4 +279,24 @@ export async function consumeProofreadTicketsFromOrganization(
     consumedTotal: c,
     consumedFrom: consumePlan,
   };
+}
+
+/** 教員登録時の無料チケット付与ロットを billing に合成する */
+export function billingWithWelcomeFreeTickets(
+  billing: Record<string, unknown>,
+  grantCount: number,
+): Record<string, unknown> {
+  const { lots } = resolveBillingTicketLots(billing);
+  const nextLots = grantTicketLot(lots, {
+    count: grantCount,
+    validityDays: VALIDITY_DAYS_BY_PLAN.t10,
+    kind: "free",
+  });
+  return applyBillingLots(
+    {
+      ...billing,
+      welcomeTicketsGranted: true,
+    },
+    nextLots,
+  );
 }

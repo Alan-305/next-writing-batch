@@ -216,6 +216,10 @@ export function TensakuMarketingBody() {
         <a href="https://www.nexus-learning.com" target="_blank" rel="noopener noreferrer">
           www.nexus-learning.com
         </a>
+        {" · "}
+        <a href="/legal">法的書面</a>
+        {" · "}
+        <a href="/legal/tokushoho">特定商取引法に基づく表記</a>
       </p>
     </main>
   );
