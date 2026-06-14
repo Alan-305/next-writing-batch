@@ -5,7 +5,7 @@ import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 export default function OpsHomePage() {
   return (
     <main className="ops-home">
-      <header className="ops-home-hero card">
+      <header className="ops-home-hero">
         <h1>{OPS_DASHBOARD_LABEL}</h1>
       </header>
 

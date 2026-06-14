@@ -1785,17 +1785,19 @@ a.ops-btn {
 }
 
 .ops-home-hero {
-  padding: 24px 24px 18px;
-  margin-bottom: 22px;
-  background: linear-gradient(135deg, #fff 0%, #f8fafc 48%, #eef2ff 100%);
-  border-color: #c7d2fe;
-  box-shadow: var(--shadow-md);
+  margin: 0 0 28px;
+  padding: 8px 0 4px;
+  text-align: center;
 }
 
 .ops-home-hero h1 {
-  margin-bottom: 10px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  margin: 0;
+  font-family: var(--font-ja);
+  font-size: clamp(1.45rem, 4.2vw, 1.95rem);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+  color: var(--teacher-ink);
 }
 
 .ops-home-grid {
