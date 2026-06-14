@@ -230,3 +230,51 @@ export async function notifyProofreadEnqueueReceipt(input: {
   );
   console.info("[notify][enqueue-receipt] sent", { to: email, count, batchId: input.batchId });
 }
+
+/** 生徒が公開済み添削の受け取り方法（Web確認 / 講師面談）を選んだとき、テナントの教師にメール */
+export async function notifyTeachersStudentReceiveMethod(input: {
+  organizationId: string;
+  submissionId: string;
+  taskId: string;
+  studentName: string;
+  method: "web" | "teacher_meeting";
+  selectedAt: string;
+}): Promise<void> {
+  const roster = await buildTenantRoster(input.organizationId);
+  const teachers = roster.teachers.filter((t) => (t.email ?? "").trim());
+  if (teachers.length === 0) {
+    console.info("[notify][receive-method] 教師メールなし", { org: input.organizationId });
+    return;
+  }
+
+  const methodLabel = input.method === "web" ? "Web確認" : "講師面談";
+  const listUrl = opsSubmissionsListUrl();
+  const detailUrl = listUrl
+    ? `${listUrl}/${encodeURIComponent(input.submissionId)}`
+    : null;
+
+  const lines = [
+    "生徒が添削結果の受け取り方法を選択しました。",
+    "",
+    `受け取り: ${methodLabel}`,
+    `課題ID: ${input.taskId}`,
+    `受付ID: ${input.submissionId}`,
+    `ニックネーム: ${input.studentName || "—"}`,
+    `選択日時: ${input.selectedAt}`,
+    "",
+    "提出一覧の「受け取り」列でも確認できます。",
+  ];
+  if (detailUrl) lines.push("", `提出詳細: ${detailUrl}`);
+  else if (listUrl) lines.push("", `提出一覧: ${listUrl}`);
+  lines.push("", "— 添削革命 / next-writing-batch");
+
+  const subject = `【添削革命】受け取り方法: ${methodLabel}（${input.taskId}）`;
+  const text = lines.join("\n");
+
+  for (const t of teachers) {
+    const email = (t.email ?? "").trim();
+    if (!email) continue;
+    await sendResendPlainEmail(email, subject, text);
+    console.info("[notify][receive-method] sent", { to: email, submissionId: input.submissionId, method: input.method });
+  }
+}

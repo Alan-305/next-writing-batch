@@ -46,5 +46,7 @@ export function buildSubmissionLookupJson(submission: Submission) {
       finalText: finalTextForSummary,
     },
     pdfHref: pdfHref || undefined,
+    studentReceiveMethod: submission.studentReceiveMethod,
+    studentReceiveMethodAt: submission.studentReceiveMethodAt,
   };
 }

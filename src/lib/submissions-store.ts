@@ -9,6 +9,7 @@ import { isStaleQueuedRow } from "@/lib/proofread/proofread-job-types";
 import { migrateLegacyOrgLayoutOnce, organizationSubmissionsFilePath, listOrganizationIdsOnDisk } from "@/lib/org-data-layout";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import type { StudentRelease } from "@/lib/student-release";
+import type { StudentReceiveMethod } from "@/lib/student-receive-method";
 import type { SubmissionInput } from "@/lib/validation";
 
 export type Submission = SubmissionInput & {
@@ -27,6 +28,9 @@ export type Submission = SubmissionInput & {
   proofreadQueuedByUid?: string;
   /** 生徒が公開済み添削結果ページを初めて開いた日時（運用一覧の Viewed 表示用） */
   studentResultFirstViewedAt?: string;
+  /** 生徒が選んだ結果の受け取り方（Web確認 / 講師面談） */
+  studentReceiveMethod?: StudentReceiveMethod;
+  studentReceiveMethodAt?: string;
   /** 運用が編集・公開した生徒向け確定データ（やり方A: ルーブリック得点＋合計＋テキスト） */
   studentRelease?: StudentRelease;
   proofread?: {

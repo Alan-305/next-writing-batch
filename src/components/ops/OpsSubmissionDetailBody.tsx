@@ -4,6 +4,7 @@ import { OpsSubmissionNextSteps } from "@/components/ops/OpsSubmissionNextSteps"
 import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEditor";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
 import { formatDateTimeIso } from "@/lib/format-date";
+import { studentReceiveMethodLabel } from "@/lib/student-receive-method";
 import { submissionProofreadTaskMismatch } from "@/lib/submission-proofread-task-mismatch";
 import type { Submission } from "@/lib/submissions-store";
 import type { TaskProblemsMaster } from "@/lib/task-problems-core";
@@ -139,6 +140,17 @@ export function OpsSubmissionDetailBody({
             生徒向け公開済み（{formatDateTimeIso(submission.studentRelease.operatorApprovedAt ?? "")}）— 合計{" "}
             {submission.studentRelease.scoreTotal}点 —{" "}
             <Link href={`/result/${encodeURIComponent(submission.submissionId)}`}>生徒向けページ</Link>
+            {submission.studentReceiveMethod ? (
+              <>
+                {" "}
+                — 受け取り: {studentReceiveMethodLabel(submission.studentReceiveMethod)}
+                {submission.studentReceiveMethodAt
+                  ? `（${formatDateTimeIso(submission.studentReceiveMethodAt)}）`
+                  : ""}
+              </>
+            ) : (
+              <> — 受け取り: 未選択</>
+            )}
           </p>
         ) : null}
         {submission.studentRelease?.operatorFinalizedAt &&

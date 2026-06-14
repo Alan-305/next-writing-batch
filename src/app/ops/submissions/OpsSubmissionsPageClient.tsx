@@ -154,6 +154,8 @@ export function OpsSubmissionsPageClient() {
           hasDay4Assets,
           resultPublished: Boolean(sr?.operatorApprovedAt),
           studentResultFirstViewedAt: s.studentResultFirstViewedAt,
+          studentReceiveMethod: s.studentReceiveMethod,
+          studentReceiveMethodAt: s.studentReceiveMethodAt,
           studentViewed,
         };
       });

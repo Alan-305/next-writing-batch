@@ -14,6 +14,7 @@ import {
 } from "@/components/ProofreadSubmissionButton";
 import { OPS_COPY, STATUS_FILTER_OPTIONS } from "@/lib/ops/submission-status-labels";
 import { formatDateTimeIso } from "@/lib/format-date";
+import { studentReceiveMethodLabel } from "@/lib/student-receive-method";
 
 export type SubmissionListRow = {
   submissionId: string;
@@ -30,6 +31,8 @@ export type SubmissionListRow = {
   hasDay4Assets?: boolean;
   resultPublished?: boolean;
   studentResultFirstViewedAt?: string;
+  studentReceiveMethod?: "web" | "teacher_meeting";
+  studentReceiveMethodAt?: string;
 };
 
 type SortKey =
@@ -237,7 +240,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
     }
   };
 
-  const colCount = enableZipSelection ? 8 : 7;
+  const colCount = enableZipSelection ? 9 : 8;
 
   const onRefreshList = () => {
     setListRefreshing(true);
@@ -392,6 +395,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
               <th>学籍</th>
               <th>氏名</th>
               <th>状態</th>
+              <th>受け取り</th>
               <th className="ops-table-actions-col">操作</th>
             </tr>
           </thead>
@@ -449,6 +453,32 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         viewedAt={item.studentResultFirstViewedAt}
                         forceProcessing={forceProcessing}
                       />
+                    </td>
+                    <td>
+                      {item.resultPublished ? (
+                        item.studentReceiveMethod ? (
+                          <span
+                            className={
+                              item.studentReceiveMethod === "teacher_meeting"
+                                ? "ops-badge ops-badge--queued"
+                                : "ops-badge ops-badge--done"
+                            }
+                            title={
+                              item.studentReceiveMethodAt
+                                ? `選択: ${formatDateTimeIso(item.studentReceiveMethodAt)}`
+                                : undefined
+                            }
+                          >
+                            {studentReceiveMethodLabel(item.studentReceiveMethod)}
+                          </span>
+                        ) : (
+                          <span className="muted" style={{ fontSize: "0.88rem" }}>
+                            未選択
+                          </span>
+                        )
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td className="ops-table-actions-col">
                       <div className="ops-row-actions">
