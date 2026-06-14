@@ -131,7 +131,7 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
       return {
         ok: false,
         error:
-          "Day4 の対象が 0 件でした。提出が status=done か、課題ID/受付ID が一致しているか、読み上げ用英文（finalText または添削結果）があるかを確認してください。",
+          "PDF・音声の対象が 0 件でした。提出が status=done か、課題ID/受付ID が一致しているか、読み上げ用英文（finalText または添削結果）があるかを確認してください。",
         stdout: out,
         stderr: err,
       };
@@ -146,7 +146,7 @@ export async function runDay4Batch(input: RunDay4Input): Promise<RunDay4Result> 
     const err = e as { stdout?: Buffer; stderr?: Buffer; message?: string; code?: string };
     return {
       ok: false,
-      error: err.message ?? "Day4 バッチの実行に失敗しました。",
+      error: err.message ?? "PDF・音声の生成に失敗しました。",
       stdout: err.stdout ? String(err.stdout) : undefined,
       stderr: err.stderr ? String(err.stderr) : undefined,
     };

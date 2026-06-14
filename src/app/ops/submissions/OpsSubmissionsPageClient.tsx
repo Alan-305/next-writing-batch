@@ -212,18 +212,6 @@ export function OpsSubmissionsPageClient() {
         />
       </section>
 
-      <section className="card ops-section" aria-labelledby="ops-deliverables-zip">
-        <div className="ops-section__head">
-          <h2 id="ops-deliverables-zip" className="ops-section__title">
-            {OPS_COPY.deliverablesZip}
-          </h2>
-          <p className="ops-section__lead">
-            補助機能です。通常は下の<strong>提出リスト左端のチェック</strong>で選び、表下の「選択分の PDF を ZIP 化」を使ってください。
-          </p>
-        </div>
-        <OpsPackageZipTaskPanel embedded />
-      </section>
-
       <section className="card ops-section" aria-labelledby="ops-submissions-list">
         <div className="ops-section__head">
           <h2 id="ops-submissions-list" className="ops-section__title">
@@ -238,6 +226,18 @@ export function OpsSubmissionsPageClient() {
           enableZipSelection
           onReloadSubmissions={() => void reloadSubmissions()}
         />
+      </section>
+
+      <section className="card ops-section" aria-labelledby="ops-deliverables-zip">
+        <div className="ops-section__head">
+          <h2 id="ops-deliverables-zip" className="ops-section__title">
+            {OPS_COPY.deliverablesZip}
+          </h2>
+          <p className="ops-section__lead">
+            補助機能です。通常は上の<strong>提出リスト左端のチェック</strong>で選び、表下の「選択分の PDF を ZIP 化」を使ってください。
+          </p>
+        </div>
+        <OpsPackageZipTaskPanel embedded />
       </section>
     </main>
   );

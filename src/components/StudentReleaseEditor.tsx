@@ -330,7 +330,7 @@ export function StudentReleaseEditor({
       stderr?: string;
     };
     if (!d4.ok) {
-      const d4detail = pickApiErrorMessage(d4json, d4, "Day4 の生成に失敗しました");
+      const d4detail = pickApiErrorMessage(d4json, d4, "PDF・音声の生成に失敗しました");
       const tail = (s: string, n: number) => {
         const t = (s ?? "").trim();
         if (!t) return "";
@@ -375,21 +375,21 @@ export function StudentReleaseEditor({
         return;
       }
       if (!finalizedAt) {
-        setError("先に「確定（Day4 生成）」で運用文面を確定してください。");
+        setError("先に「確定」で返却文面を確定してください。");
         return;
       }
       const idToken = await user.getIdToken();
       const d4Result = await invokeRunDay4Api(idToken, hasDay4Pdf);
       if (!d4Result.ok) return;
       const combined = d4Result.ticketNotice
-        ? `Day4 を再生成しました。 ${d4Result.ticketNotice}`
-        : "Day4 を再生成しました。";
+        ? `PDF・音声を再生成しました。 ${d4Result.ticketNotice}`
+        : "PDF・音声を再生成しました。";
       persistDay4TicketNotice(combined);
       completeReload("student-release-actions");
     } catch (e) {
       console.error("[StudentReleaseEditor] runDay4Only", e);
       const detail = e instanceof Error ? e.message : String(e);
-      setError(`Day4 の再生成に失敗しました: ${detail}`);
+      setError(`PDF・音声の再生成に失敗しました: ${detail}`);
     } finally {
       setBusy(false);
     }
@@ -617,11 +617,17 @@ export function StudentReleaseEditor({
       </label>
 
       <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
-        流れ: <strong>下書き保存</strong> → <strong>確定</strong>（文面ロック・Day4 生成）→ Day4 が成功したら{" "}
+        流れ: <strong>下書き保存</strong> → <strong>確定</strong>（文面ロック・PDF・音声を生成）→ 生成が成功したら{" "}
         <strong>生徒に公開する</strong>。
         {!finalizedAt ? " まだ確定していません。" : null}
-        {finalizedAt && !canPublish ? " Day4 の PDF が揃うまで公開できません。" : null}
+        {finalizedAt && !canPublish ? " PDF が揃うまで公開できません。" : null}
       </p>
+
+      {finalizedAt && !canPublish && day4Error ? (
+        <p className="error" style={{ margin: 0 }}>
+          PDF・音声の生成でエラーが発生しています。下の「PDF・音声を再生成」を試してください。
+        </p>
+      ) : null}
 
       <div
         id="student-release-actions"
@@ -637,7 +643,7 @@ export function StudentReleaseEditor({
             background: busy ? "#94a3b8" : "#475569",
             color: "#fff",
           }}
-          title="保存済みの添削データ（Day3）を修正入力欄へまとめて再読み込みします"
+          title="保存済みの添削結果を修正入力欄へまとめて再読み込みします"
         >
           添削結果を再取り込み
         </button>
@@ -658,7 +664,7 @@ export function StudentReleaseEditor({
           onClick={() =>
             patchRelease({
               operatorFinalized: true,
-              successMessage: "確定しました。Day4 を生成しました。",
+              successMessage: "確定しました。PDF・音声を生成しました。",
               runDay4After: true,
               day4Force: hasDay4Pdf,
             })
@@ -670,7 +676,7 @@ export function StudentReleaseEditor({
             color: "#fff",
           }}
         >
-          確定（Day4 生成）
+          確定
         </button>
         {needsDay4Retry ? (
           <button
@@ -683,9 +689,9 @@ export function StudentReleaseEditor({
               background: busy ? "#94a3b8" : "#0d9488",
               color: "#fff",
             }}
-            title="運用確定の日時は変えずに Day4 バッチだけ再実行します（タイムアウト・GCS 失敗後の再試行向け）"
+            title="確定日時は変えずに PDF・音声だけ再生成します（タイムアウト・GCS 失敗後の再試行向け）"
           >
-            {busy ? "実行中…" : "Day4 だけ再生成"}
+            {busy ? "実行中…" : "PDF・音声を再生成"}
           </button>
         ) : null}
         <button

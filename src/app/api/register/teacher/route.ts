@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
 import { sendWelcomeEmailIfNeeded } from "@/lib/auth/welcome-email-server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
+import { notifyAdminNewTeacherRegistration } from "@/lib/notifications/teacher-notify";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
 import { ensureOrganizationDataDir } from "@/lib/org-data-layout";
 import { generateUniqueTenantOrganizationId, sanitizeOrganizationIdForPath } from "@/lib/organization-id";
@@ -156,6 +157,14 @@ export async function POST(request: Request) {
   }
 
   const welcomeEmail = tx.changed ? await sendWelcomeEmailIfNeeded(auth.uid) : undefined;
+
+  if (tx.changed) {
+    void notifyAdminNewTeacherRegistration({
+      uid: auth.uid,
+      organizationId: orgId,
+      createdNewTenant: wantsNew,
+    }).catch((e) => console.error("[register/teacher] admin notify failed", e));
+  }
 
   return NextResponse.json({
     ok: true,

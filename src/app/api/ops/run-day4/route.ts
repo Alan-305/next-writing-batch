@@ -84,7 +84,7 @@ export async function POST(request: Request) {
           {
             ok: false,
             code: "INSUFFICIENT_TEACHER_TICKETS",
-            message: `Day4 確定に必要な教員のチケットが不足しています（必要: ${needTickets} 枚 / 残り: ${teacherBal}）。「招待QRとチケット状況」で購入してください。`,
+            message: `確定に必要な教員のチケットが不足しています（必要: ${needTickets} 枚 / 残り: ${teacherBal}）。「招待QRとチケット状況」で購入してください。`,
             balance: teacherBal,
             required: needTickets,
           },
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
   } catch (syncErr) {
     console.error("[run-day4] syncSubmissionsDiskMirrorToFirestore failed", syncErr);
-    syncWarning = "Day4 実行後の Firestore 同期に失敗しました。画面反映が遅れる可能性があります。";
+    syncWarning = "PDF・音声生成後の Firestore 同期に失敗しました。画面反映が遅れる可能性があります。";
   }
 
   if (!result.ok) {
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
       if (!consumed.ok) {
         ticketChargeWarning =
           (ticketChargeWarning ? `${ticketChargeWarning} ` : "") +
-          `${sid}: 教員チケットの減算に失敗しました（${consumed.code}）。Day4 は生成済みです。billing を確認してください。`;
+          `${sid}: 教員チケットの減算に失敗しました（${consumed.code}）。PDF・音声は生成済みです。billing を確認してください。`;
         continue;
       }
 
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    message: "Day4 バッチが完了しました。画面を再読み込みしてください。",
+    message: "PDF・音声の生成が完了しました。画面を再読み込みしてください。",
     durationMs: result.durationMs,
     stdout: result.stdout,
     stderr: result.stderr,
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
   });
   } catch (e) {
     console.error("[run-day4]", e);
-    const msg = e instanceof Error ? e.message : "Day4 処理中にサーバーエラーが発生しました。";
+    const msg = e instanceof Error ? e.message : "PDF・音声の生成中にサーバーエラーが発生しました。";
     return NextResponse.json({ ok: false, message: msg }, { status: 500 });
   }
 }

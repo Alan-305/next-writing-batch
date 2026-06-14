@@ -2,10 +2,8 @@ import Link from "next/link";
 
 import { OpsSubmissionNextSteps } from "@/components/ops/OpsSubmissionNextSteps";
 import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEditor";
-import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
 import { formatDateTimeIso } from "@/lib/format-date";
-import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
 import { submissionProofreadTaskMismatch } from "@/lib/submission-proofread-task-mismatch";
 import type { Submission } from "@/lib/submissions-store";
 import type { TaskProblemsMaster } from "@/lib/task-problems-core";
@@ -15,9 +13,6 @@ type Props = {
   master: TaskProblemsMaster | null;
   taskRubricDefaults: Record<string, number>;
   teacherSetupDefaults: Record<string, number>;
-  /** API がサーバー側で解決した再生 URL（クライアント単体では env が無いため必須） */
-  day4AudioPlayUrl?: string;
-  day4AudioQrUrl?: string;
   onReloadComplete?: (scrollToId?: string) => void;
 };
 
@@ -26,25 +21,15 @@ export function OpsSubmissionDetailBody({
   master,
   taskRubricDefaults,
   teacherSetupDefaults,
-  day4AudioPlayUrl = "",
-  day4AudioQrUrl = "",
   onReloadComplete,
 }: Props) {
   const day4 = submission.day4;
-  const hasDay4Pdf = Boolean(String(day4?.pdf_path ?? "").trim()) && !day4?.error;
-  const day4Error = day4?.error;
-
-  const qrPath = submission.day4?.qr_path ?? "";
-  const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
-  const audioUrl = String(submission.day4?.audio_url ?? "").trim();
-  const audioHref =
-    day4AudioPlayUrl.trim() || (audioUrl ? resolveDay4AudioPlayUrl(audioUrl) : "");
-  const audioQrUrl =
-    day4AudioQrUrl.trim() || (audioUrl ? resolveDay4AudioQrUrl(audioUrl) : "");
+  const hasDeliverablePdf = Boolean(String(day4?.pdf_path ?? "").trim()) && !day4?.error;
+  const deliverableError = day4?.error;
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
   const finalized = Boolean(submission.studentRelease?.operatorFinalizedAt);
-  const readyToPublish = finalized && !published && hasDay4Pdf;
+  const readyToPublish = finalized && !published && hasDeliverablePdf;
   const taskMismatch = submissionProofreadTaskMismatch(submission);
 
   return (
@@ -54,11 +39,7 @@ export function OpsSubmissionDetailBody({
         <Link href="/ops/submissions">一覧に戻る</Link>
       </p>
 
-      <OpsSubmissionNextSteps
-        submissionId={submission.submissionId}
-        readyToPublish={readyToPublish}
-        hasDay4Pdf={hasDay4Pdf}
-      />
+      <OpsSubmissionNextSteps submissionId={submission.submissionId} readyToPublish={readyToPublish} />
 
       <div className="card">
         {taskMismatch.mismatched ? (
@@ -151,7 +132,7 @@ export function OpsSubmissionDetailBody({
       <div className="card">
         <h2 style={{ marginBottom: 6 }}>修正入力</h2>
         <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-          修正の必要がある場合のみ、内容を変更してください。
+          修正の必要がある場合のみ、内容を変更してください。完成した結果は「生徒向けプレビュー」で確認できます。
         </p>
         {published && submission.studentRelease ? (
           <p className="success" style={{ marginTop: 0, marginBottom: 12 }}>
@@ -162,18 +143,18 @@ export function OpsSubmissionDetailBody({
         ) : null}
         {submission.studentRelease?.operatorFinalizedAt &&
         !submission.studentRelease?.operatorApprovedAt ? (
-          day4Error ? (
+          deliverableError ? (
             <p style={{ marginTop: 0, marginBottom: 12, color: "#b45309" }}>
               運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
-              ）— 文面は固定済みですが、<strong>下の「成果物（Day4）」でエラー</strong>のため PDF
-              がありません。公開には Day4 の成功が必要です。修正入力の{" "}
-              <strong>Day4 だけ再生成</strong>（確定日時は変えません）か「確定（Day4
-              生成）」の再実行、ログ確認のうえ失敗分のみ再実行してください。
+              ）— 文面は固定済みですが、PDF・音声の生成でエラーが発生しています。下の{" "}
+              <strong>PDF・音声を再生成</strong>を試すか、確定を再度実行してください。プレビューは{" "}
+              <Link href={`/result/${encodeURIComponent(submission.submissionId)}`}>生徒向けプレビュー</Link>
+              から確認できます。
             </p>
           ) : (
             <p style={{ marginTop: 0, marginBottom: 12, color: "#a16207" }}>
               運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
-              ）— Day4 用の文面が固定されています。PDF ができたら「生徒に公開する」が押せます。
+              ）— 返却文面が固定されています。PDF ができたら「生徒に公開する」が押せます。
             </p>
           )
         ) : null}
@@ -186,8 +167,8 @@ export function OpsSubmissionDetailBody({
             initialRelease={submission.studentRelease}
             proofread={submission.proofread}
             status={submission.status}
-            hasDay4Pdf={hasDay4Pdf}
-            day4Error={day4Error}
+            hasDay4Pdf={hasDeliverablePdf}
+            day4Error={deliverableError}
             taskRubricDefaults={taskRubricDefaults}
             teacherSetupScoreDefaults={teacherSetupDefaults}
             onReloadComplete={onReloadComplete}
@@ -197,90 +178,6 @@ export function OpsSubmissionDetailBody({
             課題マスタがありません（テナント配下の <code>task-problems/{submission.taskId}.json</code>
             ）。配置後にルーブリック編集が使えます。
           </p>
-        )}
-      </div>
-
-      <div className="card" id="day4-deliverables">
-        <h2>成果物（Day4）</h2>
-        {submission.day4?.error ? (
-          <div className="error" style={{ marginBottom: 12 }}>
-            <p style={{ marginTop: 0 }}>
-              Day4でエラー: {submission.day4.operator_message ?? submission.day4.error}
-            </p>
-            {submission.day4.operator_message && submission.day4.error ? (
-              <p className="muted" style={{ marginBottom: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                詳細: {submission.day4.error}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {submission.day4?.pdf_path ? (
-          <>
-            <p className="muted" style={{ marginBottom: 12 }}>
-              スマホで試すときは、<strong>下の画像のQR</strong>（または PDF 右上のQR）を読み取ってください。
-              Chrome の「このページのURLをQRで共有」など<strong>別のQR</strong>だと、トップページ（
-              <code>/</code>）だけが開き<strong>音声は鳴りません</strong>。
-            </p>
-            {audioHref ? (
-              <div style={{ marginBottom: 12 }}>
-                <p>
-                  <b>QR（この画像をスキャン）</b>
-                </p>
-                <StudentResultAudioQr audioHref={audioHref} serverAbsolute={audioQrUrl} />
-                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
-                  音声 URL からアプリ内で QR を生成しています（PNG ファイルが無くても表示されます）。
-                </p>
-              </div>
-            ) : qrSrc ? (
-              <div style={{ marginBottom: 12 }}>
-                <p>
-                  <b>QR（この画像をスキャン）</b>
-                </p>
-                <img
-                  src={qrSrc}
-                  alt="音声へのQR"
-                  width={220}
-                  height={220}
-                  style={{ border: "1px solid #e2e8f0", borderRadius: 8 }}
-                />
-                <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
-                  ファイル: <code>{submission.day4.qr_path}</code>
-                </p>
-              </div>
-            ) : null}
-            {audioHref ? (
-              <p style={{ wordBreak: "break-all" }}>
-                <b>音声URL（再生・QR用）</b>: {audioHref}
-                {" "}
-                <a href={audioHref}>PCで開いて試聴</a>
-              </p>
-            ) : null}
-            <p className="muted" style={{ marginTop: 8 }}>
-              音声URLは「サイトのページ」ではなく <strong>mp3 ファイル</strong>です。開くとブラウザ内蔵の再生画面になるか、
-              ダウンロードされます（真っ黒や最小表示でも正常なことがあります）。
-            </p>
-            <p className="muted" style={{ marginTop: 8 }}>
-              <strong>「このサイトへの接続は保護されていません」</strong>は、ローカル開発の{" "}
-              <code>http://</code> ではよく出る表示です（パスワードを入力しないで、という意味）。
-              ポップアップを閉じ、画面下部や中央の<strong>再生ボタン（▶）</strong>を押してください。それでも無音なら、
-              アドレスバー右の<strong>更新（再読み込み）</strong>を試すか、リンクを長押しして<strong>別タブで開く</strong>／
-              <strong>ダウンロード</strong>してから再生してください。
-            </p>
-            <p>
-              <b>PDF</b>: {submission.day4.pdf_path}
-            </p>
-            {submission.day4?.generatedAt ? (
-              <p>
-                <b>generatedAt</b>: {submission.day4.generatedAt}
-              </p>
-            ) : null}
-          </>
-        ) : submission.status === "done" ? (
-          submission.day4?.error ? null : (
-            <p>Day4（音声/QR/PDF生成）まだ未実行です。</p>
-          )
-        ) : (
-          <p>まずDay3を完了させてください。</p>
         )}
       </div>
     </main>

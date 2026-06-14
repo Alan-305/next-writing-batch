@@ -192,7 +192,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
   const selectAllFilteredWithDay4 = () => {
     const ids = filtered.filter((r) => r.hasDay4Assets).map((r) => r.submissionId);
     setZipSelected(new Set(ids));
-    setZipMsg(ids.length ? `ZIP 対象を ${ids.length} 件に設定しました。` : "条件に一致する Day4 済み提出がありません。");
+    setZipMsg(ids.length ? `ZIP 対象を ${ids.length} 件に設定しました。` : "条件に一致する PDF 作成済みの提出がありません。");
   };
 
   const clearZipSelection = () => {
@@ -375,8 +375,8 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                 <th style={{ width: 36 }}>
                   <input
                     type="checkbox"
-                    title="このページの Day4 済みをすべて選択"
-                    aria-label="このページの Day4 済みをすべて選択"
+                    title="このページの PDF 作成済みをすべて選択"
+                    aria-label="このページの PDF 作成済みをすべて選択"
                     disabled={zipBusy || !pageRows.some((r) => r.hasDay4Assets)}
                     checked={(() => {
                       const sel = pageRows.filter((r) => r.hasDay4Assets);
@@ -498,7 +498,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
             ZIP 選択: <strong>{zipSelected.size}</strong> 件
           </span>
           <button type="button" className="ops-btn ops-btn--ghost" disabled={zipBusy} onClick={() => selectAllFilteredWithDay4()}>
-            表示中の Day4 済みをすべて選択
+            表示中の PDF 作成済みをすべて選択
           </button>
           <button type="button" className="ops-btn ops-btn--ghost" disabled={zipBusy || zipSelected.size === 0} onClick={() => clearZipSelection()}>
             選択解除

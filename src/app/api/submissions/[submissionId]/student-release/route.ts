@@ -76,7 +76,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           ok: false,
           code: "DAY4_REQUIRED",
           message:
-            "Day4 の成果物（PDF）がまだないかエラー状態です。「確定」のあと Day4 が完了するまで待ち、再読み込みしてから公開してください。手元では batch/run_day4_tts_qr_pdf.py も実行できます。",
+            "返却用 PDF がまだないかエラー状態です。「確定」のあと PDF・音声の生成が完了するまで待ち、再読み込みしてから公開してください。",
         },
         { status: 422 },
       );

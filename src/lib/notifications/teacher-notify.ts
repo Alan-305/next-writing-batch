@@ -1,6 +1,7 @@
 import { buildTenantRoster } from "@/lib/admin/tenant-roster";
 import { loadUserProfileAdmin } from "@/lib/auth/load-user-profile-admin";
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
+import { parseAdminUidAllowlist } from "@/lib/firebase/admin-allowlist";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 
 function resendFromAddress(): string {
@@ -29,6 +30,88 @@ export async function resolveUidEmail(uid: string): Promise<string | null> {
     return (rec.email ?? "").trim() || null;
   } catch {
     return null;
+  }
+}
+
+async function resolveAdminNotifyEmails(): Promise<string[]> {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (raw: string) => {
+    const email = raw.trim();
+    if (!email.includes("@")) return;
+    const key = email.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(email);
+  };
+
+  push(process.env.SUPPORT_NOTIFY_EMAIL ?? "");
+  for (const uid of parseAdminUidAllowlist()) {
+    const email = await resolveUidEmail(uid);
+    if (email) push(email);
+  }
+  return out;
+}
+
+/** 教員の新規登録（テナント作成・初回 teacher ロール付与）時に管理者へ通知 */
+export async function notifyAdminNewTeacherRegistration(input: {
+  uid: string;
+  organizationId: string;
+  createdNewTenant: boolean;
+}): Promise<void> {
+  const uid = (input.uid ?? "").trim();
+  const organizationId = (input.organizationId ?? "").trim();
+  if (!uid || !organizationId) return;
+
+  const recipients = await resolveAdminNotifyEmails();
+  if (recipients.length === 0) {
+    console.info("[notify][teacher-register] 管理者メール先なし", { uid, organizationId });
+    return;
+  }
+
+  const teacherEmail = (await resolveUidEmail(uid)) ?? "—";
+  let displayName = "";
+  try {
+    const rec = await getAdminAuth().getUser(uid);
+    displayName = (rec.displayName ?? "").trim();
+  } catch {
+    /* ignore */
+  }
+
+  const adminUrlBase = (
+    process.env.NWB_PUBLIC_APP_URL ??
+    process.env.NWB_PROOFREAD_WORKER_URL ??
+    process.env.VERCEL_URL ??
+    ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+  const adminHref = adminUrlBase
+    ? adminUrlBase.startsWith("http")
+      ? `${adminUrlBase}/admin`
+      : `https://${adminUrlBase}/admin`
+    : null;
+
+  const lines = [
+    "教員の新規登録がありました。",
+    "",
+    `UID: ${uid}`,
+    `メール: ${teacherEmail}`,
+    ...(displayName ? [`表示名: ${displayName}`] : []),
+    `テナント ID: ${organizationId}`,
+    `種別: ${input.createdNewTenant ? "新規テナント作成" : "既存テナントへの参加"}`,
+    "",
+    "初回登録特典としてチケット 5 枚が付与されています。",
+  ];
+  if (adminHref) lines.push("", `管理画面: ${adminHref}`);
+  lines.push("", "— 添削革命 / next-writing-batch");
+
+  const subject = `【添削革命】教員の新規登録（${organizationId}）`;
+  const text = lines.join("\n");
+
+  for (const to of recipients) {
+    await sendResendPlainEmail(to, subject, text);
+    console.info("[notify][teacher-register] sent", { to, uid, organizationId });
   }
 }
 

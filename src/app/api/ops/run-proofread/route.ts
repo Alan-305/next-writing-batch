@@ -180,7 +180,7 @@ export async function POST(request: Request) {
   await syncSubmissionsDiskMirrorToFirestore(auth.organizationId);
 
   const message =
-    "添削バッチが完了しました。一覧を再読み込みしてください。チケットは Day4 確定時に教員プールから 1 件あたり 1 枚消費されます。";
+    "添削バッチが完了しました。一覧を再読み込みしてください。チケットは確定時に教員プールから 1 件あたり 1 枚消費されます。";
 
   return NextResponse.json({
     ok: true,
