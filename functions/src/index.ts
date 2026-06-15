@@ -23,6 +23,9 @@ import {
   resolveBillingTicketLots,
   sumTicketLots,
 } from "./ticket-lots.js";
+import { ticketExpiryReminderDaily } from "./ticket-expiry-reminder.js";
+
+export { ticketExpiryReminderDaily };
 
 admin.initializeApp();
 

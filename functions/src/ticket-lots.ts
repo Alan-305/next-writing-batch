@@ -166,3 +166,22 @@ export function resolveBillingTicketLots(
 export function validityDaysForPlan(plan: BillingPlan): number {
   return VALIDITY_DAYS_BY_PLAN[plan];
 }
+
+const LEGACY_EXPIRY_CUTOFF_MS = Date.parse("2090-01-01T00:00:00.000Z");
+
+export function nearestTicketExpiryIso(lots: TicketLot[], nowMs = Date.now()): string | null {
+  const active = purgeExpiredLots(lots, nowMs).filter((lot) => lot.count > 0);
+  if (active.length === 0) return null;
+
+  let nearest: string | null = null;
+  let nearestMs = Infinity;
+  for (const lot of active) {
+    const ms = Date.parse(lot.expiresAt);
+    if (!Number.isFinite(ms) || ms >= LEGACY_EXPIRY_CUTOFF_MS) continue;
+    if (ms < nearestMs) {
+      nearestMs = ms;
+      nearest = lot.expiresAt;
+    }
+  }
+  return nearest;
+}

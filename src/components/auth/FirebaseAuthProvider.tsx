@@ -21,7 +21,7 @@ import {
   resetRedirectResultCacheForNewFlow,
 } from "@/lib/firebase/redirect-result-once";
 import { userEntitlementRef, userProfileRef } from "@/lib/firebase/firestore-paths";
-import type { EntitlementDoc, FirestoreUserProfile } from "@/lib/firebase/types";
+import type { EntitlementDoc, FirestoreUserProfile, BillingInfo } from "@/lib/firebase/types";
 
 export type FirebaseAuthContextValue = {
   configured: boolean;
@@ -186,6 +186,16 @@ export function FirebaseAuthProvider({
             nickname: data.nickname === undefined || data.nickname === null ? null : String(data.nickname),
             studentProfileCompletedAt: data.studentProfileCompletedAt ?? null,
             welcomeEmailSentAt: data.welcomeEmailSentAt,
+            billing:
+              data.billing && typeof data.billing === "object"
+                ? {
+                    tickets:
+                      typeof (data.billing as BillingInfo).tickets === "number"
+                        ? Math.max(0, Math.floor((data.billing as BillingInfo).tickets as number))
+                        : 0,
+                    ticketLots: (data.billing as BillingInfo).ticketLots,
+                  }
+                : undefined,
           });
         }
         setProfileLoading(false);

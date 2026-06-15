@@ -302,6 +302,7 @@ export function StudentReleaseEditor({
 
   const finalizedAt = String(initialRelease?.operatorFinalizedAt ?? "").trim();
   const publishedAt = String(initialRelease?.operatorApprovedAt ?? "").trim();
+  const readOnly = Boolean(publishedAt);
 
   const buildPatchBody = (): Record<string, unknown> => ({
     scores: effectiveScores,
@@ -445,6 +446,7 @@ export function StudentReleaseEditor({
     successMessage: string;
     runDay4After?: boolean;
     day4Force?: boolean;
+    scrollToId?: string;
   }) => {
     setBusy(true);
     setMessage("");
@@ -493,7 +495,8 @@ export function StudentReleaseEditor({
       }
 
       const scrollToId =
-        opts.runDay4After || opts.operatorFinalized ? "student-release-actions" : undefined;
+        opts.scrollToId ??
+        (opts.runDay4After || opts.operatorFinalized ? "student-release-actions" : undefined);
       completeReload(scrollToId);
     } catch (e) {
       console.error("[StudentReleaseEditor] patchRelease", e);
@@ -550,7 +553,7 @@ export function StudentReleaseEditor({
             max={it.max}
             step={1}
             value={Number.isFinite(effectiveScores[it.id]) ? effectiveScores[it.id] : 0}
-            disabled={busy || it.id === contentItem?.id || it.id === grammarItem?.id}
+            disabled={busy || readOnly || it.id === contentItem?.id || it.id === grammarItem?.id}
             onChange={(e) => {
               const n = Number(e.target.value);
               setScores((prev) => ({ ...prev, [it.id]: Number.isFinite(n) ? n : 0 }));
@@ -571,7 +574,7 @@ export function StudentReleaseEditor({
               <textarea
                 rows={5}
                 value={contentComment ?? ""}
-                disabled={busy}
+                disabled={busy || readOnly}
                 onChange={(e) => setContentComment(e.target.value)}
                 placeholder={"例:\n● 立場が冒頭で明確でない\n● 具体例が1つ不足"}
               />
@@ -586,7 +589,7 @@ export function StudentReleaseEditor({
                   max={contentMax}
                   step={1}
                   value={contentDeduction}
-                  disabled={busy}
+                  disabled={busy || readOnly}
                   onChange={(e) => {
                     const n = Number(e.target.value);
                     setContentDeduction(clampInt(Number.isFinite(n) ? n : 0, 0, contentMax));
@@ -606,7 +609,7 @@ export function StudentReleaseEditor({
               <textarea
                 rows={5}
                 value={grammarComment ?? ""}
-                disabled={busy}
+                disabled={busy || readOnly}
                 onChange={(e) => setGrammarComment(e.target.value)}
                 placeholder={"例:\n● 時制の不一致がある\n● 語法の誤りがある"}
               />
@@ -621,7 +624,7 @@ export function StudentReleaseEditor({
                   max={grammarMax}
                   step={1}
                   value={grammarDeduction}
-                  disabled={busy}
+                  disabled={busy || readOnly}
                   onChange={(e) => {
                     const n = Number(e.target.value);
                     setGrammarDeduction(clampInt(Number.isFinite(n) ? n : 0, 0, grammarMax));
@@ -645,7 +648,7 @@ export function StudentReleaseEditor({
         <textarea
           rows={8}
           value={finalText ?? ""}
-          disabled={busy}
+          disabled={busy || readOnly}
           onChange={(e) => setFinalText(e.target.value)}
         />
       </label>
@@ -653,9 +656,13 @@ export function StudentReleaseEditor({
       <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
         <strong>確定＆公開</strong>で文面を確定し、PDF・音声を生成して生徒に公開します。問題があれば{" "}
         <strong>公開取り下げ</strong>を押してください。
-        {publishedAt ? " 現在、生徒に公開中です。" : null}
         {!publishedAt && finalizedAt ? " 確定済みですが未公開です。" : null}
       </p>
+      {readOnly ? (
+        <p className="muted" style={{ margin: "0 0 8px", lineHeight: 1.55 }}>
+          公開中は編集できません。「公開取り下げ」のあと、添削結果を修正できます。
+        </p>
+      ) : null}
 
       {finalizedAt && !publishedAt && day4Error ? (
         <p className="error" style={{ margin: 0 }}>
@@ -669,7 +676,7 @@ export function StudentReleaseEditor({
       >
         <button
           type="button"
-          disabled={busy || !proofread}
+          disabled={busy || readOnly || !proofread}
           onClick={reimportFromProofread}
           style={{
             padding: "10px 14px",
@@ -683,7 +690,7 @@ export function StudentReleaseEditor({
         </button>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || readOnly}
           onClick={() => void confirmAndPublish()}
           style={{
             padding: "10px 14px",
@@ -719,7 +726,9 @@ export function StudentReleaseEditor({
           onClick={() =>
             patchRelease({
               operatorApproved: false,
-              successMessage: "公開を取り下げました。",
+              successMessage:
+                "公開を取り下げました。下の欄で添削結果を修正し、再度「確定＆公開」してください。",
+              scrollToId: "correction-input",
             })
           }
           style={{

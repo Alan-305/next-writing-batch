@@ -125,10 +125,11 @@ export function OpsSubmissionDetailBody({
         )}
       </div>
 
-      <div className="card">
+      <div className="card" id="correction-input">
         <h2 style={{ marginBottom: 6 }}>修正入力</h2>
         <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
           修正の必要がある場合のみ、内容を変更してください。「生徒画面確認」で印刷用の見た目を確認できます。
+          公開を取り下げたあとは、この欄で添削結果を編集できます。
         </p>
         {published && submission.studentRelease ? (
           <p className="success" style={{ marginTop: 0, marginBottom: 12 }}>
@@ -164,7 +165,7 @@ export function OpsSubmissionDetailBody({
         ) : null}
         {master ? (
           <StudentReleaseEditor
-            key={`${submission.submissionId}-${submission.status}-${submission.proofread?.finishedAt ?? submission.proofread?.generated_at ?? ""}`}
+            key={`${submission.submissionId}-${submission.status}-${submission.proofread?.finishedAt ?? submission.proofread?.generated_at ?? ""}-${submission.studentRelease?.operatorApprovedAt ?? ""}-${submission.studentRelease?.operatorFinalizedAt ?? ""}`}
             submissionId={submission.submissionId}
             taskId={submission.taskId}
             master={master}

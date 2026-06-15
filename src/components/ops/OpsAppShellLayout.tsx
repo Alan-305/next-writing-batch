@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 
 import { AuthToolbar } from "@/components/auth/AuthToolbar";
 import { RequireOpsAccess } from "@/components/auth/RequireOpsAccess";
+import { TeacherTicketStatusBanner } from "@/components/ops/TeacherTicketStatusBanner";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 import {
@@ -67,7 +68,12 @@ export function OpsAppShellLayout({ children }: Props) {
           </div>
         </div>
       </header>
-      <RequireOpsAccess>{children}</RequireOpsAccess>
+      <RequireOpsAccess>
+        <div className="ops-shell-main-wrap" style={{ padding: "0 12px" }}>
+          <TeacherTicketStatusBanner />
+          {children}
+        </div>
+      </RequireOpsAccess>
     </div>
   );
 }
