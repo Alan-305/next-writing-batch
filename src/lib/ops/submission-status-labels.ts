@@ -6,7 +6,8 @@ export type SubmissionStatusCode =
   | "processing"
   | "done"
   | "failed"
-  | "viewed";
+  | "viewed"
+  | "withdrawn";
 
 export type SubmissionStatusMeta = {
   code: SubmissionStatusCode;
@@ -50,12 +51,20 @@ const BASE: Record<SubmissionStatusCode, Omit<SubmissionStatusMeta, "code">> = {
     hint: "生徒が結果を閲覧しました",
     badgeClass: "ops-badge ops-badge--viewed",
   },
+  withdrawn: {
+    label: "取下",
+    hint: "公開を取り下げました。確認＆修正から再編集できます",
+    badgeClass: "ops-badge ops-badge--withdrawn",
+  },
 };
 
 export function submissionStatusMeta(
   status: string,
-  opts?: { studentViewed?: boolean },
+  opts?: { studentViewed?: boolean; releaseWithdrawn?: boolean },
 ): SubmissionStatusMeta {
+  if (opts?.releaseWithdrawn) {
+    return { code: "withdrawn", ...BASE.withdrawn };
+  }
   if (status === "done" && opts?.studentViewed) {
     return { code: "viewed", ...BASE.viewed };
   }
@@ -87,12 +96,15 @@ export const OPS_COPY = {
   refresh: "更新",
   refreshing: "更新中…",
   searchPlaceholder: "課題ID・学籍・氏名・受付ID",
-  detailLink: "詳細",
+  detailLink: "確認＆修正",
+  proofreadStart: "添削開始",
+  proofreadStartBusy: "預け中…",
   proofreadNow: "今すぐ",
   proofreadQueue: "預ける",
   proofreadNowBusy: "添削中…",
   proofreadQueueBusy: "預け中…",
   proofreadRetryNow: "今すぐ再実行",
+  redoProofread: "再添削",
   redo: "やり直し",
   redoQueue: "預けてやり直し",
   cancel: "中止",

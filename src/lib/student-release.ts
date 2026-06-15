@@ -20,6 +20,8 @@ export type StudentRelease = {
   /** 運用が「確定」した日時。未公開でも Day4 用の文面として使う */
   operatorFinalizedAt?: string;
   operatorApprovedAt?: string;
+  /** 公開取り下げした日時（一覧の「取下」表示用） */
+  operatorWithdrawnAt?: string;
   updatedAt?: string;
 };
 
@@ -509,12 +511,18 @@ export function buildStudentReleaseFromPatch(
   const now = new Date().toISOString();
   let operatorApprovedAt = prev?.operatorApprovedAt;
   let operatorFinalizedAt = prev?.operatorFinalizedAt;
+  let operatorWithdrawnAt = prev?.operatorWithdrawnAt;
 
   if (body.operatorApproved === false) {
+    const wasPublished = Boolean(String(prev?.operatorApprovedAt ?? "").trim());
     operatorApprovedAt = undefined;
     operatorFinalizedAt = undefined;
+    if (wasPublished) {
+      operatorWithdrawnAt = now;
+    }
   } else if (body.operatorApproved === true) {
     operatorApprovedAt = now;
+    operatorWithdrawnAt = undefined;
   }
 
   if (body.operatorApproved !== false) {
@@ -540,6 +548,7 @@ export function buildStudentReleaseFromPatch(
     finalText,
     ...(operatorFinalizedAt ? { operatorFinalizedAt } : {}),
     ...(operatorApprovedAt ? { operatorApprovedAt } : {}),
+    ...(operatorWithdrawnAt ? { operatorWithdrawnAt } : {}),
     updatedAt: now,
   };
 

@@ -6,6 +6,7 @@ type Props = {
   status: string;
   studentViewed?: boolean;
   viewedAt?: string;
+  releaseWithdrawn?: boolean;
   /** 一括同期添削中に pending 行を添削中表示 */
   forceProcessing?: boolean;
 };
@@ -14,6 +15,7 @@ export function OpsSubmissionStatusBadge({
   status,
   studentViewed,
   viewedAt,
+  releaseWithdrawn,
   forceProcessing,
 }: Props) {
   if (forceProcessing) {
@@ -26,8 +28,9 @@ export function OpsSubmissionStatusBadge({
     );
   }
 
-  const meta = submissionStatusMeta(status, { studentViewed });
-  const title = viewedAt && meta.code === "viewed" ? `初回閲覧: ${viewedAt}` : meta.hint;
+  const meta = submissionStatusMeta(status, { studentViewed, releaseWithdrawn });
+  const title =
+    viewedAt && meta.code === "viewed" ? `初回閲覧: ${viewedAt}` : meta.hint;
 
   return (
     <span className={meta.badgeClass} title={title || undefined}>

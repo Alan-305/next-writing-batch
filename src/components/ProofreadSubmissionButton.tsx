@@ -19,45 +19,6 @@ type Props = CommonProps & {
   status: string;
 };
 
-async function postRunProofreadSync(
-  idToken: string,
-  body: {
-    taskId: string;
-    submissionIds: string[];
-    retryFailed: boolean;
-  },
-): Promise<{ ok: boolean; message?: string }> {
-  const res = await fetch("/api/ops/run-proofread", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({
-      taskId: body.taskId.trim(),
-      submissionIds: body.submissionIds,
-      workers: 1,
-      retryFailed: body.retryFailed,
-    }),
-  });
-  const json = (await res.json().catch(() => ({}))) as {
-    ok?: boolean;
-    code?: string;
-    message?: string;
-    stderr?: string;
-    stdout?: string;
-  };
-  if (!res.ok) {
-    const hint =
-      typeof json.code === "string" && json.code.trim() ? `【${json.code.trim()}】` : "";
-    let msg = (hint ? `${hint} ` : "") + (json?.message ?? "添削の実行に失敗しました。");
-    const errTail = (json.stderr ?? "").trim();
-    if (errTail) {
-      const short = errTail.length > 1500 ? `${errTail.slice(0, 1500)}…` : errTail;
-      msg += `\n\n──── 詳細 ────\n${short}`;
-    }
-    return { ok: false, message: msg };
-  }
-  return { ok: true, message: json.message };
-}
-
 async function postEnqueueProofread(
   idToken: string,
   body: {
@@ -89,7 +50,7 @@ async function postEnqueueProofread(
   };
 }
 
-/** 即時型 + 預け型の添削ボタン */
+/** キュー投入型の添削開始ボタン */
 export function ProofreadSubmissionButton({
   submissionId,
   taskId,
@@ -99,7 +60,6 @@ export function ProofreadSubmissionButton({
   onEnqueued,
 }: Props) {
   const { user } = useFirebaseAuthContext();
-  const [busySync, setBusySync] = useState(false);
   const [busyQueue, setBusyQueue] = useState(false);
 
   const staleQueued = status === "queued" && isStaleQueuedRow({ status, proofreadQueuedAt });
@@ -111,48 +71,14 @@ export function ProofreadSubmissionButton({
     staleQueued ||
     status === "processing";
 
-  const retryFailed = status === "failed" || status === "processing" || staleQueued;
-
-  const onSync = async () => {
-    if (!canAct || busySync || busyQueue || activeQueued) return;
+  const onQueue = async () => {
+    if (!canAct || busyQueue || activeQueued) return;
     const stuck =
       status === "processing" || staleQueued
         ? "\n\n※ 前回の処理が途中で止まった可能性があります。このまま再実行してよろしいですか？"
         : "";
     const ok = window.confirm(
-      `${studentLabel}\n受付ID: ${submissionId}\n\n【今すぐ添削】完了までこの画面でお待ちください。${stuck}`,
-    );
-    if (!ok) return;
-
-    setBusySync(true);
-    try {
-      if (!user) {
-        window.alert("ログインしてください。");
-        return;
-      }
-      const token = await user.getIdToken();
-      const result = await postRunProofreadSync(token, {
-        taskId,
-        submissionIds: [submissionId],
-        retryFailed,
-      });
-      if (!result.ok) {
-        window.alert(result.message ?? "添削の実行に失敗しました。");
-        return;
-      }
-      onEnqueued?.();
-      window.location.reload();
-    } catch {
-      window.alert("通信エラーが発生しました。");
-    } finally {
-      setBusySync(false);
-    }
-  };
-
-  const onQueue = async () => {
-    if (!canAct || busySync || busyQueue || activeQueued) return;
-    const ok = window.confirm(
-      `${studentLabel}\n受付ID: ${submissionId}\n\n【預ける】空き時間に処理します。完了時にメールでお知らせします。\n\nよろしいですか？`,
+      `${studentLabel}\n受付ID: ${submissionId}\n\n【添削開始】空き時間に処理します。完了時にメールでお知らせします。${stuck}\n\nよろしいですか？`,
     );
     if (!ok) return;
 
@@ -189,30 +115,15 @@ export function ProofreadSubmissionButton({
   }
 
   return (
-    <>
-      <button
-        type="button"
-        disabled={!canAct || busySync || busyQueue}
-        title="空き時間に処理・メール通知"
-        className={`ops-btn ${busyQueue ? "ops-btn--muted" : canAct ? "ops-btn--queue" : "ops-btn--muted"}`}
-        onClick={() => void onQueue()}
-      >
-        {busyQueue ? OPS_COPY.proofreadQueueBusy : OPS_COPY.proofreadQueue}
-      </button>
-      <button
-        type="button"
-        disabled={!canAct || busySync || busyQueue}
-        title="完了までこの画面で待つ"
-        className={`ops-btn ${busySync ? "ops-btn--muted" : staleQueued || status === "processing" ? "ops-btn--warn" : canAct ? "ops-btn--now" : "ops-btn--muted"}`}
-        onClick={() => void onSync()}
-      >
-        {busySync
-          ? OPS_COPY.proofreadNowBusy
-          : staleQueued || status === "processing"
-            ? OPS_COPY.proofreadRetryNow
-            : OPS_COPY.proofreadNow}
-      </button>
-    </>
+    <button
+      type="button"
+      disabled={!canAct || busyQueue}
+      title="空き時間に処理・メール通知"
+      className={`ops-btn ${busyQueue ? "ops-btn--muted" : canAct ? "ops-btn--queue" : "ops-btn--muted"}`}
+      onClick={() => void onQueue()}
+    >
+      {busyQueue ? OPS_COPY.proofreadStartBusy : OPS_COPY.proofreadStart}
+    </button>
   );
 }
 
@@ -225,7 +136,6 @@ export function RedoProofreadSubmissionButton({
   onEnqueued,
 }: CommonProps & { status?: string }) {
   const { user } = useFirebaseAuthContext();
-  const [busySync, setBusySync] = useState(false);
   const [busyQueue, setBusyQueue] = useState(false);
 
   const staleQueued = status === "queued" && isStaleQueuedRow({ status, proofreadQueuedAt });
@@ -233,42 +143,10 @@ export function RedoProofreadSubmissionButton({
 
   if (activeQueued) return null;
 
-  const onSync = async () => {
-    if (busySync || busyQueue) return;
-    const ok = window.confirm(
-      `${studentLabel}\n受付ID: ${submissionId}\n\n【やり直し】既存の AI 添削結果は上書きされます。実行しますか？`,
-    );
-    if (!ok) return;
-
-    setBusySync(true);
-    try {
-      if (!user) {
-        window.alert("ログインしてください。");
-        return;
-      }
-      const token = await user.getIdToken();
-      const result = await postRunProofreadSync(token, {
-        taskId,
-        submissionIds: [submissionId],
-        retryFailed: false,
-      });
-      if (!result.ok) {
-        window.alert(result.message ?? "添削の実行に失敗しました。");
-        return;
-      }
-      onEnqueued?.();
-      window.location.reload();
-    } catch {
-      window.alert("通信エラーが発生しました。");
-    } finally {
-      setBusySync(false);
-    }
-  };
-
   const onQueue = async () => {
-    if (busySync || busyQueue) return;
+    if (busyQueue) return;
     const ok = window.confirm(
-      `${studentLabel}\n受付ID: ${submissionId}\n\n【預けてやり直し】空き時間に処理し、完了時にメールします。よろしいですか？`,
+      `${studentLabel}\n受付ID: ${submissionId}\n\n【再添削】空き時間に処理し、既存の AI 添削結果は上書きされます。完了時にメールでお知らせします。\n\nよろしいですか？`,
     );
     if (!ok) return;
 
@@ -298,26 +176,15 @@ export function RedoProofreadSubmissionButton({
   };
 
   return (
-    <>
-      <button
-        type="button"
-        disabled={busySync || busyQueue}
-        title="やり直しをキューに預ける"
-        className={`ops-btn ${busyQueue ? "ops-btn--muted" : "ops-btn--queue"}`}
-        onClick={() => void onQueue()}
-      >
-        {busyQueue ? OPS_COPY.proofreadQueueBusy : OPS_COPY.redoQueue}
-      </button>
-      <button
-        type="button"
-        disabled={busySync || busyQueue}
-        title="設定変更後に AI 添削を出し直す"
-        className={`ops-btn ${busySync ? "ops-btn--muted" : "ops-btn--warn"}`}
-        onClick={() => void onSync()}
-      >
-        {busySync ? OPS_COPY.proofreadNowBusy : OPS_COPY.redo}
-      </button>
-    </>
+    <button
+      type="button"
+      disabled={busyQueue}
+      title="再添削をキューに預ける"
+      className={`ops-btn ${busyQueue ? "ops-btn--muted" : "ops-btn--warn"}`}
+      onClick={() => void onQueue()}
+    >
+      {busyQueue ? OPS_COPY.proofreadStartBusy : OPS_COPY.redoProofread}
+    </button>
   );
 }
 
@@ -375,7 +242,7 @@ export function CancelProofreadButton({
       type="button"
       disabled={busy}
       title="待機中・添削中を中止"
-      className={`ops-btn ${busy ? "ops-btn--muted" : "ops-btn--danger"}`}
+      className={`ops-btn ${busy ? "ops-btn--muted" : "ops-btn--danger-soft"}`}
       onClick={() => void onClick()}
     >
       {busy ? OPS_COPY.cancelBusy : OPS_COPY.cancel}

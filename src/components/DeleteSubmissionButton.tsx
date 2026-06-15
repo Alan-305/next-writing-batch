@@ -50,7 +50,7 @@ export function DeleteSubmissionButton({ submissionId, confirmLabel }: Props) {
       <button
         type="button"
         disabled={busy}
-        className={`ops-btn ${busy ? "ops-btn--muted" : "ops-btn--danger"}`}
+        className={`ops-btn ${busy ? "ops-btn--muted" : "ops-btn--danger-soft"}`}
         onClick={() => setDialog("warning")}
       >
         {busy ? "削除中…" : "削除"}

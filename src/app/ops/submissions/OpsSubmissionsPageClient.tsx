@@ -153,6 +153,7 @@ export function OpsSubmissionsPageClient() {
           proofreadQueuedAt: s.proofreadQueuedAt,
           hasDay4Assets,
           resultPublished: Boolean(sr?.operatorApprovedAt),
+          releaseWithdrawn: Boolean(String(sr?.operatorWithdrawnAt ?? "").trim()),
           studentResultFirstViewedAt: s.studentResultFirstViewedAt,
           studentReceiveMethod: s.studentReceiveMethod,
           studentReceiveMethodAt: s.studentReceiveMethodAt,

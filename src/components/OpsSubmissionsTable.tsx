@@ -30,6 +30,7 @@ export type SubmissionListRow = {
   studentViewed?: boolean;
   hasDay4Assets?: boolean;
   resultPublished?: boolean;
+  releaseWithdrawn?: boolean;
   studentResultFirstViewedAt?: string;
   studentReceiveMethod?: "web" | "teacher_meeting";
   studentReceiveMethodAt?: string;
@@ -389,7 +390,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                   />
                 </th>
               ) : null}
-              <th>詳細</th>
+              <th>確認＆修正</th>
               <th>提出日時</th>
               <th>課題ID</th>
               <th>学籍</th>
@@ -431,7 +432,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                       {String(item.submissionId ?? "").trim() ? (
                         <Link
                           href={`/ops/submissions/${encodeURIComponent(item.submissionId)}`}
-                          className="ops-btn ops-btn--ghost ops-btn--compact"
+                          className="ops-btn ops-btn--review ops-btn--compact"
                           prefetch={false}
                         >
                           {OPS_COPY.detailLink}
@@ -451,6 +452,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         status={rawStatus}
                         studentViewed={item.studentViewed}
                         viewedAt={item.studentResultFirstViewedAt}
+                        releaseWithdrawn={item.releaseWithdrawn}
                         forceProcessing={forceProcessing}
                       />
                     </td>

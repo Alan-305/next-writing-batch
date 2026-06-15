@@ -743,6 +743,16 @@ td {
 .ops-btn--queue { background: #2563eb; }
 .ops-btn--warn { background: #ca8a04; }
 .ops-btn--danger { background: #dc2626; }
+.ops-btn--danger-soft {
+  background: #fecaca;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+.ops-btn--review {
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
 .ops-btn--muted { background: #64748b; }
 .ops-btn--ghost {
   background: #fff;
@@ -812,6 +822,12 @@ a.ops-btn {
 .ops-badge--viewed {
   background: #f0fdf4;
   color: #166534;
+}
+
+.ops-badge--withdrawn {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 
 .ops-zip-bar {
@@ -1755,6 +1771,26 @@ a.ops-btn {
 
 .app-shell--teacher .ops-btn--danger { background: #dc2626; }
 .app-shell--teacher .ops-btn--danger:hover:not(:disabled) { background: #b91c1c; }
+
+.app-shell--teacher .ops-btn--danger-soft {
+  background: #fecaca;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+.app-shell--teacher .ops-btn--danger-soft:hover:not(:disabled) {
+  background: #fca5a5;
+  color: #7f1d1d;
+}
+
+.app-shell--teacher .ops-btn--review {
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+.app-shell--teacher .ops-btn--review:hover:not(:disabled) {
+  background: #fed7aa;
+  color: #7c2d12;
+}
 
 .app-shell--teacher .ops-btn--muted { background: #64748b; }
 .app-shell--teacher .ops-btn--muted:hover:not(:disabled) { background: #475569; }
