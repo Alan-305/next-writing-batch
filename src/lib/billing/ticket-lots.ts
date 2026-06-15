@@ -32,7 +32,25 @@ function parseLot(raw: unknown): TicketLot | null {
   if (count <= 0 || !expiresAt || !Date.parse(expiresAt)) return null;
   if (kind !== "free" && kind !== "paid" && kind !== "manual" && kind !== "legacy") return null;
   const plan = typeof o.plan === "string" && o.plan.trim() ? o.plan.trim() : undefined;
-  return { count, expiresAt, kind, plan };
+  return {
+    count,
+    expiresAt,
+    kind,
+    ...(plan ? { plan } : {}),
+  };
+}
+
+/** Firestore は undefined を許容しないため、書き込み用に正規化する */
+export function ticketLotToFirestore(lot: TicketLot): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    count: lot.count,
+    expiresAt: lot.expiresAt,
+    kind: lot.kind,
+  };
+  if (typeof lot.plan === "string" && lot.plan.trim()) {
+    row.plan = lot.plan.trim();
+  }
+  return row;
 }
 
 export function parseTicketLots(raw: unknown): TicketLot[] {
@@ -144,7 +162,7 @@ export function applyBillingLots(
   const purged = purgeExpiredLots(lots, nowMs);
   return {
     ...billing,
-    ticketLots: purged,
+    ticketLots: purged.map(ticketLotToFirestore),
     tickets: sumTicketLots(purged),
   };
 }
