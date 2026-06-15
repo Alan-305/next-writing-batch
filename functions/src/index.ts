@@ -23,9 +23,6 @@ import {
   resolveBillingTicketLots,
   sumTicketLots,
 } from "./ticket-lots.js";
-import { ticketExpiryReminderDaily } from "./ticket-expiry-reminder.js";
-
-export { ticketExpiryReminderDaily };
 
 admin.initializeApp();
 
@@ -1026,3 +1023,5 @@ function parseRequiredUrl(value: unknown, fieldName: string): string {
     throw new functions.https.HttpsError("invalid-argument", `${fieldName} の URL が不正です。`);
   }
 }
+
+export { ticketExpiryReminderDaily } from "./ticket-expiry-reminder.js";

@@ -10,7 +10,6 @@ import {
   sumTicketLots,
 } from "./ticket-lots.js";
 
-const db = admin.firestore();
 const WARN_DAYS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -65,6 +64,7 @@ export async function runTicketExpiryReminderScan(nowMs = Date.now()): Promise<{
   sent: number;
   skipped: number;
 }> {
+  const db = admin.firestore();
   const snap = await db.collection("users").where("roles", "array-contains", "teacher").get();
   let sent = 0;
   let skipped = 0;
