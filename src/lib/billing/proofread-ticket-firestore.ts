@@ -24,11 +24,18 @@ function withConsumeAuditFields(
   reason: TicketConsumeReason,
   count: number,
 ): Record<string, unknown> {
+  const prevLifetime =
+    typeof billing.lifetimeTicketsConsumed === "number" && Number.isFinite(billing.lifetimeTicketsConsumed)
+      ? Math.max(0, Math.floor(billing.lifetimeTicketsConsumed))
+      : 0;
+  const lifetimeTicketsConsumed = prevLifetime + Math.max(0, Math.floor(count));
+
   if (reason === "day4_finalize") {
     return {
       ...billing,
       lastDay4FinalizeTicketConsume: count,
       lastDay4FinalizeTicketAt: FieldValue.serverTimestamp(),
+      lifetimeTicketsConsumed,
       updatedAt: FieldValue.serverTimestamp(),
     };
   }
@@ -36,6 +43,7 @@ function withConsumeAuditFields(
     ...billing,
     lastProofreadTicketConsume: count,
     lastProofreadTicketAt: FieldValue.serverTimestamp(),
+    lifetimeTicketsConsumed,
     updatedAt: FieldValue.serverTimestamp(),
   };
 }

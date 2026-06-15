@@ -4,9 +4,14 @@ import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { resolveEffectiveOrganizationIdForApi } from "@/lib/auth/resolve-effective-organization";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
 import { nearestTicketExpiryIso, resolveBillingTicketLots, sumTicketLots } from "@/lib/billing/ticket-lots";
+import {
+  countDay4TicketsChargedByTeacher,
+  readLifetimeTicketsConsumed,
+} from "@/lib/billing/teacher-ticket-usage";
 import { loadTeacherUidsFromProofreadingSetup } from "@/lib/admin/tenant-roster";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import { getSubmissions } from "@/lib/submissions-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,6 +28,10 @@ type TicketRow = {
   registeredAt: string | null;
   tickets: number;
   ticketExpiresAt: string | null;
+  /** 確定公開（Day4）で消費したチケットの累計（提出記録ベース） */
+  cumulativeProofreadTickets: number;
+  /** billing.lifetimeTicketsConsumed（サーバー記録。提出記録と照合用） */
+  lifetimeTicketsConsumed: number;
   lastProofreadTicketConsume: number | null;
   lastProofreadTicketAt: string | null;
   lastCheckoutSessionId: string | null;
@@ -121,6 +130,7 @@ export async function GET(request: Request) {
     const organizationId = await resolveEffectiveOrganizationIdForApi(auth.uid, request);
     const db = getAdminFirestore();
     const teacherUidsFromDisk = await loadTeacherUidsFromProofreadingSetup(organizationId);
+    const submissions = await getSubmissions(organizationId);
     const snap = await db.collection("users").where("organizationId", "==", organizationId).get();
     const uids = snap.docs.map((d) => d.id);
     const authMap = await fetchAuthLabels(uids);
@@ -144,6 +154,7 @@ export async function GET(request: Request) {
       const studentNumber = stringOrNull(doc.get("studentNumber"));
       const profileCompleted = doc.get("studentProfileCompletedAt") != null;
       const docCreatedAt = timestampToIso(doc.get("createdAt"));
+      const lifetimeTicketsConsumed = readLifetimeTicketsConsumed(billing);
       return {
         uid,
         displayLabel,
@@ -156,6 +167,8 @@ export async function GET(request: Request) {
         registeredAt: authLabel.registeredAt ?? docCreatedAt,
         tickets,
         ticketExpiresAt,
+        cumulativeProofreadTickets: 0,
+        lifetimeTicketsConsumed,
         lastProofreadTicketConsume,
         lastProofreadTicketAt,
         lastCheckoutSessionId: stringOrNull(billing["lastCheckoutSessionId"]),
@@ -166,13 +179,32 @@ export async function GET(request: Request) {
     const teachers = rows.filter((r) => r.kind === "teacher").sort((a, b) => a.displayLabel.localeCompare(b.displayLabel, "ja"));
     const students = rows.filter((r) => r.kind === "student").sort((a, b) => a.displayLabel.localeCompare(b.displayLabel, "ja"));
 
+    const teacherUidList = teachers.map((t) => t.uid);
+    const chargeCounts = countDay4TicketsChargedByTeacher(submissions, teacherUidList);
+    const teachersWithUsage = teachers.map((t) => {
+      const fromSubmissions = chargeCounts.byUid.get(t.uid) ?? 0;
+      const fromBilling = t.lifetimeTicketsConsumed;
+      return {
+        ...t,
+        cumulativeProofreadTickets: Math.max(fromSubmissions, fromBilling),
+      };
+    });
+
+    const usageNote =
+      chargeCounts.unattributed > 0
+        ? `過去の確定公開 ${chargeCounts.unattributed} 件は消費教員が記録されていないため、教員別累計に含まれていません。`
+        : null;
+
     return NextResponse.json({
       ok: true,
       organizationId,
-      teachers,
+      teachers: teachersWithUsage,
       students,
       teacherCount: teachers.length,
       studentCount: students.length,
+      orgCumulativeProofreadTickets: chargeCounts.orgTotal,
+      unattributedProofreadTickets: chargeCounts.unattributed,
+      usageNote,
       note: null,
     });
   } catch (e) {

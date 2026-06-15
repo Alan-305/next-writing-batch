@@ -1,17 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
-import { DEFAULT_STUDENT_BRANDING, type StudentBranding } from "@/lib/student-branding";
+import {
+  applyStudentBrandingPreset,
+  resolveActivePresetId,
+  STUDENT_BRANDING_PRESET_CATEGORIES,
+  STUDENT_BRANDING_PRESETS,
+} from "@/lib/student-branding-presets";
+import {
+  DEFAULT_STUDENT_BRANDING,
+  studentBrandingStyle,
+  type StudentBranding,
+} from "@/lib/student-branding";
 
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 
 function colorPickerValue(hex: string, fallback: string): string {
   const t = hex.trim();
   return HEX6.test(t) ? t : fallback;
+}
+
+function preventEnterSubmit(ev: React.KeyboardEvent<HTMLFormElement>) {
+  if (ev.key === "Enter" && (ev.target as HTMLElement).tagName !== "TEXTAREA") {
+    ev.preventDefault();
+  }
 }
 
 export default function OpsStudentAppearancePage() {
@@ -21,6 +37,9 @@ export default function OpsStudentAppearancePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const activePresetId = useMemo(() => resolveActivePresetId(branding), [branding]);
+  const shellStyle = useMemo(() => studentBrandingStyle(branding), [branding]);
 
   const authHeader = useCallback(async (): Promise<Record<string, string> | null> => {
     if (!user) return null;
@@ -51,8 +70,16 @@ export default function OpsStudentAppearancePage() {
     void load();
   }, [load]);
 
-  const patch = (p: Partial<StudentBranding>) => {
+  const patchText = (p: Partial<StudentBranding>) => {
     setBranding((prev) => ({ ...prev, ...p }));
+  };
+
+  const patchColors = (p: Partial<StudentBranding>) => {
+    setBranding((prev) => ({ ...prev, ...p, stylePresetId: "custom" }));
+  };
+
+  const selectPreset = (presetId: string) => {
+    setBranding((prev) => applyStudentBrandingPreset(prev, presetId));
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -90,20 +117,25 @@ export default function OpsStudentAppearancePage() {
       </p>
       <h1>教師・生徒画面設定</h1>
       <p className="muted">
-        ここで設定した<strong>タイトル・学校名・色</strong>は、<strong>教員の運用画面</strong>と<strong>生徒の提出・結果画面</strong>の両方に同じトーンで反映されます。
-        組織 ID の確認は <Link href="/ops/tenant">テナント（検証）</Link> から行えます。
+        <strong>タイトル・学校名</strong>は自由入力、<strong>色と雰囲気</strong>はスタイルから選べます。
+        設定は<strong>教員の運用画面</strong>と<strong>生徒の提出・結果画面</strong>の両方に反映されます。
       </p>
 
       {loading ? (
         <p className="muted">読み込み中…</p>
       ) : (
-        <form className="card" onSubmit={onSubmit} style={{ maxWidth: 560, padding: "20px 22px" }}>
+        <form
+          className="card"
+          onSubmit={onSubmit}
+          onKeyDown={preventEnterSubmit}
+          style={{ maxWidth: 720, padding: "20px 22px" }}
+        >
           <div className="field">
             <span>左上のタイトル</span>
             <input
               type="text"
               value={branding.productTitle}
-              onChange={(ev) => patch({ productTitle: ev.target.value })}
+              onChange={(ev) => patchText({ productTitle: ev.target.value })}
               autoComplete="off"
             />
           </div>
@@ -112,7 +144,7 @@ export default function OpsStudentAppearancePage() {
             <input
               type="text"
               value={branding.badgeLabel}
-              onChange={(ev) => patch({ badgeLabel: ev.target.value })}
+              onChange={(ev) => patchText({ badgeLabel: ev.target.value })}
               autoComplete="off"
             />
           </div>
@@ -121,7 +153,7 @@ export default function OpsStudentAppearancePage() {
             <input
               type="text"
               value={branding.teacherBadgeLabel}
-              onChange={(ev) => patch({ teacherBadgeLabel: ev.target.value })}
+              onChange={(ev) => patchText({ teacherBadgeLabel: ev.target.value })}
               autoComplete="off"
             />
           </div>
@@ -130,97 +162,187 @@ export default function OpsStudentAppearancePage() {
             <input
               type="text"
               value={branding.schoolDisplayName}
-              onChange={(ev) => patch({ schoolDisplayName: ev.target.value })}
+              onChange={(ev) => patchText({ schoolDisplayName: ev.target.value })}
               autoComplete="organization"
             />
           </div>
 
-          <fieldset style={{ border: "none", margin: "18px 0 0", padding: 0 }}>
-            <legend className="field" style={{ marginBottom: 8 }}>
-              <span>色（# と 6 桁の英数字）</span>
-            </legend>
-            <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
-              <label className="field" style={{ margin: 0 }}>
-                <span>メイン（見出し・強調）</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input
-                    type="color"
-                    value={colorPickerValue(branding.primaryColor, DEFAULT_STUDENT_BRANDING.primaryColor)}
-                    onChange={(ev) => patch({ primaryColor: ev.target.value })}
-                    aria-label="メイン色"
-                    style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
-                  />
-                  <input
-                    type="text"
-                    value={branding.primaryColor}
-                    onChange={(ev) => patch({ primaryColor: ev.target.value })}
-                    pattern="^#[0-9A-Fa-f]{6}$"
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
+          <section className="appearance-preset-section" aria-labelledby="appearance-style-heading">
+            <h2 id="appearance-style-heading" className="appearance-preset-section__title">
+              画面スタイル
+            </h2>
+            <p className="appearance-preset-section__hint">
+              ボタンは白文字＋濃いめのグラデーションで表示されます。視認性を優先した配色です。
+            </p>
+
+            {STUDENT_BRANDING_PRESET_CATEGORIES.map((cat) => {
+              const presets = STUDENT_BRANDING_PRESETS.filter((p) => p.category === cat.id);
+              if (presets.length === 0) return null;
+              return (
+                <div key={cat.id} className="appearance-preset-category">
+                  <p className="appearance-preset-category__label">{cat.label}</p>
+                  <div className="appearance-preset-grid" role="list">
+                    {presets.map((preset) => {
+                      const selected = activePresetId === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          role="listitem"
+                          className={`appearance-preset-card${selected ? " appearance-preset-card--selected" : ""}`}
+                          aria-pressed={selected}
+                          onClick={() => selectPreset(preset.id)}
+                        >
+                          <div className="appearance-preset-card__swatches" aria-hidden>
+                            <span
+                              className="appearance-preset-card__swatch"
+                              style={{ background: preset.colors.surfaceTintStart }}
+                            />
+                            <span
+                              className="appearance-preset-card__swatch"
+                              style={{ background: preset.colors.accentColor }}
+                            />
+                            <span
+                              className="appearance-preset-card__swatch"
+                              style={{ background: preset.colors.primaryColor }}
+                            />
+                          </div>
+                          <span className="appearance-preset-card__name">{preset.name}</span>
+                          <span className="appearance-preset-card__desc">{preset.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                <span>アクセント（ボタン・装飾）</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input
-                    type="color"
-                    value={colorPickerValue(branding.accentColor, DEFAULT_STUDENT_BRANDING.accentColor)}
-                    onChange={(ev) => patch({ accentColor: ev.target.value })}
-                    aria-label="アクセント色"
-                    style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
-                  />
-                  <input
-                    type="text"
-                    value={branding.accentColor}
-                    onChange={(ev) => patch({ accentColor: ev.target.value })}
-                    pattern="^#[0-9A-Fa-f]{6}$"
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
+              );
+            })}
+          </section>
+
+          <div className="appearance-preview-panel" style={shellStyle}>
+            <p className="appearance-preview-panel__label">プレビュー（ボタン・見出しの視認性）</p>
+            <div className="appearance-preview-shell">
+              <div
+                className="appearance-preview-header"
+                style={{
+                  background: `linear-gradient(90deg, ${branding.primaryColor}, ${branding.accentColor})`,
+                }}
+              >
+                <span className="appearance-preview-header__title">{branding.productTitle}</span>
+                <span className="appearance-preview-header__badge">{branding.badgeLabel}</span>
+              </div>
+              <div
+                className="appearance-preview-body"
+                style={{
+                  background: `linear-gradient(180deg, ${branding.surfaceTintStart}, ${branding.surfaceTintEnd})`,
+                }}
+              >
+                <h3 style={{ color: branding.primaryColor }}>提出・結果画面の見出し</h3>
+                <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+                  背景グラデーションとボタンのコントラストを確認できます。
+                </p>
+                <div className="appearance-preview-actions">
+                  <span
+                    className="appearance-preview-btn"
+                    style={{
+                      background: `linear-gradient(180deg, ${branding.accentColor}, ${branding.primaryColor})`,
+                    }}
+                  >
+                    送信する
+                  </span>
+                  <span className="appearance-preview-btn appearance-preview-btn--ghost">キャンセル</span>
                 </div>
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                <span>背景（上）</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input
-                    type="color"
-                    value={colorPickerValue(
-                      branding.surfaceTintStart,
-                      DEFAULT_STUDENT_BRANDING.surfaceTintStart,
-                    )}
-                    onChange={(ev) => patch({ surfaceTintStart: ev.target.value })}
-                    aria-label="背景色（上）"
-                    style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
-                  />
-                  <input
-                    type="text"
-                    value={branding.surfaceTintStart}
-                    onChange={(ev) => patch({ surfaceTintStart: ev.target.value })}
-                    pattern="^#[0-9A-Fa-f]{6}$"
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
-                </div>
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                <span>背景（下）</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input
-                    type="color"
-                    value={colorPickerValue(branding.surfaceTintEnd, DEFAULT_STUDENT_BRANDING.surfaceTintEnd)}
-                    onChange={(ev) => patch({ surfaceTintEnd: ev.target.value })}
-                    aria-label="背景色（下）"
-                    style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
-                  />
-                  <input
-                    type="text"
-                    value={branding.surfaceTintEnd}
-                    onChange={(ev) => patch({ surfaceTintEnd: ev.target.value })}
-                    pattern="^#[0-9A-Fa-f]{6}$"
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
-                </div>
-              </label>
+              </div>
             </div>
-          </fieldset>
+          </div>
+
+          {activePresetId === "custom" ? (
+            <fieldset className="appearance-custom-colors" style={{ border: "none", margin: 0, padding: 0 }}>
+              <legend className="field" style={{ marginBottom: 8 }}>
+                <span>カスタム色（上級者向け）</span>
+              </legend>
+              <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+                <label className="field" style={{ margin: 0 }}>
+                  <span>メイン（見出し・強調）</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="color"
+                      value={colorPickerValue(branding.primaryColor, DEFAULT_STUDENT_BRANDING.primaryColor)}
+                      onChange={(ev) => patchColors({ primaryColor: ev.target.value })}
+                      aria-label="メイン色"
+                      style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
+                    />
+                    <input
+                      type="text"
+                      value={branding.primaryColor}
+                      onChange={(ev) => patchColors({ primaryColor: ev.target.value })}
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                  </div>
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  <span>アクセント（ボタン・装飾）</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="color"
+                      value={colorPickerValue(branding.accentColor, DEFAULT_STUDENT_BRANDING.accentColor)}
+                      onChange={(ev) => patchColors({ accentColor: ev.target.value })}
+                      aria-label="アクセント色"
+                      style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
+                    />
+                    <input
+                      type="text"
+                      value={branding.accentColor}
+                      onChange={(ev) => patchColors({ accentColor: ev.target.value })}
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                  </div>
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  <span>背景（上）</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="color"
+                      value={colorPickerValue(
+                        branding.surfaceTintStart,
+                        DEFAULT_STUDENT_BRANDING.surfaceTintStart,
+                      )}
+                      onChange={(ev) => patchColors({ surfaceTintStart: ev.target.value })}
+                      aria-label="背景色（上）"
+                      style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
+                    />
+                    <input
+                      type="text"
+                      value={branding.surfaceTintStart}
+                      onChange={(ev) => patchColors({ surfaceTintStart: ev.target.value })}
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                  </div>
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  <span>背景（下）</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="color"
+                      value={colorPickerValue(branding.surfaceTintEnd, DEFAULT_STUDENT_BRANDING.surfaceTintEnd)}
+                      onChange={(ev) => patchColors({ surfaceTintEnd: ev.target.value })}
+                      aria-label="背景色（下）"
+                      style={{ width: 44, height: 44, padding: 0, border: "1px solid #cbd5e1", borderRadius: 8 }}
+                    />
+                    <input
+                      type="text"
+                      value={branding.surfaceTintEnd}
+                      onChange={(ev) => patchColors({ surfaceTintEnd: ev.target.value })}
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                  </div>
+                </label>
+              </div>
+            </fieldset>
+          ) : null}
 
           {error ? (
             <p className="muted" style={{ color: "#b91c1c", marginTop: 16 }}>

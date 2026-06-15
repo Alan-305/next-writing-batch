@@ -24,6 +24,8 @@ export type StudentBranding = {
   surfaceTintStart: string;
   /** 背景グラデの下側の色 */
   surfaceTintEnd: string;
+  /** 選択中の画面スタイル（プリセット ID。未設定・custom は手動色） */
+  stylePresetId?: string;
 };
 
 export const DEFAULT_STUDENT_BRANDING: StudentBranding = {
@@ -35,6 +37,7 @@ export const DEFAULT_STUDENT_BRANDING: StudentBranding = {
   accentColor: "#0ea5e9",
   surfaceTintStart: "#f0f9ff",
   surfaceTintEnd: "#fffbeb",
+  stylePresetId: "standard",
 };
 
 export function mergeStudentBranding(raw: unknown): StudentBranding {
@@ -50,6 +53,8 @@ export function mergeStudentBranding(raw: unknown): StudentBranding {
       : d.teacherBadgeLabel;
   const schoolDisplayName =
     typeof o.schoolDisplayName === "string" ? o.schoolDisplayName.trim() : d.schoolDisplayName;
+  const stylePresetId =
+    typeof o.stylePresetId === "string" && o.stylePresetId.trim() ? o.stylePresetId.trim() : d.stylePresetId;
   return {
     productTitle,
     badgeLabel,
@@ -59,6 +64,7 @@ export function mergeStudentBranding(raw: unknown): StudentBranding {
     accentColor: safeHex(o.accentColor, d.accentColor),
     surfaceTintStart: safeHex(o.surfaceTintStart, d.surfaceTintStart),
     surfaceTintEnd: safeHex(o.surfaceTintEnd, d.surfaceTintEnd),
+    stylePresetId,
   };
 }
 

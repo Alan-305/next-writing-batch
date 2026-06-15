@@ -22,6 +22,8 @@ export type BillingInfo = {
   /** 添削 API 成功後のチケット消費（任意） */
   lastProofreadTicketConsume?: number;
   lastProofreadTicketAt?: Timestamp | null;
+  /** 確定公開（Day4）で消費したチケットの累計（サーバー記録） */
+  lifetimeTicketsConsumed?: number;
   /** 有効期限7日前リマインドの送信済み失効日（ISO） */
   ticketExpiryWarningSentFor?: string | null;
   ticketExpiryWarningSentAt?: Timestamp | null;

@@ -1507,6 +1507,16 @@ a.ops-btn {
   border-left: 3px solid #2563eb;
 }
 
+.admin-stat-card--usage {
+  border-left: 3px solid #16a34a;
+}
+
+.admin-usage-note {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
 .admin-stat-card__label {
   margin: 0;
   font-size: 0.82rem;
@@ -1619,6 +1629,13 @@ a.ops-btn {
 .admin-table__tickets {
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.admin-table__unit {
+  margin-left: 2px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .admin-status {
@@ -3123,5 +3140,181 @@ a.ops-btn {
   .legal-table--tokushoho th[scope="row"] {
     width: auto;
   }
+}
+
+/* ─── 教師・生徒画面スタイルプリセット ─── */
+.appearance-preset-section {
+  margin: 20px 0 0;
+}
+
+.appearance-preset-section__title {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.appearance-preset-section__hint {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.appearance-preset-category {
+  margin-bottom: 18px;
+}
+
+.appearance-preset-category__label {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.appearance-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+}
+
+.appearance-preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px 12px 10px;
+  border: 2px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.appearance-preset-card:hover:not(:disabled) {
+  border-color: #94a3b8;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.appearance-preset-card:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.appearance-preset-card--selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.appearance-preset-card__swatches {
+  display: flex;
+  gap: 4px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.appearance-preset-card__swatch {
+  flex: 1;
+  min-width: 0;
+}
+
+.appearance-preset-card__name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.appearance-preset-card__desc {
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.appearance-preview-panel {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.appearance-preview-panel__label {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.appearance-preview-shell {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.appearance-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  color: #f8fafc;
+}
+
+.appearance-preview-header__title {
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.appearance-preview-header__badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.appearance-preview-body {
+  padding: 14px;
+}
+
+.appearance-preview-body h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.appearance-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.appearance-preview-btn {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #fff;
+  cursor: default;
+}
+
+.appearance-preview-btn--ghost {
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+.appearance-custom-colors {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #cbd5e1;
 }
 

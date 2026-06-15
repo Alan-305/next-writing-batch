@@ -34,6 +34,7 @@ type MemberRow = {
   registeredAt: string | null;
   tickets: number;
   ticketExpiresAt: string | null;
+  cumulativeProofreadTickets?: number;
   lastCheckoutSessionId: string | null;
   lastPaymentIntentId: string | null;
 };
@@ -45,6 +46,9 @@ type RosterPayload = {
   students?: MemberRow[];
   teacherCount?: number;
   studentCount?: number;
+  orgCumulativeProofreadTickets?: number;
+  unattributedProofreadTickets?: number;
+  usageNote?: string | null;
   message?: string;
 };
 
@@ -406,7 +410,14 @@ export function AdminTenantDashboard() {
   const loading = ctxLoading || rosterLoading;
   const refundDisabled = selectedMembers.length !== 1;
 
-  const renderMemberTable = (rows: MemberRow[], sectionId: string, heading: string, showSelectAll?: boolean) => {
+  const renderMemberTable = (
+    rows: MemberRow[],
+    sectionId: string,
+    heading: string,
+    options?: { showSelectAll?: boolean; showCumulativeProofreads?: boolean },
+  ) => {
+    const showSelectAll = options?.showSelectAll ?? false;
+    const showCumulativeProofreads = options?.showCumulativeProofreads ?? false;
     const allStudentsSelected =
       rows.length > 0 && rows.every((r) => selected.has(r.uid));
     return (
@@ -441,6 +452,7 @@ export function AdminTenantDashboard() {
                   <th scope="col">メール</th>
                   <th scope="col">登録日</th>
                   <th scope="col">チケット</th>
+                  {showCumulativeProofreads ? <th scope="col">累計添削</th> : null}
                   <th scope="col">有効期限</th>
                   <th scope="col">状態</th>
                 </tr>
@@ -465,6 +477,12 @@ export function AdminTenantDashboard() {
                     <td className="admin-table__tickets">
                       <strong>{m.tickets}</strong>
                     </td>
+                    {showCumulativeProofreads ? (
+                      <td className="admin-table__tickets">
+                        <strong>{m.cumulativeProofreadTickets ?? 0}</strong>
+                        <span className="admin-table__unit">枚</span>
+                      </td>
+                    ) : null}
                     <td className="admin-table__date">
                       {m.kind === "teacher" && m.ticketExpiresAt
                         ? formatTicketExpiryJa(m.ticketExpiresAt)
@@ -551,11 +569,26 @@ export function AdminTenantDashboard() {
                 <p className="admin-stat-card__label">合計チケット</p>
                 <p className="admin-stat-card__value">{totalTickets}</p>
               </div>
+              <div className="admin-stat-card admin-stat-card--usage">
+                <p className="admin-stat-card__label">累計添削（テナント）</p>
+                <p className="admin-stat-card__value">{roster?.orgCumulativeProofreadTickets ?? 0}</p>
+              </div>
             </div>
           </div>
 
-          {renderMemberTable(teachers, "admin-teachers-heading", "テナント本人（教員）")}
-          {renderMemberTable(students, "admin-students-heading", "生徒一覧", true)}
+          {roster?.usageNote ? (
+            <p className="admin-usage-note muted" role="note">
+              {roster.usageNote}
+            </p>
+          ) : null}
+          <p className="admin-usage-note muted">
+            <strong>累計添削</strong>は確定＆公開（Day4）でチケットを消費した件数です。チケット残数との整合確認にご利用ください。
+          </p>
+
+          {renderMemberTable(teachers, "admin-teachers-heading", "テナント本人（教員）", {
+            showCumulativeProofreads: true,
+          })}
+          {renderMemberTable(students, "admin-students-heading", "生徒一覧", { showSelectAll: true })}
         </>
       )}
 

@@ -59,6 +59,8 @@ export type Submission = SubmissionInput & {
   };
   /** Day4 確定フローで生徒から 1 枚消費済み（再生成で二重課金しない） */
   day4TicketChargedAt?: string;
+  /** Day4 確定時にチケットを消費した教員 UID（管理者の累計集計用） */
+  day4TicketChargedFromUid?: string;
   day4?: {
     audio_path?: string;
     audio_url?: string;

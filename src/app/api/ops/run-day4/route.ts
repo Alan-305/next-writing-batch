@@ -151,6 +151,7 @@ export async function POST(request: Request) {
       await updateSubmissionByIdInOrganization(auth.organizationId, sid, (cur) => ({
         ...cur,
         day4TicketChargedAt: iso,
+        day4TicketChargedFromUid: teacherUid,
       }));
       ticketsCharged.push({ submissionId: sid, chargedFromUid: teacherUid, remainingAfter: consumed.tickets });
     }
