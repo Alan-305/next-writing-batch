@@ -32,10 +32,7 @@ export function OpsSubmissionDetailBody({
 
   return (
     <main>
-      <h1>提出詳細</h1>
-      <p>
-        <Link href="/ops/submissions">一覧に戻る</Link>
-      </p>
+      <h1>確認＆修正</h1>
 
       <div className="card">
         {taskMismatch.mismatched ? (
@@ -128,8 +125,8 @@ export function OpsSubmissionDetailBody({
       <div className="card" id="correction-input">
         <h2 style={{ marginBottom: 6 }}>修正入力</h2>
         <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-          修正の必要がある場合のみ、内容を変更してください。「生徒画面確認」で印刷用の見た目を確認できます。
-          公開を取り下げたあとは、この欄で添削結果を編集できます。
+          修正の必要がある場合のみ、内容を変更してください。「生徒画面」で印刷用の見た目を確認できます。
+          公開を取下したあとは、この欄で添削結果を編集できます。
         </p>
         {published && submission.studentRelease ? (
           <p className="success" style={{ marginTop: 0, marginBottom: 12 }}>

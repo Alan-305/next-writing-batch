@@ -19,14 +19,13 @@ import { SubmitGradingConfirmDialog } from "@/components/SubmitGradingConfirmDia
 import { TextareaWithFileDrop } from "@/components/TextareaWithFileDrop";
 
 type FieldErrors = Partial<
-  Record<"taskId" | "studentId" | "studentName" | "essayText" | "problemMemo" | "problemId" | "nickname", string>
+  Record<"taskId" | "studentId" | "studentName" | "essayText" | "problemId" | "nickname", string>
 >;
 
 const initialMeta = {
   taskId: "",
   studentId: "",
   studentName: "",
-  problemMemo: "",
   nickname: "",
 };
 
@@ -117,14 +116,12 @@ export default function SubmitPageClient() {
     setSubmitSuccess(null);
 
     const pid = problemId.trim();
-    const problemMemoField = isAnonymousInvite ? {} : { problemMemo: form.problemMemo };
     const body =
       answerMode === "multipart"
         ? {
             taskId: form.taskId,
             studentId: "",
             studentName: "",
-            ...problemMemoField,
             ...(pid ? { problemId: pid } : {}),
             essayMultipart: true,
             essayParts,
@@ -134,7 +131,6 @@ export default function SubmitPageClient() {
             taskId: form.taskId,
             studentId: "",
             studentName: "",
-            ...problemMemoField,
             ...(pid ? { problemId: pid } : {}),
             essayText: form.essayText,
             essayMultipart: false,
@@ -339,22 +335,6 @@ export default function SubmitPageClient() {
             <span className="muted" style={{ fontSize: "0.9em" }}>
               本名は使わないでください。未入力の場合、提出後に自動生成された名前が表示されます。
             </span>
-          </label>
-        ) : null}
-
-        {!isAnonymousInvite ? (
-          <label className="field">
-            <span>問題メモ（任意・目安20字）</span>
-            <input
-              type="text"
-              maxLength={30}
-              value={form.problemMemo}
-              onChange={(e) => setForm((p) => ({ ...p, problemMemo: e.target.value }))}
-              placeholder="例: Week3 自由英作文"
-              disabled={submitting}
-              autoComplete="off"
-            />
-            {errors.problemMemo ? <span className="error">{errors.problemMemo}</span> : null}
           </label>
         ) : null}
 

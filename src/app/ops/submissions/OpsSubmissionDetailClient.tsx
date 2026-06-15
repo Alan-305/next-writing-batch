@@ -86,7 +86,7 @@ export function OpsSubmissionDetailClient() {
   if (!submissionId) {
     return (
       <main>
-        <h1>提出詳細</h1>
+        <h1>確認＆修正</h1>
         <p>受付IDがありません。</p>
         <Link href="/ops/submissions">一覧に戻る</Link>
       </main>
@@ -96,7 +96,7 @@ export function OpsSubmissionDetailClient() {
   if (authLoading || (!err && !bundle && user)) {
     return (
       <main>
-        <h1>提出詳細</h1>
+        <h1>確認＆修正</h1>
         <p className="muted">読み込み中…</p>
       </main>
     );
@@ -105,7 +105,7 @@ export function OpsSubmissionDetailClient() {
   if (err || !bundle?.submission) {
     return (
       <main>
-        <h1>提出詳細</h1>
+        <h1>確認＆修正</h1>
         <p>{err || "該当データが見つかりませんでした。"}</p>
         <p>
           <Link href="/ops/submissions">一覧に戻る</Link>

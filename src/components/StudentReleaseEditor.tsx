@@ -252,42 +252,6 @@ export function StudentReleaseEditor({
     }
   };
 
-  const reimportFromProofread = () => {
-    if (!proofread) return;
-    const mergedFmt = proofreadExplanationLooksSectionMerged(String(proofread.explanation ?? ""));
-    const mergedContent = firstNonEmptyComment(
-      mergedFmt ? aiSplitComments.contentComment : proofread.content_comment,
-      mergedFmt ? proofread.content_comment : aiSplitComments.contentComment,
-    );
-    const mergedGrammar = firstNonEmptyComment(
-      mergedFmt ? aiSplitComments.grammarComment : proofread.grammar_comment,
-      mergedFmt ? proofread.grammar_comment : aiSplitComments.grammarComment,
-    );
-    const nextFinalText = sanitizeFinalEssayArtifactText(
-      coalesceText(proofread.final_essay ?? proofread.final_version ?? ""),
-    );
-
-    const aiDedContent = Number(proofread.content_deduction);
-    const aiDedGrammar = Number(proofread.grammar_deduction);
-    const parsed = parseAiContentGrammarScores(String(proofread.evaluation ?? ""));
-
-    setContentComment(mergedContent);
-    setGrammarComment(mergedGrammar);
-    setFinalText(nextFinalText);
-    if (Number.isFinite(aiDedContent)) {
-      setContentDeduction(clampInt(aiDedContent, 0, contentMax));
-    } else if (parsed && contentItem) {
-      setContentDeduction(clampInt(contentMax - parsed.content, 0, contentMax));
-    }
-    if (Number.isFinite(aiDedGrammar)) {
-      setGrammarDeduction(clampInt(aiDedGrammar, 0, grammarMax));
-    } else if (parsed && grammarItem) {
-      setGrammarDeduction(clampInt(grammarMax - parsed.grammar, 0, grammarMax));
-    }
-    setMessage("最新の添削結果を修正入力へ再取り込みしました。");
-    setError("");
-  };
-
   const effectiveScores = useMemo(() => {
     const next: Record<string, number> = { ...scores };
     if (contentItem) {
@@ -655,12 +619,12 @@ export function StudentReleaseEditor({
 
       <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
         <strong>確定＆公開</strong>で文面を確定し、PDF・音声を生成して生徒に公開します。問題があれば{" "}
-        <strong>公開取り下げ</strong>を押してください。
+        <strong>公開取下</strong>を押してください。
         {!publishedAt && finalizedAt ? " 確定済みですが未公開です。" : null}
       </p>
       {readOnly ? (
         <p className="muted" style={{ margin: "0 0 8px", lineHeight: 1.55 }}>
-          公開中は編集できません。「公開取り下げ」のあと、添削結果を修正できます。
+          公開中は編集できません。「公開取下」のあと、添削結果を修正できます。
         </p>
       ) : null}
 
@@ -676,28 +640,9 @@ export function StudentReleaseEditor({
       >
         <button
           type="button"
-          disabled={busy || readOnly || !proofread}
-          onClick={reimportFromProofread}
-          style={{
-            padding: "10px 14px",
-            fontSize: "0.95rem",
-            background: busy ? "#94a3b8" : "#475569",
-            color: "#fff",
-          }}
-          title="保存済みの添削結果を修正入力欄へまとめて再読み込みします"
-        >
-          添削結果を再取り込み
-        </button>
-        <button
-          type="button"
           disabled={busy || readOnly}
           onClick={() => void confirmAndPublish()}
-          style={{
-            padding: "10px 14px",
-            fontSize: "0.95rem",
-            background: busy ? "#94a3b8" : "#16a34a",
-            color: "#fff",
-          }}
+          className={`ops-btn ${busy || readOnly ? "ops-btn--muted" : "ops-btn--now"}`}
         >
           {busy ? "処理中…" : "確定＆公開"}
         </button>
@@ -705,20 +650,9 @@ export function StudentReleaseEditor({
           href={`/result/${encodeURIComponent(submissionId)}`}
           target="_blank"
           rel="noreferrer"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            padding: "10px 14px",
-            fontSize: "0.95rem",
-            background: "#fff",
-            color: "#0f172a",
-            border: "1px solid #cbd5e1",
-            borderRadius: 6,
-            textDecoration: "none",
-            minHeight: 44,
-          }}
+          className="ops-btn ops-btn--preview"
         >
-          生徒画面確認
+          生徒画面
         </a>
         <button
           type="button"
@@ -731,15 +665,13 @@ export function StudentReleaseEditor({
               scrollToId: "correction-input",
             })
           }
-          style={{
-            padding: "10px 14px",
-            fontSize: "0.95rem",
-            background: busy || !publishedAt ? "#94a3b8" : "#dc2626",
-            color: "#fff",
-          }}
+          className={`ops-btn ${busy || !publishedAt ? "ops-btn--muted" : "ops-btn--danger-soft"}`}
         >
-          公開取り下げ
+          公開取下
         </button>
+        <Link href="/ops/submissions" className="ops-btn ops-btn--list">
+          提出一覧
+        </Link>
       </div>
 
       {message ? <p className="success">{message}</p> : null}
