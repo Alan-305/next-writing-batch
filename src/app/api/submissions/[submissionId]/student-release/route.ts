@@ -62,7 +62,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         {
           ok: false,
           code: "FINALIZE_REQUIRED",
-          message: "生徒に公開する前に「確定」を押して運用文面を確定してください。",
+          message: "生徒に公開する前に「確定＆公開」で運用文面を確定してください。",
         },
         { status: 422 },
       );
@@ -76,7 +76,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           ok: false,
           code: "DAY4_REQUIRED",
           message:
-            "返却用 PDF がまだないかエラー状態です。「確定」のあと PDF・音声の生成が完了するまで待ち、再読み込みしてから公開してください。",
+            "返却用 PDF がまだないかエラー状態です。「確定＆公開」で PDF・音声の生成が完了するまでお待ちください。",
         },
         { status: 422 },
       );

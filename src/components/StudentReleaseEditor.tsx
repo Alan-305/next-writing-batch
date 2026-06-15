@@ -284,7 +284,7 @@ export function StudentReleaseEditor({
     } else if (parsed && grammarItem) {
       setGrammarDeduction(clampInt(grammarMax - parsed.grammar, 0, grammarMax));
     }
-    setMessage("最新の添削結果を修正入力へ再取り込みしました。保存するまで確定はされません。");
+    setMessage("最新の添削結果を修正入力へ再取り込みしました。");
     setError("");
   };
 
@@ -302,10 +302,45 @@ export function StudentReleaseEditor({
 
   const finalizedAt = String(initialRelease?.operatorFinalizedAt ?? "").trim();
   const publishedAt = String(initialRelease?.operatorApprovedAt ?? "").trim();
-  const canPublish =
-    Boolean(finalizedAt) && hasDay4Pdf && !(day4Error && String(day4Error).trim());
-  /** 確定済み・未公開で Day4 未完了またはエラー */
-  const needsDay4Retry = Boolean(finalizedAt) && !publishedAt && !canPublish;
+
+  const buildPatchBody = (): Record<string, unknown> => ({
+    scores: effectiveScores,
+    generalComment: "",
+    contentComment,
+    grammarComment,
+    deductions: {
+      content: contentDeduction,
+      grammar: grammarDeduction,
+    },
+    finalText,
+  });
+
+  const submitPatch = async (
+    idToken: string,
+    patch: Record<string, unknown>,
+  ): Promise<{ ok: true } | { ok: false }> => {
+    const res = await fetch(`/api/submissions/${encodeURIComponent(submissionId)}/student-release`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify(patch),
+    });
+    const json = (await parseFetchJson(res)) as {
+      ok?: boolean;
+      message?: string;
+      fields?: Record<string, string>;
+    };
+    if (!res.ok) {
+      const fields = json?.fields as Record<string, string> | undefined;
+      const baseMsg = pickApiErrorMessage(json, res, "保存に失敗しました。");
+      if (fields && Object.keys(fields).length > 0) {
+        setError(`${baseMsg} ${Object.values(fields).join(" ")}`.trim());
+      } else {
+        setError(baseMsg);
+      }
+      return { ok: false };
+    }
+    return { ok: true };
+  };
 
   const invokeRunDay4Api = async (
     idToken: string,
@@ -365,31 +400,40 @@ export function StudentReleaseEditor({
     window.location.reload();
   };
 
-  const runDay4Only = async () => {
+  const confirmAndPublish = async () => {
     setBusy(true);
-    setMessage("");
+    setMessage("確定＆公開を実行しています…");
     setError("");
     try {
       if (!user) {
         setError("ログインしてください。");
         return;
       }
-      if (!finalizedAt) {
-        setError("先に「確定」で返却文面を確定してください。");
-        return;
-      }
       const idToken = await user.getIdToken();
+      const finalizeOk = await submitPatch(idToken, {
+        ...buildPatchBody(),
+        operatorFinalized: true,
+      });
+      if (!finalizeOk.ok) return;
+
       const d4Result = await invokeRunDay4Api(idToken, hasDay4Pdf);
       if (!d4Result.ok) return;
+
+      const publishOk = await submitPatch(idToken, {
+        ...buildPatchBody(),
+        operatorApproved: true,
+      });
+      if (!publishOk.ok) return;
+
       const combined = d4Result.ticketNotice
-        ? `PDF・音声を再生成しました。 ${d4Result.ticketNotice}`
-        : "PDF・音声を再生成しました。";
+        ? `確定して生徒に公開しました。 ${d4Result.ticketNotice}`
+        : "確定して生徒に公開しました。";
       persistDay4TicketNotice(combined);
       completeReload("student-release-actions");
     } catch (e) {
-      console.error("[StudentReleaseEditor] runDay4Only", e);
+      console.error("[StudentReleaseEditor] confirmAndPublish", e);
       const detail = e instanceof Error ? e.message : String(e);
-      setError(`PDF・音声の再生成に失敗しました: ${detail}`);
+      setError(`確定＆公開に失敗しました: ${detail}`);
     } finally {
       setBusy(false);
     }
@@ -411,17 +455,7 @@ export function StudentReleaseEditor({
         return;
       }
       const idToken = await user.getIdToken();
-      const body: Record<string, unknown> = {
-        scores: effectiveScores,
-        generalComment: "",
-        contentComment,
-        grammarComment,
-        deductions: {
-          content: contentDeduction,
-          grammar: grammarDeduction,
-        },
-        finalText,
-      };
+      const body: Record<string, unknown> = buildPatchBody();
       if (opts.operatorApproved === true) body.operatorApproved = true;
       if (opts.operatorApproved === false) body.operatorApproved = false;
       if (opts.operatorFinalized === true) body.operatorFinalized = true;
@@ -617,15 +651,15 @@ export function StudentReleaseEditor({
       </label>
 
       <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
-        流れ: <strong>下書き保存</strong> → <strong>確定</strong>（文面ロック・PDF・音声を生成）→ 生成が成功したら{" "}
-        <strong>生徒に公開する</strong>。
-        {!finalizedAt ? " まだ確定していません。" : null}
-        {finalizedAt && !canPublish ? " PDF が揃うまで公開できません。" : null}
+        <strong>確定＆公開</strong>で文面を確定し、PDF・音声を生成して生徒に公開します。問題があれば{" "}
+        <strong>公開取り下げ</strong>を押してください。
+        {publishedAt ? " 現在、生徒に公開中です。" : null}
+        {!publishedAt && finalizedAt ? " 確定済みですが未公開です。" : null}
       </p>
 
-      {finalizedAt && !canPublish && day4Error ? (
+      {finalizedAt && !publishedAt && day4Error ? (
         <p className="error" style={{ margin: 0 }}>
-          PDF・音声の生成でエラーが発生しています。下の「PDF・音声を再生成」を試してください。
+          PDF・音声の生成でエラーが発生しています。「確定＆公開」を再度お試しください。
         </p>
       ) : null}
 
@@ -650,71 +684,38 @@ export function StudentReleaseEditor({
         <button
           type="button"
           disabled={busy}
-          onClick={() =>
-            patchRelease({
-              successMessage: "下書きを保存しました。",
-            })
-          }
-        >
-          {busy ? "保存中…" : "下書き保存"}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            patchRelease({
-              operatorFinalized: true,
-              successMessage: "確定しました。PDF・音声を生成しました。",
-              runDay4After: true,
-              day4Force: hasDay4Pdf,
-            })
-          }
+          onClick={() => void confirmAndPublish()}
           style={{
             padding: "10px 14px",
             fontSize: "0.95rem",
-            background: busy ? "#94a3b8" : "#ca8a04",
+            background: busy ? "#94a3b8" : "#16a34a",
             color: "#fff",
           }}
         >
-          確定
+          {busy ? "処理中…" : "確定＆公開"}
         </button>
-        {needsDay4Retry ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void runDay4Only()}
-            style={{
-              padding: "10px 14px",
-              fontSize: "0.95rem",
-              background: busy ? "#94a3b8" : "#0d9488",
-              color: "#fff",
-            }}
-            title="確定日時は変えずに PDF・音声だけ再生成します（タイムアウト・GCS 失敗後の再試行向け）"
-          >
-            {busy ? "実行中…" : "PDF・音声を再生成"}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          disabled={busy || !canPublish}
-          onClick={() =>
-            patchRelease({
-              operatorApproved: true,
-              successMessage: "生徒向けに公開しました。",
-            })
-          }
+        <a
+          href={`/result/${encodeURIComponent(submissionId)}`}
+          target="_blank"
+          rel="noreferrer"
           style={{
+            display: "inline-flex",
+            alignItems: "center",
             padding: "10px 14px",
             fontSize: "0.95rem",
-            background: busy || !canPublish ? "#94a3b8" : "#16a34a",
-            color: "#fff",
+            background: "#fff",
+            color: "#0f172a",
+            border: "1px solid #cbd5e1",
+            borderRadius: 6,
+            textDecoration: "none",
+            minHeight: 44,
           }}
         >
-          生徒に公開する
-        </button>
+          生徒画面確認
+        </a>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !publishedAt}
           onClick={() =>
             patchRelease({
               operatorApproved: false,
@@ -724,15 +725,12 @@ export function StudentReleaseEditor({
           style={{
             padding: "10px 14px",
             fontSize: "0.95rem",
-            background: busy ? "#94a3b8" : "#dc2626",
+            background: busy || !publishedAt ? "#94a3b8" : "#dc2626",
             color: "#fff",
           }}
         >
-          公開を取り下げ
+          公開取り下げ
         </button>
-        <a href={`/result/${encodeURIComponent(submissionId)}`} target="_blank" rel="noreferrer">
-          生徒向けプレビュー（新しいタブ）
-        </a>
       </div>
 
       {message ? <p className="success">{message}</p> : null}

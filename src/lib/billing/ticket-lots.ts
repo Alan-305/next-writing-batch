@@ -185,6 +185,24 @@ export function nearestTicketExpiryIso(lots: TicketLot[], nowMs = Date.now()): s
   return nearest;
 }
 
+/** 有効なロットの expiresAt を日数分シフト（負数で短縮） */
+export function extendActiveTicketLotExpiry(
+  lots: TicketLot[],
+  extendDays: number,
+  nowMs = Date.now(),
+): TicketLot[] {
+  const days = Math.floor(extendDays);
+  if (!Number.isFinite(days) || days === 0) return lots;
+  return lots.map((lot) => {
+    if (lot.count <= 0) return lot;
+    const expiresMs = Date.parse(lot.expiresAt);
+    if (!Number.isFinite(expiresMs) || expiresMs <= nowMs) return lot;
+    const next = new Date(expiresMs);
+    next.setUTCDate(next.getUTCDate() + days);
+    return { ...lot, expiresAt: next.toISOString() };
+  });
+}
+
 export function formatTicketExpiryJa(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("ja-JP", {

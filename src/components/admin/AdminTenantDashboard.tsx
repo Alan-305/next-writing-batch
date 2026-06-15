@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 
 import { ADMIN_TENANT_CHANGED_EVENT } from "@/lib/admin/admin-tenant-events";
 import { adminAdjustBillingTickets } from "@/lib/billing/admin-adjust-billing-tickets";
+import { adminAdjustTicketExpiry } from "@/lib/billing/admin-adjust-ticket-expiry";
+import { formatTicketExpiryJa } from "@/lib/billing/ticket-lots";
 import { adminCreateStripeRefund } from "@/lib/billing/admin-create-stripe-refund";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { TwoStepDeleteConfirm, type TwoStepDeletePhase } from "@/components/TwoStepDeleteConfirm";
@@ -31,6 +33,7 @@ type MemberRow = {
   statusLabel: string;
   registeredAt: string | null;
   tickets: number;
+  ticketExpiresAt: string | null;
   lastCheckoutSessionId: string | null;
   lastPaymentIntentId: string | null;
 };
@@ -45,7 +48,7 @@ type RosterPayload = {
   message?: string;
 };
 
-type ActionKind = "delete" | "tickets" | "refund" | null;
+type ActionKind = "delete" | "tickets" | "expiry" | "refund" | null;
 
 function memberName(row: MemberRow): string {
   if (row.kind === "student") {
@@ -90,6 +93,8 @@ export function AdminTenantDashboard() {
 
   const [deltaTickets, setDeltaTickets] = useState("");
   const [ticketReason, setTicketReason] = useState("");
+  const [extendDays, setExtendDays] = useState("");
+  const [expiryReason, setExpiryReason] = useState("");
   const [refundPi, setRefundPi] = useState("");
   const [refundAmountYen, setRefundAmountYen] = useState("");
   const [refundNote, setRefundNote] = useState("");
@@ -244,6 +249,8 @@ export function AdminTenantDashboard() {
     setActionResult(null);
     setDeltaTickets("");
     setTicketReason("");
+    setExtendDays("");
+    setExpiryReason("");
     setRefundPi("");
     setRefundAmountYen("");
     setRefundNote("");
@@ -307,6 +314,43 @@ export function AdminTenantDashboard() {
       await loadRoster();
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "チケット調整に失敗しました。");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const runExpiryAdjust = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setActionError(null);
+    setActionResult(null);
+    const days = Number.parseInt(extendDays, 10);
+    if (!Number.isFinite(days) || days === 0) {
+      setActionError("有効期限の変更日数は 0 以外の整数で入力してください（延長は正、短縮は負）。");
+      return;
+    }
+    const teachersOnly = selectedMembers.filter((m) => m.kind === "teacher");
+    if (teachersOnly.length === 0) {
+      setActionError("有効期限の調整は教員のみ対象です。教員を選択してください。");
+      return;
+    }
+    setActionBusy(true);
+    try {
+      const lines: string[] = [];
+      for (const m of teachersOnly) {
+        const data = await adminAdjustTicketExpiry({
+          targetUserId: m.uid,
+          extendDays: days,
+          reason: expiryReason.trim() || undefined,
+        });
+        const expiryLabel = data.ticketExpiresAt ? formatTicketExpiryJa(data.ticketExpiresAt) : "—";
+        lines.push(
+          `${memberName(m)}: ${days >= 0 ? "+" : ""}${days}日 → 残 ${data.tickets} 枚 / 直近期限 ${expiryLabel}`,
+        );
+      }
+      setActionResult(lines.join("\n"));
+      await loadRoster();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "有効期限の調整に失敗しました。");
     } finally {
       setActionBusy(false);
     }
@@ -397,6 +441,7 @@ export function AdminTenantDashboard() {
                   <th scope="col">メール</th>
                   <th scope="col">登録日</th>
                   <th scope="col">チケット</th>
+                  <th scope="col">有効期限</th>
                   <th scope="col">状態</th>
                 </tr>
               </thead>
@@ -419,6 +464,11 @@ export function AdminTenantDashboard() {
                     <td className="admin-table__date">{formatRegisteredAt(m.registeredAt)}</td>
                     <td className="admin-table__tickets">
                       <strong>{m.tickets}</strong>
+                    </td>
+                    <td className="admin-table__date">
+                      {m.kind === "teacher" && m.ticketExpiresAt
+                        ? formatTicketExpiryJa(m.ticketExpiresAt)
+                        : "—"}
                     </td>
                     <td>
                       <span className={`admin-status admin-status--${m.kind}`}>{m.statusLabel}</span>
@@ -521,6 +571,9 @@ export function AdminTenantDashboard() {
             <button type="button" className="ops-btn ops-btn--queue" onClick={() => openAction("tickets")}>
               チケット調整
             </button>
+            <button type="button" className="ops-btn ops-btn--queue" onClick={() => openAction("expiry")}>
+              有効期限調整
+            </button>
             <button
               type="button"
               className="ops-btn ops-btn--warn"
@@ -601,6 +654,60 @@ export function AdminTenantDashboard() {
                   id="admin-ticket-reason"
                   value={ticketReason}
                   onChange={(ev) => setTicketReason(ev.target.value)}
+                  disabled={actionBusy}
+                  rows={2}
+                />
+              </div>
+              {actionError ? <p className="admin-alert admin-alert--error">{actionError}</p> : null}
+              {actionResult ? <p className="admin-alert admin-alert--success">{actionResult}</p> : null}
+              <div className="admin-modal__actions">
+                <button type="button" className="ops-btn ops-btn--ghost" disabled={actionBusy} onClick={closeAction}>
+                  閉じる
+                </button>
+                <button type="submit" className="ops-btn ops-btn--queue" disabled={actionBusy}>
+                  {actionBusy ? "反映中…" : "反映する"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {activeAction === "expiry" ? (
+        <div className="admin-modal-overlay" role="presentation" onClick={closeAction}>
+          <div
+            className="admin-modal card"
+            role="dialog"
+            aria-labelledby="admin-expiry-dialog-title"
+            aria-modal="true"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <h2 id="admin-expiry-dialog-title" className="admin-modal__title">
+              チケット有効期限の調整
+            </h2>
+            <p className="admin-modal__lead">
+              選択した教員の有効チケットロットの失効日を日数分ずらします。延長は正の整数、短縮は負の整数（例: +30 / -7）。
+            </p>
+            <form onSubmit={(ev) => void runExpiryAdjust(ev)} onKeyDown={preventEnterSubmit}>
+              <div className="field">
+                <label htmlFor="admin-extend-days">変更日数（整数）</label>
+                <input
+                  id="admin-extend-days"
+                  type="text"
+                  inputMode="numeric"
+                  value={extendDays}
+                  onChange={(ev) => setExtendDays(ev.target.value)}
+                  disabled={actionBusy}
+                  placeholder="例: 30 または -7"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="admin-expiry-reason">理由（任意）</label>
+                <textarea
+                  id="admin-expiry-reason"
+                  value={expiryReason}
+                  onChange={(ev) => setExpiryReason(ev.target.value)}
                   disabled={actionBusy}
                   rows={2}
                 />

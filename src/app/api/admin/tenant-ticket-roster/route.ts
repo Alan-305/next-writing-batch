@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { resolveEffectiveOrganizationIdForApi } from "@/lib/auth/resolve-effective-organization";
 import { isAllowlistedAdminUid } from "@/lib/firebase/admin-allowlist";
+import { nearestTicketExpiryIso, resolveBillingTicketLots, sumTicketLots } from "@/lib/billing/ticket-lots";
 import { loadTeacherUidsFromProofreadingSetup } from "@/lib/admin/tenant-roster";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
@@ -21,6 +22,7 @@ type TicketRow = {
   statusLabel: string;
   registeredAt: string | null;
   tickets: number;
+  ticketExpiresAt: string | null;
   lastProofreadTicketConsume: number | null;
   lastProofreadTicketAt: string | null;
   lastCheckoutSessionId: string | null;
@@ -129,7 +131,9 @@ export async function GET(request: Request) {
       const kind: "teacher" | "student" =
         isTeacherByRoles(roles) || teacherUidsFromDisk.has(uid) ? "teacher" : "student";
       const billing = (doc.get("billing") ?? {}) as Record<string, unknown>;
-      const tickets = Math.max(0, Math.floor(numberOrZero(billing["tickets"])));
+      const { lots } = resolveBillingTicketLots(billing);
+      const tickets = sumTicketLots(lots);
+      const ticketExpiresAt = tickets > 0 ? nearestTicketExpiryIso(lots) : null;
       const lastConsumeRaw = billing["lastProofreadTicketConsume"];
       const lastProofreadTicketConsume =
         typeof lastConsumeRaw === "number" && Number.isFinite(lastConsumeRaw) ? Math.floor(lastConsumeRaw) : null;
@@ -151,6 +155,7 @@ export async function GET(request: Request) {
         statusLabel: statusLabelFor(kind, roles, profileCompleted),
         registeredAt: authLabel.registeredAt ?? docCreatedAt,
         tickets,
+        ticketExpiresAt,
         lastProofreadTicketConsume,
         lastProofreadTicketAt,
         lastCheckoutSessionId: stringOrNull(billing["lastCheckoutSessionId"]),

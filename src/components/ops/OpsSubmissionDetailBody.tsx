@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { OpsSubmissionNextSteps } from "@/components/ops/OpsSubmissionNextSteps";
 import { OpsSubmissionTaskIdEditor } from "@/components/OpsSubmissionTaskIdEditor";
 import { StudentReleaseEditor } from "@/components/StudentReleaseEditor";
 import { formatDateTimeIso } from "@/lib/format-date";
@@ -29,8 +28,6 @@ export function OpsSubmissionDetailBody({
   const deliverableError = day4?.error;
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
-  const finalized = Boolean(submission.studentRelease?.operatorFinalizedAt);
-  const readyToPublish = finalized && !published && hasDeliverablePdf;
   const taskMismatch = submissionProofreadTaskMismatch(submission);
 
   return (
@@ -39,8 +36,6 @@ export function OpsSubmissionDetailBody({
       <p>
         <Link href="/ops/submissions">一覧に戻る</Link>
       </p>
-
-      <OpsSubmissionNextSteps submissionId={submission.submissionId} readyToPublish={readyToPublish} />
 
       <div className="card">
         {taskMismatch.mismatched ? (
@@ -133,7 +128,7 @@ export function OpsSubmissionDetailBody({
       <div className="card">
         <h2 style={{ marginBottom: 6 }}>修正入力</h2>
         <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
-          修正の必要がある場合のみ、内容を変更してください。完成した結果は「生徒向けプレビュー」で確認できます。
+          修正の必要がある場合のみ、内容を変更してください。「生徒画面確認」で印刷用の見た目を確認できます。
         </p>
         {published && submission.studentRelease ? (
           <p className="success" style={{ marginTop: 0, marginBottom: 12 }}>
@@ -158,15 +153,12 @@ export function OpsSubmissionDetailBody({
           deliverableError ? (
             <p style={{ marginTop: 0, marginBottom: 12, color: "#b45309" }}>
               運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
-              ）— 文面は固定済みですが、PDF・音声の生成でエラーが発生しています。下の{" "}
-              <strong>PDF・音声を再生成</strong>を試すか、確定を再度実行してください。プレビューは{" "}
-              <Link href={`/result/${encodeURIComponent(submission.submissionId)}`}>生徒向けプレビュー</Link>
-              から確認できます。
+              ）— 文面は固定済みですが、PDF・音声の生成でエラーが発生しています。「確定＆公開」を再度お試しください。
             </p>
           ) : (
             <p style={{ marginTop: 0, marginBottom: 12, color: "#a16207" }}>
               運用<strong>確定</strong>済み（{formatDateTimeIso(submission.studentRelease.operatorFinalizedAt)}
-              ）— 返却文面が固定されています。PDF ができたら「生徒に公開する」が押せます。
+              ）— 未公開です。「確定＆公開」で生徒に返却できます。
             </p>
           )
         ) : null}
