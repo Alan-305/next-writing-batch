@@ -3322,21 +3322,33 @@ a.ops-btn {
 .celebration-overlay {
   position: fixed;
   inset: 0;
-  z-index: 900;
-  pointer-events: none;
+  z-index: 9999;
+  pointer-events: auto;
   overflow: hidden;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(2px);
+}
+
+.celebration-overlay--daily {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.celebration-overlay--score {
+  background: rgba(15, 23, 42, 0.62);
 }
 
 .celebration-particles {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .celebration-particle {
   position: absolute;
-  top: -2rem;
+  top: -3rem;
   line-height: 1;
   opacity: 0;
+  filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.25));
   animation-name: celebration-particle-fall;
   animation-timing-function: linear;
   animation-fill-mode: forwards;
@@ -3344,31 +3356,65 @@ a.ops-btn {
 
 @keyframes celebration-particle-fall {
   0% {
+    transform: translateY(-8vh) rotate(0deg) scale(0.8);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(112vh) rotate(420deg) scale(1.15);
+    opacity: 0.35;
+  }
+}
+
+.celebration-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.celebration-confetti-piece {
+  position: absolute;
+  top: -1rem;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: celebration-confetti-fall;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+@keyframes celebration-confetti-fall {
+  0% {
     transform: translateY(-5vh) rotate(0deg);
     opacity: 0;
   }
   8% {
-    opacity: 0.95;
+    opacity: 1;
   }
   100% {
-    transform: translateY(108vh) rotate(300deg);
-    opacity: 0.15;
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0.2;
   }
 }
 
 .celebration-balloons {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .celebration-balloon {
   position: absolute;
-  bottom: -4.5rem;
-  width: 2.25rem;
-  height: 2.75rem;
+  bottom: -6rem;
+  width: 3.5rem;
+  height: 4.25rem;
   border-radius: 50% 50% 50% 50% / 58% 58% 42% 42%;
-  box-shadow: inset -4px -6px 12px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    inset -6px -10px 16px rgba(0, 0, 0, 0.18),
+    0 8px 20px rgba(15, 23, 42, 0.22);
   opacity: 0;
+  transform: scale(var(--balloon-scale, 1));
   animation-name: celebration-balloon-rise;
   animation-timing-function: ease-out;
   animation-fill-mode: forwards;
@@ -3377,116 +3423,154 @@ a.ops-btn {
 .celebration-balloon::after {
   content: "";
   position: absolute;
-  bottom: -0.55rem;
+  bottom: -0.75rem;
   left: 50%;
-  width: 2px;
-  height: 0.85rem;
-  background: rgba(15, 23, 42, 0.35);
+  width: 3px;
+  height: 1.1rem;
+  background: rgba(15, 23, 42, 0.4);
   transform: translateX(-50%);
 }
 
 @keyframes celebration-balloon-rise {
   0% {
-    transform: translateY(0) translateX(0) scale(1);
+    transform: translateY(0) translateX(0) scale(var(--balloon-scale, 1));
     opacity: 0;
   }
-  6% {
-    opacity: 0.95;
+  5% {
+    opacity: 1;
   }
   100% {
-    transform: translateY(-115vh) translateX(18px) scale(1.05);
+    transform: translateY(-120vh) translateX(28px) scale(calc(var(--balloon-scale, 1) * 1.08));
     opacity: 0;
   }
 }
 
 .celebration-toast {
   position: fixed;
+  top: 50%;
   left: 50%;
-  bottom: max(1.25rem, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: min(92vw, 22rem);
-  padding: 14px 16px 12px;
-  border-radius: 12px;
-  border: 1px solid #cbd5e1;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  transform: translate(-50%, -50%);
+  width: min(94vw, 34rem);
+  padding: 28px 26px 22px;
+  border-radius: 16px;
+  border: 3px solid #fff;
+  background: #fff;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.35),
+    0 24px 60px rgba(15, 23, 42, 0.35);
   pointer-events: auto;
-  animation: celebration-toast-in 0.45s ease-out;
+  text-align: center;
+  animation: celebration-toast-pop 0.55s cubic-bezier(0.22, 1.1, 0.36, 1) forwards;
 }
 
 .celebration-toast--score {
-  border-color: #86efac;
-  background: linear-gradient(180deg, #f0fdf4 0%, #fff 100%);
+  border-color: #bbf7d0;
+  box-shadow:
+    0 0 0 4px rgba(22, 163, 74, 0.4),
+    0 24px 60px rgba(15, 23, 42, 0.38);
+  background: linear-gradient(180deg, #ecfdf5 0%, #fff 55%);
 }
 
 .celebration-toast--daily {
-  border-color: #93c5fd;
-  background: linear-gradient(180deg, #eff6ff 0%, #fff 100%);
+  border-color: #bfdbfe;
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.38),
+    0 24px 60px rgba(15, 23, 42, 0.35);
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 55%);
 }
 
-@keyframes celebration-toast-in {
-  from {
+@keyframes celebration-toast-pop {
+  0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(12px);
+    transform: translate(-50%, -46%) scale(0.82);
   }
-  to {
+  55% {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 
 .celebration-toast__eyebrow {
-  margin: 0 0 6px;
-  font-size: 0.78rem;
+  margin: 0 0 12px;
+  font-size: clamp(1rem, 3.2vw, 1.15rem);
   font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #0369a1;
+  letter-spacing: 0.06em;
+  color: #1d4ed8;
 }
 
 .celebration-toast--score .celebration-toast__eyebrow {
   color: #15803d;
+  font-size: clamp(1.05rem, 3.5vw, 1.25rem);
 }
 
 .celebration-toast__message {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: clamp(1.28rem, 4.5vw, 1.65rem);
+  font-weight: 800;
   line-height: 1.55;
   color: #0f172a;
+  text-wrap: balance;
 }
 
 .celebration-toast__score {
-  margin: 8px 0 0;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  margin: 16px 0 0;
+  font-size: clamp(1.05rem, 3.5vw, 1.2rem);
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.celebration-toast__score-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #475569;
 }
 
 .celebration-toast__dismiss {
-  margin-top: 10px;
-  min-height: 40px;
-  padding: 6px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
-  font-size: 0.86rem;
-  font-weight: 600;
+  margin-top: 18px;
+  min-height: 48px;
+  min-width: 140px;
+  padding: 10px 20px;
+  border: 2px solid #1d4ed8;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.celebration-toast--score .celebration-toast__dismiss {
+  border-color: #15803d;
+  background: #16a34a;
 }
 
 .celebration-toast__dismiss:hover {
-  background: #f8fafc;
+  filter: brightness(1.06);
+  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .celebration-overlay {
+    backdrop-filter: none;
+  }
+
   .celebration-particle,
-  .celebration-balloon {
+  .celebration-balloon,
+  .celebration-confetti-piece {
     animation: none !important;
     display: none;
   }
 
   .celebration-toast {
     animation: none;
+    transform: translate(-50%, -50%);
   }
 }
 

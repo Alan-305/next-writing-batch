@@ -16,14 +16,14 @@ export type DailyMoodTheme = {
 };
 
 const THEMES: DailyMoodTheme[] = [
-  { id: "sakura", label: "春桜", particleEmoji: "🌸", particleCount: 14 },
-  { id: "snow", label: "冬雪", particleEmoji: "❄️", particleCount: 16 },
-  { id: "sunshine", label: "晴れ", particleEmoji: "✨", particleCount: 12 },
-  { id: "autumn", label: "秋", particleEmoji: "🍂", particleCount: 12 },
-  { id: "spring", label: "新緑", particleEmoji: "🌿", particleCount: 12 },
-  { id: "summer", label: "夏", particleEmoji: "🌊", particleCount: 10 },
-  { id: "stars", label: "星", particleEmoji: "⭐", particleCount: 10 },
-  { id: "sparkle", label: "きらめき", particleEmoji: "💫", particleCount: 12 },
+  { id: "sakura", label: "春桜", particleEmoji: "🌸", particleCount: 28 },
+  { id: "snow", label: "冬雪", particleEmoji: "❄️", particleCount: 32 },
+  { id: "sunshine", label: "晴れ", particleEmoji: "✨", particleCount: 26 },
+  { id: "autumn", label: "秋", particleEmoji: "🍂", particleCount: 26 },
+  { id: "spring", label: "新緑", particleEmoji: "🌿", particleCount: 26 },
+  { id: "summer", label: "夏", particleEmoji: "🌊", particleCount: 24 },
+  { id: "stars", label: "星", particleEmoji: "⭐", particleCount: 24 },
+  { id: "sparkle", label: "きらめき", particleEmoji: "💫", particleCount: 28 },
 ];
 
 function dayOfYear(d: Date): number {

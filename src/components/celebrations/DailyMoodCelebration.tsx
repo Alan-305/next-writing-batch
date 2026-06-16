@@ -51,7 +51,7 @@ export function DailyMoodCelebration({ audience, identity }: Props) {
 
   useEffect(() => {
     if (!visible) return;
-    const t = window.setTimeout(() => setVisible(false), reducedMotion ? 3200 : 4800);
+    const t = window.setTimeout(() => setVisible(false), reducedMotion ? 4500 : 7000);
     return () => window.clearTimeout(t);
   }, [visible, reducedMotion]);
 
@@ -62,13 +62,19 @@ export function DailyMoodCelebration({ audience, identity }: Props) {
     left: `${(i * 17 + 7) % 100}%`,
     delay: `${(i % 8) * 0.35}s`,
     duration: `${4.2 + (i % 5) * 0.4}s`,
-    size: `${0.85 + (i % 4) * 0.15}rem`,
+    size: `${1.35 + (i % 5) * 0.22}rem`,
   }));
 
   return (
-    <div className="celebration-overlay celebration-overlay--daily no-print" role="presentation" aria-hidden>
+    <div
+      className="celebration-overlay celebration-overlay--daily no-print"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="celebration-daily-title"
+      onClick={() => setVisible(false)}
+    >
       {!reducedMotion ? (
-        <div className="celebration-particles celebration-particles--daily">
+        <div className="celebration-particles celebration-particles--daily" aria-hidden>
           {particles.map((p) => (
             <span
               key={p.id}
@@ -85,14 +91,19 @@ export function DailyMoodCelebration({ audience, identity }: Props) {
           ))}
         </div>
       ) : null}
-      <div className="celebration-toast celebration-toast--daily" role="status">
-        <p className="celebration-toast__eyebrow">{theme.label}の一日</p>
+      <div
+        className="celebration-toast celebration-toast--daily"
+        role="status"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <p id="celebration-daily-title" className="celebration-toast__eyebrow">
+          {theme.particleEmoji} {theme.label}の一日
+        </p>
         <p className="celebration-toast__message">{message}</p>
         <button
           type="button"
           className="celebration-toast__dismiss"
           onClick={() => setVisible(false)}
-          aria-label="メッセージを閉じる"
         >
           閉じる
         </button>
