@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { StudentResultAudioControls } from "@/components/StudentResultAudioControls";
 import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentResultViewBeacon } from "@/components/StudentResultViewBeacon";
+import { ScoreCelebrationOnResult } from "@/components/celebrations/ScoreCelebrationOnResult";
 import type { StudentResultPublishedModel } from "@/lib/student-result-published-view";
 
 type Props = {
@@ -23,6 +24,7 @@ export function StudentResultPublishedBody({
 }: Props) {
   return (
     <main className="student-result-page">
+      <ScoreCelebrationOnResult scoreTotal={model.scoreTotal} scoreMaxTotal={model.scoreMaxTotal} />
       {showViewBeacon ? <StudentResultViewBeacon submissionId={model.submissionId} /> : null}
       <h1>添削結果（確定版）</h1>
       <p className="muted" style={{ marginTop: 0 }}>

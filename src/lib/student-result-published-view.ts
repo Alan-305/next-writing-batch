@@ -5,6 +5,7 @@ import { enrichSubmissionWithResolvedStudentFields } from "@/lib/submission-disp
 import { resolveFinalEssayForStudentDisplay } from "@/lib/student-final-essay-display";
 import { loadTaskProblemsMaster } from "@/lib/load-task-problems-master";
 import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
+import { resolveScoreMaxTotalFromRubric } from "@/lib/celebrations/score-threshold";
 import { findSubmissionAcrossOrganizations } from "@/lib/submissions-store";
 import { organizationIdFromSubmissionHit } from "@/lib/student-submit-page-path";
 import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
@@ -18,6 +19,7 @@ export type StudentResultPublishedModel = {
   finalEssayHtml: string;
   scoreInline: string | null;
   scoreTotal: number;
+  scoreMaxTotal: number;
   evaluationText: string;
   audioSrc: string;
   audioUrl: string;
@@ -71,6 +73,10 @@ export async function loadStudentResultPublishedView(
   const scoreInline = taskMaster
     ? formatRubricEvaluationInline(taskMaster, sr.scores ?? {}, sr.scoreTotal)
     : null;
+  const itemMaxSum = taskMaster
+    ? taskMaster.rubric.items.reduce((sum, it) => sum + (it.max > 0 ? it.max : 0), 0)
+    : 0;
+  const scoreMaxTotal = resolveScoreMaxTotalFromRubric(taskMaster?.rubric.maxTotal, itemMaxSum);
 
   const model: StudentResultPublishedModel = {
     submissionId: submission.submissionId,
@@ -81,6 +87,7 @@ export async function loadStudentResultPublishedView(
     finalEssayHtml,
     scoreInline,
     scoreTotal: sr.scoreTotal,
+    scoreMaxTotal,
     evaluationText: String(sr.evaluation ?? ""),
     audioSrc,
     audioUrl,

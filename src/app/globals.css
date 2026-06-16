@@ -3318,3 +3318,181 @@ a.ops-btn {
   border-top: 1px dashed #cbd5e1;
 }
 
+/* ─── 演出（日替わり・高得点バルーン） ─── */
+.celebration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.celebration-particles {
+  position: absolute;
+  inset: 0;
+}
+
+.celebration-particle {
+  position: absolute;
+  top: -2rem;
+  line-height: 1;
+  opacity: 0;
+  animation-name: celebration-particle-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes celebration-particle-fall {
+  0% {
+    transform: translateY(-5vh) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(108vh) rotate(300deg);
+    opacity: 0.15;
+  }
+}
+
+.celebration-balloons {
+  position: absolute;
+  inset: 0;
+}
+
+.celebration-balloon {
+  position: absolute;
+  bottom: -4.5rem;
+  width: 2.25rem;
+  height: 2.75rem;
+  border-radius: 50% 50% 50% 50% / 58% 58% 42% 42%;
+  box-shadow: inset -4px -6px 12px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  animation-name: celebration-balloon-rise;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.celebration-balloon::after {
+  content: "";
+  position: absolute;
+  bottom: -0.55rem;
+  left: 50%;
+  width: 2px;
+  height: 0.85rem;
+  background: rgba(15, 23, 42, 0.35);
+  transform: translateX(-50%);
+}
+
+@keyframes celebration-balloon-rise {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+  6% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-115vh) translateX(18px) scale(1.05);
+    opacity: 0;
+  }
+}
+
+.celebration-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(92vw, 22rem);
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  pointer-events: auto;
+  animation: celebration-toast-in 0.45s ease-out;
+}
+
+.celebration-toast--score {
+  border-color: #86efac;
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 100%);
+}
+
+.celebration-toast--daily {
+  border-color: #93c5fd;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 100%);
+}
+
+@keyframes celebration-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.celebration-toast__eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #0369a1;
+}
+
+.celebration-toast--score .celebration-toast__eyebrow {
+  color: #15803d;
+}
+
+.celebration-toast__message {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.55;
+  color: #0f172a;
+}
+
+.celebration-toast__score {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.celebration-toast__dismiss {
+  margin-top: 10px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.celebration-toast__dismiss:hover {
+  background: #f8fafc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-particle,
+  .celebration-balloon {
+    animation: none !important;
+    display: none;
+  }
+
+  .celebration-toast {
+    animation: none;
+  }
+}
+
+@media print {
+  .celebration-overlay {
+    display: none !important;
+  }
+}
+

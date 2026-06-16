@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 
 import { AuthToolbar } from "@/components/auth/AuthToolbar";
 import { RequireAuth } from "@/components/auth/RequireAuth";
+import { DailyMoodCelebration } from "@/components/celebrations/DailyMoodCelebration";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import {
   DEFAULT_STUDENT_BRANDING,
@@ -96,9 +97,15 @@ export function StudentAppShellLayout({
 
   const shellStyle = useMemo(() => studentBrandingStyle(branding), [branding]);
   const school = branding.schoolDisplayName.trim();
+  const dailyIdentity = user?.uid?.trim()
+    ? user.uid
+    : allowAnonymous && (publicOrganizationId ?? "").trim()
+      ? `org:${publicOrganizationId!.trim()}`
+      : "";
 
   return (
     <div className="app-shell app-shell--student" style={shellStyle}>
+      {dailyIdentity ? <DailyMoodCelebration audience="student" identity={dailyIdentity} /> : null}
       <header className="app-shell-header app-shell-header--student no-print">
         <div className="app-shell-header-inner">
           <div className="app-shell-brand-cluster">
