@@ -67,11 +67,10 @@ export function DailyMoodCelebration({ audience, identity }: Props) {
 
   return (
     <div
-      className="celebration-overlay celebration-overlay--daily no-print"
+      className="celebration-overlay celebration-overlay--daily celebration-overlay--no-dismiss no-print"
       role="dialog"
       aria-modal="true"
       aria-labelledby="celebration-daily-title"
-      onClick={() => setVisible(false)}
     >
       {!reducedMotion ? (
         <div className="celebration-particles celebration-particles--daily" aria-hidden>
@@ -91,22 +90,11 @@ export function DailyMoodCelebration({ audience, identity }: Props) {
           ))}
         </div>
       ) : null}
-      <div
-        className="celebration-toast celebration-toast--daily"
-        role="status"
-        onClick={(ev) => ev.stopPropagation()}
-      >
+      <div className="celebration-toast celebration-toast--daily" role="status">
         <p id="celebration-daily-title" className="celebration-toast__eyebrow">
           {theme.particleEmoji} {theme.label}の一日
         </p>
         <p className="celebration-toast__message">{message}</p>
-        <button
-          type="button"
-          className="celebration-toast__dismiss"
-          onClick={() => setVisible(false)}
-        >
-          閉じる
-        </button>
       </div>
     </div>
   );

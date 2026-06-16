@@ -184,6 +184,7 @@ export default function OpsStudentAppearancePage() {
                   <div className="appearance-preset-grid" role="list">
                     {presets.map((preset) => {
                       const selected = activePresetId === preset.id;
+                      const { primaryColor, accentColor } = preset.colors;
                       return (
                         <button
                           key={preset.id}
@@ -191,22 +192,12 @@ export default function OpsStudentAppearancePage() {
                           role="listitem"
                           className={`appearance-preset-card${selected ? " appearance-preset-card--selected" : ""}`}
                           aria-pressed={selected}
+                          aria-label={`${preset.name} — ${preset.description}`}
+                          style={{
+                            background: `linear-gradient(135deg, ${primaryColor} 0%, ${accentColor} 100%)`,
+                          }}
                           onClick={() => selectPreset(preset.id)}
                         >
-                          <div className="appearance-preset-card__swatches" aria-hidden>
-                            <span
-                              className="appearance-preset-card__swatch"
-                              style={{ background: preset.colors.surfaceTintStart }}
-                            />
-                            <span
-                              className="appearance-preset-card__swatch"
-                              style={{ background: preset.colors.accentColor }}
-                            />
-                            <span
-                              className="appearance-preset-card__swatch"
-                              style={{ background: preset.colors.primaryColor }}
-                            />
-                          </div>
                           <span className="appearance-preset-card__name">{preset.name}</span>
                           <span className="appearance-preset-card__desc">{preset.description}</span>
                         </button>
