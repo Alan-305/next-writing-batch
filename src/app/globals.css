@@ -3142,6 +3142,232 @@ a.ops-btn {
   }
 }
 
+/* ─── 確認＆修正（2画面・リサイズ） ─── */
+.app-shell--teacher main.ops-review-page {
+  max-width: min(100%, 1680px);
+  width: 100%;
+  padding-bottom: 20px;
+}
+
+.ops-review-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ops-review-page__header h1 {
+  margin-bottom: 4px;
+}
+
+.ops-review-page__sub {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.ops-review-alert {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  color: #78350f;
+  line-height: 1.55;
+}
+
+.ops-review-alert p {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+
+.ops-review-split {
+  display: flex;
+  align-items: stretch;
+  height: calc(100dvh - 152px);
+  min-height: 520px;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.ops-review-split--dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.ops-review-split--dragging * {
+  cursor: col-resize !important;
+}
+
+.ops-review-split__pane {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ops-review-split__pane--left {
+  flex-grow: 0;
+  flex-shrink: 0;
+  border-right: none;
+  background: #fafbfc;
+}
+
+.ops-review-split__pane--right {
+  flex: 1 1 0;
+  background: #fff;
+}
+
+.ops-review-split__divider {
+  flex: 0 0 12px;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 50%, #e2e8f0 100%);
+  border-left: 1px solid #94a3b8;
+  border-right: 1px solid #94a3b8;
+}
+
+.ops-review-split__divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    180deg,
+    #64748b 0,
+    #64748b 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  opacity: 0.85;
+}
+
+.ops-review-split__divider:hover,
+.ops-review-split--dragging .ops-review-split__divider {
+  background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 50%, #bfdbfe 100%);
+}
+
+.ops-review-pane-inner {
+  padding: 18px 20px 28px;
+}
+
+.ops-review-pane__title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.ops-review-pane__subtitle {
+  margin: 20px 0 10px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ops-review-pane__lead {
+  margin: 0 0 14px;
+  line-height: 1.55;
+  font-size: 0.92rem;
+}
+
+.ops-review-status {
+  margin: 0 0 14px;
+  line-height: 1.55;
+  font-size: 0.92rem;
+}
+
+.ops-review-status--warn {
+  color: #b45309;
+}
+
+.ops-review-status--pending {
+  color: #a16207;
+}
+
+.ops-review-meta {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.ops-review-meta__row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.ops-review-meta__row dt {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #475569;
+  padding-top: 8px;
+}
+
+.ops-review-meta__row dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.ops-review-meta__code {
+  font-size: 0.92rem;
+  word-break: break-all;
+}
+
+.ops-review-original__note {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+}
+
+.ops-review-original__part {
+  margin-bottom: 14px;
+}
+
+.ops-review-original__part-label {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.ops-review-original__text {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-family: var(--font-en);
+  font-size: 1.05rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 1023px) {
+  .ops-review-split {
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+
+  .ops-review-split__pane--left {
+    flex-basis: auto !important;
+    max-height: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .ops-review-split__divider {
+    display: none;
+  }
+}
+
 /* ─── 教師・生徒画面スタイルプリセット ─── */
 .appearance-preset-section {
   margin: 20px 0 0;

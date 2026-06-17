@@ -394,6 +394,7 @@ export function StudentReleaseEditor({
         ? `確定して生徒に公開しました。 ${d4Result.ticketNotice}`
         : "確定して生徒に公開しました。";
       persistDay4TicketNotice(combined);
+      window.open(`/result/${encodeURIComponent(submissionId)}`, "_blank", "noopener,noreferrer");
       completeReload("student-release-actions");
     } catch (e) {
       console.error("[StudentReleaseEditor] confirmAndPublish", e);
@@ -618,7 +619,7 @@ export function StudentReleaseEditor({
       </label>
 
       <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
-        <strong>確定＆公開</strong>で文面を確定し、PDF・音声を生成して生徒に公開します。問題があれば{" "}
+        <strong>確定＆公開</strong>で文面を確定し、PDF・音声を生成して生徒に公開します。公開後は生徒画面が別タブで開きます。問題があれば{" "}
         <strong>公開取下</strong>を押してください。
         {!publishedAt && finalizedAt ? " 確定済みですが未公開です。" : null}
       </p>
