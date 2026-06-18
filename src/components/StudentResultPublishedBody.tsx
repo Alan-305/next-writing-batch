@@ -56,52 +56,54 @@ export function StudentResultPublishedBody({
           />
         </div>
 
-        <div className="card student-result-card student-result-card--essay">
-          <h2 className="student-result-section-title">完成版</h2>
-          <div
-            className="essay-final-diff student-result-essay-body"
-            dangerouslySetInnerHTML={{ __html: model.finalEssayHtml }}
-          />
-          {model.audioSrc ? (
-            <div className="no-print">
-              <StudentResultAudioControls src={model.audioSrc} />
+        <div className="student-result-print-tail">
+          <div className="card student-result-card student-result-card--essay">
+            <h2 className="student-result-section-title">完成版</h2>
+            <div
+              className="essay-final-diff student-result-essay-body"
+              dangerouslySetInnerHTML={{ __html: model.finalEssayHtml }}
+            />
+            {model.audioSrc ? (
+              <div className="no-print">
+                <StudentResultAudioControls src={model.audioSrc} />
+              </div>
+            ) : null}
+          </div>
+
+          {model.audioSrc || model.qrSrc ? (
+            <div className="card student-result-card student-result-card--qr">
+              <h2 className="student-result-section-title">音声（スマホ用 QR）</h2>
+              <p className="muted student-result-qr-lead">
+                <span className="student-result-qr-lead__screen">
+                  音声には再生可能期限がありますのでダウンロードして保存してください。
+                </span>
+                <span className="student-result-qr-lead__print">スマホで読み取り、音声を再生・保存できます。</span>
+              </p>
+              {model.audioSrc ? (
+                <StudentResultAudioQr audioHref={model.audioSrc} serverAbsolute={model.audioQrEncodeUrl} />
+              ) : model.qrSrc ? (
+                <div className="student-result-qr-img-wrap">
+                  <img
+                    src={model.qrSrc}
+                    alt="音声への QR"
+                    width={220}
+                    height={220}
+                    className="student-result-qr-img"
+                  />
+                </div>
+              ) : null}
+              {model.audioUrl ? (
+                <p className="student-result-qr-audio-link no-print">
+                  同じ音声を PC のブラウザで聞く場合:{" "}
+                  <a href={model.audioSrc}>音声を開く</a>
+                </p>
+              ) : null}
+              <p className="muted student-result-qr-foot">
+                開いた先はページではなく <strong>mp3 ファイル</strong>です。再生ボタン（▶）を押すか、ダウンロードしてから聞いてください。
+              </p>
             </div>
           ) : null}
         </div>
-
-        {model.audioSrc || model.qrSrc ? (
-          <div className="card student-result-card student-result-card--qr">
-            <h2 className="student-result-section-title">音声（スマホ用 QR）</h2>
-            <p className="muted student-result-qr-lead">
-              <span className="student-result-qr-lead__screen">
-                音声には再生可能期限がありますのでダウンロードして保存してください。
-              </span>
-              <span className="student-result-qr-lead__print">スマホで読み取り、音声を再生・保存できます。</span>
-            </p>
-            {model.audioSrc ? (
-              <StudentResultAudioQr audioHref={model.audioSrc} serverAbsolute={model.audioQrEncodeUrl} />
-            ) : model.qrSrc ? (
-              <div className="student-result-qr-img-wrap">
-                <img
-                  src={model.qrSrc}
-                  alt="音声への QR"
-                  width={220}
-                  height={220}
-                  className="student-result-qr-img"
-                />
-              </div>
-            ) : null}
-            {model.audioUrl ? (
-              <p className="student-result-qr-audio-link no-print">
-                同じ音声を PC のブラウザで聞く場合:{" "}
-                <a href={model.audioSrc}>音声を開く</a>
-              </p>
-            ) : null}
-            <p className="muted student-result-qr-foot">
-              開いた先はページではなく <strong>mp3 ファイル</strong>です。再生ボタン（▶）を押すか、ダウンロードしてから聞いてください。
-            </p>
-          </div>
-        ) : null}
       </StudentResultPrintFit>
 
       {bottomSlot}

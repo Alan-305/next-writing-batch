@@ -2484,6 +2484,17 @@ a.ops-btn {
     page-break-inside: avoid;
   }
 
+  /* 完成版＋QR：1ページ目末尾で切れるときはまとめて2ページ目へ */
+  .student-result-print-fit .student-result-print-tail {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .student-result-print-fit .student-result-print-tail--page2 {
+    break-before: page;
+    page-break-before: always;
+  }
+
   /* 音声 QR：印刷時は最小サイズ・横並びで紙面を占有しない */
   .student-result-print-fit .student-result-card--qr {
     display: grid;

@@ -19,8 +19,17 @@ export function printableAreaPx(pages: number): { width: number; height: number 
 
 const MIN_PRINT_SCALE = 0.52;
 
+const PAGE2_TAIL_CLASS = "student-result-print-tail--page2";
+
 function readHeight(el: HTMLElement): number {
   return Math.max(el.scrollHeight, el.getBoundingClientRect().height);
+}
+
+function readOffsetTopWithin(el: HTMLElement, root: HTMLElement): number {
+  const zoom = Number.parseFloat(root.style.zoom || "1") || 1;
+  const elTop = el.getBoundingClientRect().top;
+  const rootTop = root.getBoundingClientRect().top;
+  return (elTop - rootTop) / zoom;
 }
 
 function supportsZoom(el: HTMLElement): boolean {
@@ -42,14 +51,55 @@ function clearScale(root: HTMLElement): void {
   root.style.removeProperty("--print-fit-scale");
 }
 
+function readPrintHeight(root: HTMLElement): number {
+  const tail = root.querySelector(".student-result-print-tail") as HTMLElement | null;
+  if (tail?.classList.contains(PAGE2_TAIL_CLASS)) {
+    const essay = root.querySelector(".student-result-card--essay") as HTMLElement | null;
+    if (essay) {
+      const pageHeight = printableAreaPx(1).height;
+      const essayTop = readOffsetTopWithin(essay, root);
+      const pagesBefore = Math.max(1, Math.ceil(essayTop / pageHeight));
+      return pagesBefore * pageHeight + readHeight(tail);
+    }
+  }
+  return readHeight(root);
+}
+
+function clearPageLayout(root: HTMLElement): void {
+  root.querySelector(".student-result-print-tail")?.classList.remove(PAGE2_TAIL_CLASS);
+}
+
 /**
- * 解説・完成版の長さに応じて縮小率を決める（最大 maxPages 枚の A4 に収める）。
- * beforeprint 内で呼ぶ想定。
+ * 完成版＋QR が1ページ目の末尾で切れる場合、まとめて2ページ目先頭へ送る。
  */
-export function fitStudentResultPrint(root: HTMLElement, maxPages = STUDENT_RESULT_PRINT_MAX_PAGES): void {
+function applyPageLayout(root: HTMLElement): void {
+  const tail = root.querySelector(".student-result-print-tail") as HTMLElement | null;
+  const essay = root.querySelector(".student-result-card--essay") as HTMLElement | null;
+  if (!tail || !essay) return;
+
+  tail.classList.remove(PAGE2_TAIL_CLASS);
+
+  const pageHeight = printableAreaPx(1).height;
+  const essayTop = readOffsetTopWithin(essay, root);
+  const essayHeight = readHeight(essay);
+  const tailHeight = readHeight(tail);
+
+  const roomLeftOnPage1 = pageHeight - essayTop;
+  const essayWouldSplitOnPage1 =
+    essayTop > 0 && essayTop < pageHeight && essayHeight > roomLeftOnPage1 + 2;
+  const tailWouldSpanPages =
+    essayTop > 0 && essayTop < pageHeight && essayTop + tailHeight > pageHeight + 2;
+  const tailFitsOnOnePage = tailHeight <= pageHeight * 1.02;
+
+  if ((essayWouldSplitOnPage1 || tailWouldSpanPages) && tailFitsOnOnePage) {
+    tail.classList.add(PAGE2_TAIL_CLASS);
+  }
+}
+
+function fitScaleOnly(root: HTMLElement, maxPages: number): void {
   clearScale(root);
   const maxHeight = printableAreaPx(maxPages).height;
-  const naturalHeight = readHeight(root);
+  const naturalHeight = readPrintHeight(root);
   if (naturalHeight <= maxHeight || naturalHeight <= 0) return;
 
   let lo = MIN_PRINT_SCALE;
@@ -59,7 +109,7 @@ export function fitStudentResultPrint(root: HTMLElement, maxPages = STUDENT_RESU
   for (let i = 0; i < 14; i += 1) {
     const mid = (lo + hi) / 2;
     applyScale(root, mid);
-    const h = readHeight(root);
+    const h = readPrintHeight(root);
     if (h <= maxHeight) {
       best = mid;
       lo = mid;
@@ -71,6 +121,25 @@ export function fitStudentResultPrint(root: HTMLElement, maxPages = STUDENT_RESU
   applyScale(root, best * 0.98);
 }
 
+/**
+ * 解説・完成版の長さに応じて縮小率を決める（最大 maxPages 枚の A4 に収める）。
+ * beforeprint 内で呼ぶ想定。
+ */
+export function fitStudentResultPrint(root: HTMLElement, maxPages = STUDENT_RESULT_PRINT_MAX_PAGES): void {
+  clearPageLayout(root);
+  clearScale(root);
+
+  fitScaleOnly(root, maxPages);
+  applyPageLayout(root);
+
+  const maxHeight = printableAreaPx(maxPages).height;
+  if (readPrintHeight(root) > maxHeight) {
+    fitScaleOnly(root, maxPages);
+    applyPageLayout(root);
+  }
+}
+
 export function resetStudentResultPrint(root: HTMLElement): void {
   clearScale(root);
+  clearPageLayout(root);
 }
