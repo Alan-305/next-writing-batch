@@ -7,7 +7,7 @@ import { formatDateTimeIso } from "@/lib/format-date";
 import { studentReceiveMethodLabel } from "@/lib/student-receive-method";
 import { submissionProofreadTaskMismatch } from "@/lib/submission-proofread-task-mismatch";
 import type { Submission } from "@/lib/submissions-store";
-import type { TaskProblemsMaster } from "@/lib/task-problems-core";
+import { pickQuestion, type TaskProblemsMaster } from "@/lib/task-problems-core";
 
 type Props = {
   submission: Submission;
@@ -16,6 +16,28 @@ type Props = {
   teacherSetupDefaults: Record<string, number>;
   onReloadComplete?: (scrollToId?: string) => void;
 };
+
+function resolveSubmissionProblemText(submission: Submission, master: TaskProblemsMaster | null): string {
+  if (master) {
+    const problemId = (submission.problemId ?? "").trim();
+    if (problemId) {
+      const q = pickQuestion(master, problemId);
+      if (q) return q;
+    }
+    if (master.problems.length === 1) {
+      return master.problems[0]!.question.trim();
+    }
+    if (master.problems.length > 1) {
+      return master.problems
+        .map((p) => (p.title ? `【${p.title}】\n${p.question}` : p.question))
+        .join("\n\n");
+    }
+  }
+  const legacy = (submission.question ?? "").trim();
+  if (legacy) return legacy;
+  const memo = (submission.problemMemo ?? "").trim();
+  return memo || "—";
+}
 
 function OriginalEssayPanel({ submission }: { submission: Submission }) {
   return (
@@ -52,8 +74,55 @@ export function OpsSubmissionDetailBody({
 
   const published = Boolean(submission.studentRelease?.operatorApprovedAt);
   const taskMismatch = submissionProofreadTaskMismatch(submission);
+  const problemText = resolveSubmissionProblemText(submission, master);
 
-  const leftPane = (
+  const referencePane = (
+    <div className="ops-review-pane-inner">
+      <h2 className="ops-review-pane__title">提出情報・原文</h2>
+
+      <dl className="ops-review-meta">
+        <div className="ops-review-meta__row">
+          <dt>課題ID</dt>
+          <dd>
+            <OpsSubmissionTaskIdEditor
+              key={submission.taskId}
+              submissionId={submission.submissionId}
+              initialTaskId={submission.taskId}
+              disabled={published}
+              disabledReason={published ? "生徒向け公開済みのため課題IDは変更できません。" : undefined}
+              embedded
+            />
+          </dd>
+        </div>
+        <div className="ops-review-meta__row">
+          <dt>ニックネーム</dt>
+          <dd>{submission.studentName}</dd>
+        </div>
+        {submission.redeemId ? (
+          <div className="ops-review-meta__row">
+            <dt>引換ID</dt>
+            <dd>
+              <code className="ops-review-meta__code">{submission.redeemId}</code>
+            </dd>
+          </div>
+        ) : null}
+        <div className="ops-review-meta__row ops-review-meta__row--block">
+          <dt>問題文</dt>
+          <dd>
+            <pre className="ops-review-question__text">{problemText}</pre>
+          </dd>
+        </div>
+        <div className="ops-review-meta__row ops-review-meta__row--block">
+          <dt>提出解答（原文）</dt>
+          <dd>
+            <OriginalEssayPanel submission={submission} />
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+
+  const editPane = (
     <div className="ops-review-pane-inner">
       <h2 className="ops-review-pane__title">修正入力</h2>
       <p className="muted ops-review-pane__lead">
@@ -116,42 +185,6 @@ export function OpsSubmissionDetailBody({
     </div>
   );
 
-  const rightPane = (
-    <div className="ops-review-pane-inner">
-      <h2 className="ops-review-pane__title">提出情報・原文</h2>
-
-      <dl className="ops-review-meta">
-        <div className="ops-review-meta__row">
-          <dt>課題ID</dt>
-          <dd>
-            <OpsSubmissionTaskIdEditor
-              key={submission.taskId}
-              submissionId={submission.submissionId}
-              initialTaskId={submission.taskId}
-              disabled={published}
-              disabledReason={published ? "生徒向け公開済みのため課題IDは変更できません。" : undefined}
-            />
-          </dd>
-        </div>
-        <div className="ops-review-meta__row">
-          <dt>ニックネーム</dt>
-          <dd>{submission.studentName}</dd>
-        </div>
-        {submission.redeemId ? (
-          <div className="ops-review-meta__row">
-            <dt>引換ID</dt>
-            <dd>
-              <code className="ops-review-meta__code">{submission.redeemId}</code>
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-
-      <h3 className="ops-review-pane__subtitle">あなたの解答（原文）</h3>
-      <OriginalEssayPanel submission={submission} />
-    </div>
-  );
-
   return (
     <main className="ops-review-page">
       <header className="ops-review-page__header">
@@ -172,12 +205,12 @@ export function OpsSubmissionDetailBody({
           <p>
             現在の課題IDは <code>{submission.taskId}</code> ですが、この添削結果は{" "}
             <code>{taskMismatch.sourceTaskId}</code> のときに生成されています。正しい課題で再度 AI
-            添削する場合は、右側で課題IDを保存したうえで、提出一覧へ戻り「添削やり直し」を実行してください。
+            添削する場合は、左側で課題IDを保存したうえで、提出一覧へ戻り「添削やり直し」を実行してください。
           </p>
         </div>
       ) : null}
 
-      <OpsReviewSplitPane left={leftPane} right={rightPane} />
+      <OpsReviewSplitPane left={referencePane} right={editPane} defaultLeftPercent={42} />
     </main>
   );
 }

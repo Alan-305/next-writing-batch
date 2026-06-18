@@ -11,6 +11,8 @@ type Props = {
   initialTaskId: string;
   disabled?: boolean;
   disabledReason?: string;
+  /** 確認＆修正の左ペイン内：見出し・説明文を出さない */
+  embedded?: boolean;
 };
 
 export function OpsSubmissionTaskIdEditor({
@@ -18,6 +20,7 @@ export function OpsSubmissionTaskIdEditor({
   initialTaskId,
   disabled = false,
   disabledReason,
+  embedded = false,
 }: Props) {
   const router = useRouter();
   const { user } = useFirebaseAuthContext();
@@ -102,14 +105,18 @@ export function OpsSubmissionTaskIdEditor({
     }
   };
 
-  return (
-    <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>
-      <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>課題IDの修正</h3>
-      <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.9rem" }}>
-        間違った課題のまま添削したあとに正しい課題で出し直す場合は、
-        <strong>先にここで課題IDを保存</strong>してから、提出一覧の<strong>「添削やり直し」</strong>を実行してください。
-        再添削が完了すると、以前の AI 添削結果は新しい結果で上書きされます。
-      </p>
+  const inner = (
+    <>
+      {!embedded ? (
+        <>
+          <h3 style={{ margin: "0 0 8px", fontSize: "1rem" }}>課題IDの修正</h3>
+          <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: "0.9rem" }}>
+            間違った課題のまま添削したあとに正しい課題で出し直す場合は、
+            <strong>先にここで課題IDを保存</strong>してから、提出一覧の<strong>「添削やり直し」</strong>
+            を実行してください。再添削が完了すると、以前の AI 添削結果は新しい結果で上書きされます。
+          </p>
+        </>
+      ) : null}
       {disabled && disabledReason ? <p className="error">{disabledReason}</p> : null}
       {tasks === null && !registryErr ? (
         <p className="muted" style={{ marginBottom: 10 }}>
@@ -130,13 +137,13 @@ export function OpsSubmissionTaskIdEditor({
         </div>
       ) : null}
       {!registryErr && tasks && tasks.length > 0 ? (
-        <label className="field" style={{ display: "block", marginBottom: 10 }}>
-          <span>課題（taskId）</span>
+        <label className="field" style={{ display: "block", marginBottom: embedded ? 8 : 10 }}>
+          {!embedded ? <span>課題（taskId）</span> : null}
           <select
             value={taskId.trim()}
             onChange={(e) => setTaskId(e.target.value)}
             disabled={disabled || busy}
-            style={{ width: "100%", maxWidth: 560 }}
+            style={{ width: "100%", maxWidth: embedded ? "100%" : 560 }}
           >
             {currentNotInRegistry ? (
               <option value={initialTaskId.trim()}>
@@ -153,10 +160,11 @@ export function OpsSubmissionTaskIdEditor({
       ) : null}
       <button
         type="button"
+        className={embedded ? "ops-btn ops-btn--compact" : undefined}
         disabled={disabled || busy || registryErr !== "" || !tasks?.length}
         onClick={() => void onSave()}
       >
-        {busy ? "保存中…" : "課題IDを保存（マスタと同期）"}
+        {busy ? "保存中…" : embedded ? "課題IDを保存" : "課題IDを保存（マスタと同期）"}
       </button>
       {message ? (
         <p className="success" style={{ marginTop: 10, marginBottom: 0 }}>
@@ -168,6 +176,14 @@ export function OpsSubmissionTaskIdEditor({
           {error}
         </p>
       ) : null}
-    </div>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="ops-task-id-editor ops-task-id-editor--embedded">{inner}</div>;
+  }
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #e2e8f0" }}>{inner}</div>
   );
 }
