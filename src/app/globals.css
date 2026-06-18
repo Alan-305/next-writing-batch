@@ -281,6 +281,10 @@ select:focus-visible {
   padding: 14px 12px 36px;
 }
 
+.student-result-page .student-result-print-meta {
+  margin-top: 0;
+}
+
 .student-result-page .student-result-print-hint-block {
   margin: 0 0 12px;
   max-width: 42rem;
@@ -2411,6 +2415,11 @@ a.ops-btn {
 
 /* 添削結果 /result：ブラウザ印刷・「PDFに保存」用 */
 @media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
   .no-print {
     display: none !important;
   }
@@ -2420,20 +2429,77 @@ a.ops-btn {
     background: #fff !important;
   }
 
-  .app-shell--student main {
+  .app-shell--student main.student-result-page {
     max-width: none;
-    padding: 12px 16px 24px;
+    padding: 0;
   }
 
-  .app-shell--student .card {
+  .student-result-print-fit {
+    --print-fit-scale: 1;
+  }
+
+  .student-result-print-fit h1 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    color: #000;
+  }
+
+  .student-result-print-fit .student-result-print-meta {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .app-shell--student .card,
+  .student-result-print-fit .student-result-card {
     box-shadow: none;
     border-color: #cbd5e1;
-    break-inside: avoid;
-    page-break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
+    margin-bottom: 4px;
+    padding: 4px 6px;
   }
 
-  .app-shell--student h1 {
-    color: #000;
+  .student-result-print-fit .student-result-section-title {
+    margin-bottom: 2px;
+    font-size: 0.88rem;
+  }
+
+  .student-result-print-fit .student-result-score-line {
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
+  .student-result-print-fit .student-result-pre,
+  .student-result-print-fit .student-explanation-html-wrap,
+  .student-result-print-fit .essay-final-diff {
+    font-size: 0.82rem;
+    line-height: 1.38;
+  }
+
+  /* zoom 非対応ブラウザ（Firefox 等）向けフォールバック */
+  @supports not (zoom: 1) {
+    .student-result-print-fit {
+      font-size: calc(9pt * var(--print-fit-scale, 1));
+    }
+
+    .student-result-print-fit h1 {
+      font-size: calc(11pt * var(--print-fit-scale, 1));
+    }
+
+    .student-result-print-fit .student-result-section-title {
+      font-size: calc(8.5pt * var(--print-fit-scale, 1));
+    }
+
+    .student-result-print-fit .student-result-score-line,
+    .student-result-print-fit .student-result-pre,
+    .student-result-print-fit .student-explanation-html-wrap,
+    .student-result-print-fit .essay-final-diff,
+    .student-result-print-fit .student-result-qr-lead,
+    .student-result-print-fit .student-result-qr-foot {
+      font-size: calc(8pt * var(--print-fit-scale, 1));
+      line-height: calc(1.38 * var(--print-fit-scale, 1));
+    }
   }
 
   .essay-final-diff .essay-revision,

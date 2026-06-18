@@ -75,8 +75,8 @@ export default async function StudentResultPage({ params }: Props) {
       topSlot={
         <div className="student-result-print-hint-block no-print">
           <p className="muted student-result-print-hint-block__text">
-            印刷や PDF への保存は、ブラウザの<strong>印刷</strong>から行ってください。Mac は{" "}
-            <kbd>⌘</kbd>
+            印刷や PDF への保存は、ブラウザの<strong>印刷</strong>から行ってください。解説・完成版の長さに合わせ、
+            <strong>A4 用紙 2 枚</strong>に収まるよう文字サイズと行間を自動調整します。Mac は <kbd>⌘</kbd>
             <kbd>P</kbd>、Windows は <kbd>Ctrl</kbd>
             <kbd>P</kbd>、またはメニューの「印刷」を選び、保存先に「PDFに保存」などを指定できます。
           </p>
