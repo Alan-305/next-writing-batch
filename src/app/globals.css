@@ -420,6 +420,11 @@ select:focus-visible {
   font-size: 0.82rem;
 }
 
+.student-result-qr-print-notes,
+.student-result-qr-print-usage {
+  display: none;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -2514,24 +2519,42 @@ a.ops-btn {
     font-size: 0.78rem;
   }
 
-  .student-result-qr-lead__print {
-    display: none;
-  }
-
-  .student-result-print-fit .student-result-qr-lead {
-    grid-column: 1;
-    grid-row: 2;
-    margin: 0;
-    font-size: 0.65rem;
-    line-height: 1.25;
-  }
-
   .student-result-print-fit .student-result-qr-lead__screen {
     display: none;
   }
 
-  .student-result-print-fit .student-result-qr-lead__print {
-    display: inline;
+  .student-result-print-fit .student-result-qr-print-notes {
+    display: block;
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0;
+    padding-left: 1.15em;
+    list-style: disc;
+    font-size: 0.6rem;
+    line-height: 1.32;
+  }
+
+  .student-result-print-fit .student-result-qr-print-notes li {
+    margin: 0 0 3px;
+    padding-left: 0.1em;
+  }
+
+  .student-result-print-fit .student-result-qr-print-notes li:last-child {
+    margin-bottom: 0;
+  }
+
+  .student-result-print-fit .student-result-qr-print-usage {
+    display: block;
+    grid-column: 1;
+    grid-row: 3;
+    margin: 4px 0 0;
+    font-size: 0.6rem;
+    line-height: 1.32;
+    color: #334155;
+  }
+
+  .student-result-print-fit .student-result-qr-print-usage strong {
+    font-weight: 700;
   }
 
   .student-result-print-fit .student-result-qr-foot {
@@ -2540,10 +2563,11 @@ a.ops-btn {
 
   .student-result-print-fit .student-result-qr-img-wrap {
     grid-column: 2;
-    grid-row: 1 / 3;
+    grid-row: 1 / -1;
     width: 52px;
     margin: 0;
     justify-self: end;
+    align-self: start;
   }
 
   .student-result-print-fit .student-result-qr-img-wrap svg,
@@ -2571,10 +2595,10 @@ a.ops-btn {
     .student-result-print-fit .student-result-pre,
     .student-result-print-fit .student-explanation-html-wrap,
     .student-result-print-fit .essay-final-diff,
-    .student-result-print-fit .student-result-qr-lead,
-    .student-result-print-fit .student-result-qr-foot {
-      font-size: calc(8pt * var(--print-fit-scale, 1));
-      line-height: calc(1.38 * var(--print-fit-scale, 1));
+    .student-result-print-fit .student-result-qr-print-notes,
+    .student-result-print-fit .student-result-qr-print-usage {
+      font-size: calc(7.5pt * var(--print-fit-scale, 1));
+      line-height: calc(1.32 * var(--print-fit-scale, 1));
     }
   }
 

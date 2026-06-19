@@ -73,11 +73,17 @@ export function StudentResultPublishedBody({
           {model.audioSrc || model.qrSrc ? (
             <div className="card student-result-card student-result-card--qr">
               <h2 className="student-result-section-title">音声（スマホ用 QR）</h2>
-              <p className="muted student-result-qr-lead">
-                <span className="student-result-qr-lead__screen">
-                  音声には再生可能期限がありますのでダウンロードして保存してください。
-                </span>
-                <span className="student-result-qr-lead__print">スマホで読み取り、音声を再生・保存できます。</span>
+              <p className="muted student-result-qr-lead student-result-qr-lead__screen">
+                音声には再生可能期限がありますのでダウンロードして保存してください。
+              </p>
+              <ul className="student-result-qr-print-notes" aria-label="音声QRの使い方">
+                <li>QRコードを読み取ると音声が再生されます。</li>
+                <li>再生期限があるのでダウンロードしてください。</li>
+                <li>ブラウザは Google Chrome を推奨します。</li>
+              </ul>
+              <p className="student-result-qr-print-usage">
+                <strong>利用方法：</strong>
+                この音声はあなたの言いたいことをネイティブ音声で読み上げる貴重なデータです。聞くだけではなく、同じように言えるまでシャドーイングしたり、カラオケのように何度も練習して下さい。きっと自分の意見が言えるようになります。一生モノの素晴らしい力が身につきますよ。
               </p>
               {model.audioSrc ? (
                 <StudentResultAudioQr audioHref={model.audioSrc} serverAbsolute={model.audioQrEncodeUrl} />
