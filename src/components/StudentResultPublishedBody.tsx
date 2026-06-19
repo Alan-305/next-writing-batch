@@ -73,40 +73,40 @@ export function StudentResultPublishedBody({
           {model.audioSrc || model.qrSrc ? (
             <div className="card student-result-card student-result-card--qr">
               <h2 className="student-result-section-title">音声（スマホ用 QR）</h2>
-              <p className="muted student-result-qr-lead student-result-qr-lead__screen">
-                音声には再生可能期限がありますのでダウンロードして保存してください。
-              </p>
-              <ul className="student-result-qr-print-notes" aria-label="音声QRの使い方">
-                <li>QRコードを読み取ると音声が再生されます。</li>
-                <li>再生期限があるのでダウンロードしてください。</li>
-                <li>ブラウザは Google Chrome を推奨します。</li>
-              </ul>
-              <p className="student-result-qr-print-usage">
-                <strong>利用方法：</strong>
-                この音声はあなたの言いたいことをネイティブ音声で読み上げる貴重なデータです。聞くだけではなく、同じように言えるまでシャドーイングしたり、カラオケのように何度も練習して下さい。きっと自分の意見が言えるようになります。一生モノの素晴らしい力が身につきますよ。
-              </p>
-              {model.audioSrc ? (
-                <StudentResultAudioQr audioHref={model.audioSrc} serverAbsolute={model.audioQrEncodeUrl} />
-              ) : model.qrSrc ? (
-                <div className="student-result-qr-img-wrap">
-                  <img
-                    src={model.qrSrc}
-                    alt="音声への QR"
-                    width={220}
-                    height={220}
-                    className="student-result-qr-img"
-                  />
+              <div className="student-result-qr-layout">
+                <div className="student-result-qr-media">
+                  {model.audioSrc ? (
+                    <StudentResultAudioQr audioHref={model.audioSrc} serverAbsolute={model.audioQrEncodeUrl} />
+                  ) : model.qrSrc ? (
+                    <div className="student-result-qr-img-wrap">
+                      <img
+                        src={model.qrSrc}
+                        alt="音声への QR"
+                        width={220}
+                        height={220}
+                        className="student-result-qr-img"
+                      />
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              {model.audioUrl ? (
-                <p className="student-result-qr-audio-link no-print">
-                  同じ音声を PC のブラウザで聞く場合:{" "}
-                  <a href={model.audioSrc}>音声を開く</a>
-                </p>
-              ) : null}
-              <p className="muted student-result-qr-foot">
-                開いた先はページではなく <strong>mp3 ファイル</strong>です。再生ボタン（▶）を押すか、ダウンロードしてから聞いてください。
-              </p>
+                <div className="student-result-qr-copy">
+                  <ul className="student-result-qr-notes" aria-label="音声QRの使い方">
+                    <li>QRコードを読み取ると音声が再生されます。</li>
+                    <li>再生期限があるのでダウンロードしてください。</li>
+                    <li>ブラウザは Google Chrome を推奨します。</li>
+                  </ul>
+                  <p className="student-result-qr-usage">
+                    <strong>利用方法：</strong>
+                    この音声はあなたの言いたいことをネイティブ音声で読み上げる貴重なデータです。聞くだけではなく、同じように言えるまでシャドーイングしたり、カラオケのように何度も練習して下さい。きっと自分の意見が言えるようになります。一生モノの素晴らしい力が身につきますよ。
+                  </p>
+                  {model.audioUrl ? (
+                    <p className="student-result-qr-audio-link no-print">
+                      同じ音声を PC のブラウザで聞く場合:{" "}
+                      <a href={model.audioSrc}>音声を開く</a>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             </div>
           ) : null}
         </div>

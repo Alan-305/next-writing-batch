@@ -392,14 +392,52 @@ select:focus-visible {
   font-size: 0.88rem;
 }
 
-.student-result-page .student-result-qr-lead {
-  margin: 0 0 4px;
-  line-height: 1.45;
+.student-result-page .student-result-qr-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: start;
+}
+
+.student-result-page .student-result-qr-media {
+  min-width: 0;
+}
+
+.student-result-page .student-result-qr-copy {
+  min-width: 0;
+}
+
+.student-result-page .student-result-qr-notes {
+  margin: 0;
+  padding-left: 1.2em;
+  list-style: disc;
   font-size: 0.86rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.student-result-page .student-result-qr-notes li {
+  margin: 0 0 4px;
+}
+
+.student-result-page .student-result-qr-notes li:last-child {
+  margin-bottom: 0;
+}
+
+.student-result-page .student-result-qr-usage {
+  margin: 10px 0 0;
+  line-height: 1.55;
+  font-size: 0.86rem;
+  color: #475569;
+}
+
+.student-result-page .student-result-qr-usage strong {
+  font-weight: 700;
+  color: #334155;
 }
 
 .student-result-page .student-result-qr-img-wrap {
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .student-result-page .student-result-qr-img {
@@ -409,20 +447,9 @@ select:focus-visible {
 }
 
 .student-result-page .student-result-qr-audio-link {
-  margin: 0 0 2px;
+  margin: 10px 0 0;
   word-break: break-all;
   font-size: 0.86rem;
-}
-
-.student-result-page .student-result-qr-foot {
-  margin: 0;
-  line-height: 1.45;
-  font-size: 0.82rem;
-}
-
-.student-result-qr-print-notes,
-.student-result-qr-print-usage {
-  display: none;
 }
 
 table {
@@ -2500,74 +2527,69 @@ a.ops-btn {
     page-break-before: always;
   }
 
-  /* 音声 QR：印刷時は最小サイズ・横並びで紙面を占有しない */
+  /* 音声 QR：印刷時は最小サイズ・説明文左・QR右 */
   .student-result-print-fit .student-result-card--qr {
-    display: grid;
-    grid-template-columns: 1fr 52px;
-    grid-template-rows: auto auto;
-    gap: 1px 8px;
-    align-items: start;
     break-inside: avoid;
     page-break-inside: avoid;
     padding: 3px 6px;
   }
 
   .student-result-print-fit .student-result-card--qr .student-result-section-title {
-    grid-column: 1;
-    grid-row: 1;
-    margin: 0;
+    margin: 0 0 4px;
     font-size: 0.78rem;
   }
 
-  .student-result-print-fit .student-result-qr-lead__screen {
-    display: none;
+  .student-result-print-fit .student-result-qr-layout {
+    display: grid;
+    grid-template-columns: 1fr 52px;
+    gap: 2px 8px;
+    align-items: start;
   }
 
-  .student-result-print-fit .student-result-qr-print-notes {
-    display: block;
+  .student-result-print-fit .student-result-qr-copy {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .student-result-print-fit .student-result-qr-media {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .student-result-print-fit .student-result-qr-notes {
     margin: 0;
     padding-left: 1.15em;
     list-style: disc;
     font-size: 0.6rem;
     line-height: 1.32;
+    color: #334155;
   }
 
-  .student-result-print-fit .student-result-qr-print-notes li {
+  .student-result-print-fit .student-result-qr-notes li {
     margin: 0 0 3px;
     padding-left: 0.1em;
   }
 
-  .student-result-print-fit .student-result-qr-print-notes li:last-child {
+  .student-result-print-fit .student-result-qr-notes li:last-child {
     margin-bottom: 0;
   }
 
-  .student-result-print-fit .student-result-qr-print-usage {
-    display: block;
-    grid-column: 1;
-    grid-row: 3;
+  .student-result-print-fit .student-result-qr-usage {
     margin: 4px 0 0;
     font-size: 0.6rem;
     line-height: 1.32;
     color: #334155;
   }
 
-  .student-result-print-fit .student-result-qr-print-usage strong {
+  .student-result-print-fit .student-result-qr-usage strong {
     font-weight: 700;
   }
 
-  .student-result-print-fit .student-result-qr-foot {
-    display: none;
-  }
-
   .student-result-print-fit .student-result-qr-img-wrap {
-    grid-column: 2;
-    grid-row: 1 / -1;
     width: 52px;
     margin: 0;
-    justify-self: end;
-    align-self: start;
   }
 
   .student-result-print-fit .student-result-qr-img-wrap svg,
@@ -2595,8 +2617,8 @@ a.ops-btn {
     .student-result-print-fit .student-result-pre,
     .student-result-print-fit .student-explanation-html-wrap,
     .student-result-print-fit .essay-final-diff,
-    .student-result-print-fit .student-result-qr-print-notes,
-    .student-result-print-fit .student-result-qr-print-usage {
+    .student-result-print-fit .student-result-qr-notes,
+    .student-result-print-fit .student-result-qr-usage {
       font-size: calc(7.5pt * var(--print-fit-scale, 1));
       line-height: calc(1.32 * var(--print-fit-scale, 1));
     }
