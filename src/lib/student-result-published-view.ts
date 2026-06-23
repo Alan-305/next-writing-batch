@@ -8,7 +8,7 @@ import { formatRubricEvaluationInline } from "@/lib/task-problems-core";
 import { resolveScoreMaxTotalFromRubric } from "@/lib/celebrations/score-threshold";
 import { findSubmissionAcrossOrganizations } from "@/lib/submissions-store";
 import { organizationIdFromSubmissionHit } from "@/lib/student-submit-page-path";
-import { resolveDay4AudioPlayUrl, resolveDay4AudioQrUrl } from "@/lib/day4-audio-public-url";
+import { resolveDay4AudioPlayUrlForSubmission, resolveDay4AudioQrUrlForSubmission } from "@/lib/day4-audio-public-url";
 
 export type StudentResultPublishedModel = {
   submissionId: string;
@@ -57,8 +57,10 @@ export async function loadStudentResultPublishedView(
   const qrSrc = qrPath ? (qrPath.startsWith("/") ? qrPath : `/${qrPath}`) : "";
   const audioUrl = String(submission.day4?.audio_url ?? "").trim();
   const requestOrigin = (options?.requestOrigin ?? "").trim();
-  const audioSrc = audioUrl ? resolveDay4AudioPlayUrl(audioUrl, requestOrigin) : "";
-  const audioQrEncodeUrl = audioUrl ? resolveDay4AudioQrUrl(audioUrl, requestOrigin) : "";
+  const audioSrc = audioUrl || submission.day4?.audio_path
+    ? resolveDay4AudioPlayUrlForSubmission(submission, requestOrigin)
+    : "";
+  const audioQrEncodeUrl = audioSrc ? resolveDay4AudioQrUrlForSubmission(submission, requestOrigin) : "";
 
   const explanationHtml = studentExplanationToDisplayHtml(sr.explanation ?? "");
   const { revised: finalRevised } = resolveFinalEssayForStudentDisplay({

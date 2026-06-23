@@ -187,6 +187,17 @@ def resolve_qr_audio_url_for_day4(
             from urllib.parse import urlparse
 
             u = urlparse(raw)
+            if "storage.googleapis.com" in raw and base:
+                parts = [p for p in u.path.split("/") if p]
+                try:
+                    audio_idx = parts.index("audio")
+                    if audio_idx >= 0 and len(parts) >= audio_idx + 3:
+                        tid = parts[audio_idx + 1]
+                        fn = parts[audio_idx + 2]
+                        if fn.lower().endswith(".mp3"):
+                            return _api_day4_audio_url(base=base, task_id=tid, filename=fn)
+                except ValueError:
+                    pass
             if _is_broken_audio_host(u.hostname or ""):
                 from_output = re.match(r"^/output/audio/([^/]+)/([^/]+\.mp3)$", u.path, re.I)
                 if from_output and base:

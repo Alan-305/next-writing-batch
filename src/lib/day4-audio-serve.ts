@@ -1,12 +1,11 @@
-import { getStorage } from "firebase-admin/storage";
 import { NextResponse } from "next/server";
 
 import {
   day4AudioExpiredMessage,
   isDay4AudioPlaybackAllowed,
 } from "@/lib/day4-audio-retention";
-import { getFirebaseAdminApp } from "@/lib/firebase/admin-app";
-import { findSubmissionAcrossOrganizations } from "@/lib/submissions-store";
+import { fetchDay4AudioFromGcs } from "@/lib/day4-audio-gcs-fetch";
+import { findSubmissionForDay4Audio } from "@/lib/day4-audio-submission-lookup";
 import { getOutputFileResponse } from "@/lib/serve-output-file";
 
 function segmentOk(seg: string): boolean {
@@ -15,8 +14,13 @@ function segmentOk(seg: string): boolean {
   return true;
 }
 
+const AUDIO_HEADERS: Record<string, string> = {
+  "Content-Type": "audio/mpeg",
+  "Cache-Control": "public, max-age=86400",
+};
+
 /**
- * Day4 音声 mp3 を配信する（ローカル output → 無ければ GCS_BUCKET_NAME）。
+ * Day4 音声 mp3 を配信する（ローカル output → GCS 複数候補）。
  * QR / 生徒向け結果で使う安定 URL 用（署名付き URL は使わない）。
  */
 export async function getDay4AudioResponse(taskId: string, filename: string): Promise<NextResponse> {
@@ -35,28 +39,16 @@ async function getDay4AudioResponseInner(taskId: string, filename: string): Prom
     return NextResponse.json({ message: "Bad request" }, { status: 400 });
   }
 
-  const submissionId = fn.replace(/\.mp3$/i, "");
-  // 再生は「致命的に止めない」が最優先（QR の配布体験が重要）。
-  // 期限判定に必要な Firestore 取得が失敗する/まだ未反映の場合でも、
-  // ファイルが存在すればそのまま配信する（UI 側の Server Error を防ぐ）。
-  let shouldCheckRetentionForHit: boolean | null = null;
-  let hitSubmission: Parameters<typeof isDay4AudioPlaybackAllowed>[0] | null = null;
+  let hitSubmission: Awaited<ReturnType<typeof findSubmissionForDay4Audio>> = null;
   try {
-    const hit = await findSubmissionAcrossOrganizations(submissionId);
-    if (hit && (hit.submission.taskId ?? "").trim() === tid) {
-      shouldCheckRetentionForHit = true;
-      hitSubmission = hit.submission;
-    } else {
-      shouldCheckRetentionForHit = false;
-    }
+    hitSubmission = await findSubmissionForDay4Audio(tid, fn);
   } catch (e) {
-    console.error("[day4-audio] findSubmissionAcrossOrganizations failed", { submissionId, tid, e });
-    shouldCheckRetentionForHit = false;
+    console.error("[day4-audio] findSubmissionForDay4Audio failed", { taskId: tid, filename: fn, e });
   }
 
   const local = await getOutputFileResponse(["audio", tid, fn]);
   if (local.status === 200) {
-    if (shouldCheckRetentionForHit && hitSubmission && !isDay4AudioPlaybackAllowed(hitSubmission)) {
+    if (hitSubmission && !isDay4AudioPlaybackAllowed(hitSubmission.submission)) {
       return new NextResponse(day4AudioExpiredMessage(), {
         status: 410,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -65,35 +57,29 @@ async function getDay4AudioResponseInner(taskId: string, filename: string): Prom
     return local;
   }
 
-  const bucketName = (process.env.GCS_BUCKET_NAME ?? "").trim();
-  if (!bucketName) {
-    return NextResponse.json({ message: "Not found" }, { status: 404 });
-  }
+  const gcsHit = await fetchDay4AudioFromGcs({
+    taskId: tid,
+    mp3Filename: fn,
+    submission: hitSubmission?.submission ?? null,
+  });
 
-  try {
-    const bucket = getStorage(getFirebaseAdminApp()).bucket(bucketName);
-    const objectName = `audio/${tid}/${fn}`;
-    const file = bucket.file(objectName);
-    const [exists] = await file.exists();
-    if (!exists) {
-      return NextResponse.json({ message: "Not found" }, { status: 404 });
-    }
-    if (shouldCheckRetentionForHit && hitSubmission && !isDay4AudioPlaybackAllowed(hitSubmission)) {
+  if (gcsHit) {
+    if (hitSubmission && !isDay4AudioPlaybackAllowed(hitSubmission.submission)) {
       return new NextResponse(day4AudioExpiredMessage(), {
         status: 410,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
-    const [buf] = await file.download();
-    return new NextResponse(buf, {
+    return new NextResponse(new Uint8Array(gcsHit.buffer), {
       status: 200,
-      headers: {
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "public, max-age=86400",
-      },
+      headers: AUDIO_HEADERS,
     });
-  } catch (e) {
-    console.error("[day4-audio] GCS download failed", { taskId: tid, filename: fn, e });
-    return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
+
+  console.error("[day4-audio] not found", {
+    taskId: tid,
+    filename: fn,
+    submissionId: hitSubmission?.submission.submissionId,
+  });
+  return NextResponse.json({ message: "Not found" }, { status: 404 });
 }
