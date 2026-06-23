@@ -1,12 +1,13 @@
 /**
  * Day4 GCS バケット候補（batch/day4_gcs.py の _bucket_candidates_from_env 相当）。
- * GCS_BUCKET_NAME が無い Cloud Run でも Firebase Storage バケットから PDF/mp3 を取得できるようにする。
+ * GCS_BUCKET_NAME（Day4 専用バケット）を最優先し、Firebase Storage もフォールバックで試す。
  */
 export function gcsBucketCandidates(): string[] {
-  const explicit = (process.env.GCS_BUCKET_NAME ?? "").trim();
-  if (explicit) return [explicit];
-
   const out: string[] = [];
+
+  const explicit = (process.env.GCS_BUCKET_NAME ?? "").trim();
+  if (explicit) out.push(explicit);
+
   for (const key of ["FIREBASE_STORAGE_BUCKET", "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"] as const) {
     const val = (process.env[key] ?? "").trim();
     if (!val) continue;

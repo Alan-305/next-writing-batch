@@ -1,15 +1,17 @@
-import { getStorage } from "firebase-admin/storage";
+import { readFile } from "fs/promises";
 import { NextResponse } from "next/server";
 
-import { getFirebaseAdminApp } from "@/lib/firebase/admin-app";
-import { gcsBucketCandidates } from "@/lib/gcs-bucket-candidates";
+import { fetchSubmissionPdfFromGcs } from "@/lib/day4-pdf-gcs-fetch";
+import { pdfGcsObjectCandidates } from "@/lib/day4-pdf-filename";
 import { defaultOrganizationId } from "@/lib/organization-id";
+import { resolveSubmissionPdfAbsPath } from "@/lib/run-resolve-submission-pdf";
 import { getOutputFileResponse } from "@/lib/serve-output-file";
 import {
   getSubmissionByIdInOrganizationReadOnly,
   listSubmissionsReadOnly,
   type Submission,
 } from "@/lib/submissions-store";
+import { gcsBucketCandidates } from "@/lib/gcs-bucket-candidates";
 
 /** テナント向け API レスポンス用（内部パス・確定日時は含めない） */
 export type TenantPublishedPdfRow = {
@@ -21,21 +23,6 @@ export type TenantPublishedPdfRow = {
   scoreTotal: number | null;
   pdfAvailable: boolean;
 };
-
-function pdfGcsObjectFromRel(pdfRel: string): string | null {
-  const rel = pdfRel.trim().replace(/\\/g, "/").replace(/^\/+/, "");
-  if (!rel) return null;
-  if (rel.startsWith("output/pdf/")) return rel.slice("output/".length);
-  if (rel.startsWith("pdf/")) return rel;
-  return null;
-}
-
-function pdfGcsObjectFromDay4(day4: Submission["day4"]): string | null {
-  if (!day4 || typeof day4 !== "object") return null;
-  const explicit = String(day4.pdf_gcs_object ?? "").trim();
-  if (explicit) return explicit;
-  return pdfGcsObjectFromRel(String(day4.pdf_path ?? ""));
-}
 
 function pdfPathToOutputSegments(pdfPath: string): string[] | null {
   const rel = pdfPath.trim().replace(/\\/g, "/").replace(/^\/+/, "");
@@ -97,6 +84,18 @@ const ADMIN_PDF_RESPONSE_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
 };
 
+function pdfResponseFromBuffer(buf: Buffer, filename: string): NextResponse {
+  const name = filename.replace(/"/g, "") || "feedback.pdf";
+  return new NextResponse(new Uint8Array(buf), {
+    status: 200,
+    headers: {
+      ...ADMIN_PDF_RESPONSE_HEADERS,
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${name}"`,
+    },
+  });
+}
+
 /**
  * 管理者による PDF 閲覧（読み取り専用・テナント非通知）。
  * mark-viewed / 提出更新 / チケット消費などは行わない。
@@ -137,41 +136,36 @@ export async function getAdminPublishedPdfResponse(
     }
   }
 
-  const gcsObject = pdfGcsObjectFromDay4(submission.day4);
-  const bucketCandidates = gcsBucketCandidates();
-  if (!gcsObject || bucketCandidates.length === 0) {
-    return NextResponse.json({ ok: false, message: "PDF ファイルを取得できませんでした。" }, { status: 404 });
+  const gcsHit = await fetchSubmissionPdfFromGcs(submission);
+  if (gcsHit) {
+    const name = gcsHit.gcsObject.split("/").pop() ?? "feedback.pdf";
+    return pdfResponseFromBuffer(gcsHit.buffer, name);
   }
 
-  const storage = getStorage(getFirebaseAdminApp());
-  let lastError: unknown = null;
-  for (const bucketName of bucketCandidates) {
+  const resolved = await resolveSubmissionPdfAbsPath(organizationId, id);
+  if (resolved.ok) {
     try {
-      const file = storage.bucket(bucketName).file(gcsObject);
-      const [exists] = await file.exists();
-      if (!exists) continue;
-      const [buf] = await file.download();
-      const name = gcsObject.split("/").pop() ?? "feedback.pdf";
-      return new NextResponse(new Uint8Array(buf), {
-        status: 200,
-        headers: {
-          ...ADMIN_PDF_RESPONSE_HEADERS,
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `inline; filename="${name.replace(/"/g, "")}"`,
-        },
-      });
+      const buf = await readFile(resolved.absPath);
+      const name = resolved.absPath.split("/").pop() ?? "feedback.pdf";
+      return pdfResponseFromBuffer(buf, name);
     } catch (e) {
-      lastError = e;
-      console.warn("[admin-published-pdf] GCS bucket miss", { bucketName, gcsObject, e });
+      console.error("[admin-published-pdf] resolved file read failed", { organizationId, submissionId: id, e });
     }
+  } else {
+    console.warn("[admin-published-pdf] python resolve failed", {
+      organizationId,
+      submissionId: id,
+      error: resolved.error,
+      stderr: resolved.stderr,
+    });
   }
 
-  console.error("[admin-published-pdf] GCS read failed", {
+  console.error("[admin-published-pdf] PDF unavailable", {
     organizationId,
     submissionId: id,
-    gcsObject,
-    buckets: bucketCandidates,
-    lastError,
+    pdfPath,
+    gcsObjects: pdfGcsObjectCandidates(submission),
+    buckets: gcsBucketCandidates(),
   });
   return NextResponse.json({ ok: false, message: "PDF ファイルを取得できませんでした。" }, { status: 404 });
 }
