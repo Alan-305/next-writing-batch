@@ -955,13 +955,63 @@ a.ops-btn {
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   background: #fff;
+  color: #0f172a;
   cursor: pointer;
+  font-weight: 400;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-.ops-support-thread-item--active {
-  border: 2px solid #2563eb;
-  background: #f8fafc;
+/* 教員シェルの button 既定（青グラデ）より優先して、一覧はカード風の白背景にする */
+.app-shell--teacher button.ops-support-thread-item,
+.app-shell--teacher.app-shell--ops-branded button.ops-support-thread-item {
+  background: #fff;
   color: #0f172a;
+  border: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+.app-shell--teacher button.ops-support-thread-item:hover:not(:disabled),
+.app-shell--teacher.app-shell--ops-branded button.ops-support-thread-item:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  filter: none;
+  transform: none;
+}
+
+.ops-support-thread-item__nick {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ops-support-thread-item .muted,
+.ops-support-thread-item__redeem,
+.ops-support-thread-item__preview,
+.ops-support-thread-item__updated {
+  color: #475569;
+}
+
+.app-shell--teacher .ops-support-thread-item .muted {
+  color: #475569;
+}
+
+.ops-support-thread-item--active,
+.app-shell--teacher button.ops-support-thread-item--active,
+.app-shell--teacher.app-shell--ops-branded button.ops-support-thread-item--active {
+  border: 1px solid #cbd5e1;
+  border-left: 3px solid #64748b;
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.app-shell--teacher button.ops-support-thread-item--active:hover:not(:disabled),
+.app-shell--teacher.app-shell--ops-branded button.ops-support-thread-item--active:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  border-left-color: #64748b;
+  filter: none;
 }
 
 .ops-support-thread-item--active .ops-support-thread-item__nick,
@@ -970,7 +1020,8 @@ a.ops-btn {
 }
 
 .ops-support-thread-item--active .muted,
-.ops-support-thread-item--active.ops-support-thread-item .muted {
+.ops-support-thread-item--active.ops-support-thread-item .muted,
+.app-shell--teacher .ops-support-thread-item--active .muted {
   color: #475569;
 }
 
@@ -1014,10 +1065,6 @@ a.ops-btn {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-}
-
-.ops-support-thread-item__nick {
-  font-weight: 700;
 }
 
 .ops-support-thread-item__redeem {
