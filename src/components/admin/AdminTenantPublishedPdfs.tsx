@@ -7,7 +7,7 @@ import { ADMIN_TENANT_CHANGED_EVENT } from "@/lib/admin/admin-tenant-events";
 import { formatDateTimeIso } from "@/lib/format-date";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
-type PublishedPdfRow = {
+type PublishedRow = {
   submissionId: string;
   taskId: string;
   studentId: string;
@@ -21,8 +21,7 @@ type ListPayload = {
   ok?: boolean;
   organizationId?: string;
   total?: number;
-  pdfAvailableCount?: number;
-  rows?: PublishedPdfRow[];
+  rows?: PublishedRow[];
   message?: string;
 };
 
@@ -34,7 +33,11 @@ type Props = {
   organizationId: string;
 };
 
-function sortRows(rows: PublishedPdfRow[], sortKey: SortKey): PublishedPdfRow[] {
+function studentResultHref(submissionId: string): string {
+  return `/result/${encodeURIComponent(submissionId)}`;
+}
+
+function sortRows(rows: PublishedRow[], sortKey: SortKey): PublishedRow[] {
   const copy = [...rows];
   copy.sort((a, b) => {
     switch (sortKey) {
@@ -58,15 +61,12 @@ function sortRows(rows: PublishedPdfRow[], sortKey: SortKey): PublishedPdfRow[] 
 
 export function AdminTenantPublishedPdfs({ organizationId }: Props) {
   const { user } = useFirebaseAuthContext();
-  const [rows, setRows] = useState<PublishedPdfRow[]>([]);
+  const [rows, setRows] = useState<PublishedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [openingId, setOpeningId] = useState<string | null>(null);
-  const [openError, setOpenError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("publishedDesc");
   const [page, setPage] = useState(1);
-  const [pdfOnly, setPdfOnly] = useState(true);
 
   const authHeaders = useCallback(async () => {
     const u = getFirebaseAuth()?.currentUser;
@@ -78,19 +78,18 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
   const loadRows = useCallback(async () => {
     setLoading(true);
     setError("");
-    setOpenError(null);
     try {
       const ah = await authHeaders();
       const res = await fetch("/api/admin/tenant-published-pdfs", { headers: ah, credentials: "same-origin" });
       const j = (await res.json()) as ListPayload;
       if (!res.ok || !j?.ok) {
-        setError(j?.message ?? "公開済み PDF 一覧の取得に失敗しました。");
+        setError(j?.message ?? "公開済み一覧の取得に失敗しました。");
         setRows([]);
         return;
       }
       setRows(Array.isArray(j.rows) ? j.rows : []);
     } catch {
-      setError("通信エラーで公開済み PDF 一覧を取得できませんでした。");
+      setError("通信エラーで公開済み一覧を取得できませんでした。");
       setRows([]);
     } finally {
       setLoading(false);
@@ -110,11 +109,11 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
 
   useEffect(() => {
     setPage(1);
-  }, [query, sortKey, pdfOnly, organizationId]);
+  }, [query, sortKey, organizationId]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = pdfOnly ? rows.filter((r) => r.pdfAvailable) : rows;
+    let list = rows;
     if (q) {
       list = list.filter((r) => {
         const hay = `${r.taskId} ${r.studentId} ${r.studentName} ${r.submissionId}`.toLowerCase();
@@ -122,60 +121,22 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
       });
     }
     return sortRows(list, sortKey);
-  }, [rows, query, sortKey, pdfOnly]);
+  }, [rows, query, sortKey]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const openPdf = async (submissionId: string) => {
-    setOpeningId(submissionId);
-    setOpenError(null);
-    try {
-      const ah = await authHeaders();
-      const res = await fetch(`/api/admin/tenant-published-pdfs/${encodeURIComponent(submissionId)}/pdf`, {
-        headers: ah,
-        credentials: "same-origin",
-      });
-      if (!res.ok) {
-        let message = `PDF を開けませんでした（HTTP ${res.status}）。`;
-        try {
-          const j = (await res.json()) as { message?: string };
-          if (j?.message) message = j.message;
-        } catch {
-          // JSON 以外は既定メッセージ
-        }
-        setOpenError(message);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        setOpenError("ポップアップがブロックされました。ブラウザの設定を確認してください。");
-        URL.revokeObjectURL(url);
-        return;
-      }
-      window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
-    } catch {
-      setOpenError("PDF の取得中に通信エラーが発生しました。");
-    } finally {
-      setOpeningId(null);
-    }
-  };
-
-  const pdfAvailableCount = rows.filter((r) => r.pdfAvailable).length;
-
   return (
-    <section className="admin-section card" aria-labelledby="admin-published-pdfs-heading">
+    <section className="admin-section card" aria-labelledby="admin-published-results-heading">
       <div className="admin-section__head">
-        <h2 id="admin-published-pdfs-heading" className="admin-section__title">
-          公開済み PDF
-          <span className="admin-section__count">{pdfAvailableCount} 件</span>
+        <h2 id="admin-published-results-heading" className="admin-section__title">
+          公開済み（生徒画面）
+          <span className="admin-section__count">{rows.length} 件</span>
         </h2>
       </div>
       <p className="muted admin-published-pdfs__lead">
-        選択中テナントで<strong>確定して生徒に公開済み</strong>の添削 PDF です（<strong>閲覧のみ</strong>）。
-        表示してもテナント側の「閲覧済み」表示や提出データは<strong>変更されません</strong>。
+        選択中テナントで<strong>生徒に公開済み</strong>の添削結果です。リンクから<strong>生徒と同じ画面</strong>
+        を別タブで開けます（<strong>閲覧のみ</strong>）。管理者の閲覧では「閲覧済み」は記録されません。
       </p>
 
       {!loading && rows.length > 0 ? (
@@ -203,22 +164,12 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
               <option value="scoreAsc">合計点（低い順）</option>
             </select>
           </label>
-          <label className="field admin-published-pdfs__filter">
-            <span>表示</span>
-            <select
-              value={pdfOnly ? "available" : "all"}
-              onChange={(e) => setPdfOnly(e.target.value === "available")}
-            >
-              <option value="available">PDF ありのみ</option>
-              <option value="all">公開済みすべて</option>
-            </select>
-          </label>
         </div>
       ) : null}
 
       {loading ? (
         <p className="admin-loading" aria-live="polite">
-          公開済み PDF を読み込み中…
+          公開済み一覧を読み込み中…
         </p>
       ) : error ? (
         <p className="admin-alert admin-alert--error" role="alert">
@@ -227,8 +178,8 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
       ) : filteredRows.length === 0 ? (
         <p className="admin-empty">
           {rows.length === 0
-            ? "このテナントに、生徒へ公開済みで閲覧可能な PDF はまだありません。"
-            : "条件に一致する公開済み PDF はありません。"}
+            ? "このテナントに、生徒へ公開済みの添削結果はまだありません。"
+            : "条件に一致する公開済み結果はありません。"}
         </p>
       ) : (
         <>
@@ -241,7 +192,7 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
                   <th scope="col">氏名</th>
                   <th scope="col">公開日時</th>
                   <th scope="col">合計点</th>
-                  <th scope="col">PDF</th>
+                  <th scope="col">生徒画面</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,18 +208,14 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
                       {typeof r.scoreTotal === "number" ? <strong>{r.scoreTotal}</strong> : "—"}
                     </td>
                     <td>
-                      {r.pdfAvailable ? (
-                        <button
-                          type="button"
-                          className="ops-btn ops-btn--ghost ops-btn--compact"
-                          disabled={openingId === r.submissionId}
-                          onClick={() => void openPdf(r.submissionId)}
-                        >
-                          {openingId === r.submissionId ? "開いています…" : "表示"}
-                        </button>
-                      ) : (
-                        <span className="muted">未生成</span>
-                      )}
+                      <a
+                        href={studentResultHref(r.submissionId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ops-btn ops-btn--ghost ops-btn--compact admin-published-result-link"
+                      >
+                        表示
+                      </a>
                     </td>
                   </tr>
                 ))}
@@ -303,18 +250,6 @@ export function AdminTenantPublishedPdfs({ organizationId }: Props) {
           )}
         </>
       )}
-
-      {openError ? (
-        <p className="admin-alert admin-alert--error" role="alert" style={{ marginTop: 12 }}>
-          {openError}
-        </p>
-      ) : null}
-
-      {!loading && rows.length > pdfAvailableCount ? (
-        <p className="muted admin-published-pdfs__note" role="note">
-          公開済みだが PDF ファイルが無い提出が {rows.length - pdfAvailableCount} 件あります（Day4 未生成・エラー等）。
-        </p>
-      ) : null}
     </section>
   );
 }

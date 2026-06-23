@@ -52,7 +52,7 @@ function pdfIsDeliverable(submission: Submission): boolean {
 }
 
 /**
- * 公開済み PDF 一覧（読み取り専用）。
+ * 公開済み提出一覧（読み取り専用）。管理画面から生徒向け /result を開く用途。
  * studentResultFirstViewedAt や提出 status には一切触れない。
  */
 export async function listTenantPublishedPdfs(organizationId: string): Promise<TenantPublishedPdfRow[]> {

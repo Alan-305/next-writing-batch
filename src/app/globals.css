@@ -1820,9 +1820,18 @@ a.ops-btn {
 
 @media (min-width: 900px) {
   .admin-published-pdfs__controls {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     align-items: end;
   }
+}
+
+.admin-published-result-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  min-height: 36px;
+  box-sizing: border-box;
 }
 
 .admin-published-pdfs__pager {
