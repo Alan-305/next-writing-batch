@@ -28,6 +28,9 @@ export type StudentSupportThreadSummary = {
   hasTeacherReply: boolean;
   /** 直近のメッセージが生徒から（教師の返信待ち） */
   needsReply: boolean;
+  /** 教員の問い合わせ一覧から非表示（メッセージは削除しない） */
+  hiddenFromTeacherList: boolean;
+  hiddenFromTeacherListAt: string;
 };
 
 function threadsRef(organizationId: string) {
@@ -60,6 +63,8 @@ function mapThreadDoc(doc: DocumentSnapshot): StudentSupportThreadSummary {
     lastMessageRole,
     hasTeacherReply,
     needsReply: lastMessageRole === "student",
+    hiddenFromTeacherList: Boolean(String(data.hiddenFromTeacherListAt ?? "").trim()),
+    hiddenFromTeacherListAt: String(data.hiddenFromTeacherListAt ?? ""),
   };
 }
 
@@ -164,7 +169,7 @@ export async function appendStudentSupportMessage(args: {
         updatedAt: now,
         lastMessagePreview: content.slice(0, 120),
         lastMessageRole: args.role,
-        ...(args.role === "teacher" ? { hasTeacherReply: true } : {}),
+        ...(args.role === "teacher" ? { hasTeacherReply: true } : { hiddenFromTeacherListAt: FieldValue.delete() }),
       });
     }
 
@@ -194,8 +199,12 @@ export async function listStudentSupportThreadsForOrg(organizationId: string): P
   return base.map((t) => byId.get(t.threadId) ?? t);
 }
 
-/** 教員が不要と判断したスレッドを削除（メッセージ一式を含む）。 */
-export async function deleteStudentSupportThread(organizationId: string, threadId: string): Promise<boolean> {
+/** 教員の一覧から非表示にする（生徒のメッセージは残す）。 */
+export async function setStudentSupportThreadHidden(
+  organizationId: string,
+  threadId: string,
+  hidden: boolean,
+): Promise<boolean> {
   const id = threadId.trim();
   if (!id) return false;
 
@@ -203,17 +212,10 @@ export async function deleteStudentSupportThread(organizationId: string, threadI
   const threadSnap = await ref.get();
   if (!threadSnap.exists) return false;
 
-  const messagesSnap = await ref.collection("messages").get();
-  const db = getAdminFirestore();
-  const chunkSize = 400;
-  for (let i = 0; i < messagesSnap.docs.length; i += chunkSize) {
-    const batch = db.batch();
-    for (const doc of messagesSnap.docs.slice(i, i + chunkSize)) {
-      batch.delete(doc.ref);
-    }
-    await batch.commit();
+  if (hidden) {
+    await ref.update({ hiddenFromTeacherListAt: isoNow() });
+  } else {
+    await ref.update({ hiddenFromTeacherListAt: FieldValue.delete() });
   }
-
-  await ref.delete();
   return true;
 }

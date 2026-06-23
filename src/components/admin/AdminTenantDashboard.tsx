@@ -586,12 +586,12 @@ export function AdminTenantDashboard() {
             <strong>累計添削</strong>は確定＆公開（Day4）でチケットを消費した件数です。チケット残数との整合確認にご利用ください。
           </p>
 
-          <AdminTenantPublishedPdfs organizationId={effectiveOrg} />
-
           {renderMemberTable(teachers, "admin-teachers-heading", "テナント本人（教員）", {
             showCumulativeProofreads: true,
           })}
           {renderMemberTable(students, "admin-students-heading", "生徒一覧", { showSelectAll: true })}
+
+          <AdminTenantPublishedPdfs organizationId={effectiveOrg} />
         </>
       )}
 

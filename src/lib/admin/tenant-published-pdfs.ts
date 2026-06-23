@@ -2,6 +2,7 @@ import { getStorage } from "firebase-admin/storage";
 import { NextResponse } from "next/server";
 
 import { getFirebaseAdminApp } from "@/lib/firebase/admin-app";
+import { gcsBucketCandidates } from "@/lib/gcs-bucket-candidates";
 import { defaultOrganizationId } from "@/lib/organization-id";
 import { getOutputFileResponse } from "@/lib/serve-output-file";
 import {
@@ -137,30 +138,40 @@ export async function getAdminPublishedPdfResponse(
   }
 
   const gcsObject = pdfGcsObjectFromDay4(submission.day4);
-  const bucketName = (process.env.GCS_BUCKET_NAME ?? "").trim();
-  if (!gcsObject || !bucketName) {
+  const bucketCandidates = gcsBucketCandidates();
+  if (!gcsObject || bucketCandidates.length === 0) {
     return NextResponse.json({ ok: false, message: "PDF ファイルを取得できませんでした。" }, { status: 404 });
   }
 
-  try {
-    const bucket = getStorage(getFirebaseAdminApp()).bucket(bucketName);
-    const file = bucket.file(gcsObject);
-    const [exists] = await file.exists();
-    if (!exists) {
-      return NextResponse.json({ ok: false, message: "PDF ファイルを取得できませんでした。" }, { status: 404 });
+  const storage = getStorage(getFirebaseAdminApp());
+  let lastError: unknown = null;
+  for (const bucketName of bucketCandidates) {
+    try {
+      const file = storage.bucket(bucketName).file(gcsObject);
+      const [exists] = await file.exists();
+      if (!exists) continue;
+      const [buf] = await file.download();
+      const name = gcsObject.split("/").pop() ?? "feedback.pdf";
+      return new NextResponse(new Uint8Array(buf), {
+        status: 200,
+        headers: {
+          ...ADMIN_PDF_RESPONSE_HEADERS,
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="${name.replace(/"/g, "")}"`,
+        },
+      });
+    } catch (e) {
+      lastError = e;
+      console.warn("[admin-published-pdf] GCS bucket miss", { bucketName, gcsObject, e });
     }
-    const [buf] = await file.download();
-    const name = gcsObject.split("/").pop() ?? "feedback.pdf";
-    return new NextResponse(buf, {
-      status: 200,
-      headers: {
-        ...ADMIN_PDF_RESPONSE_HEADERS,
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${name.replace(/"/g, "")}"`,
-      },
-    });
-  } catch (e) {
-    console.error("[admin-published-pdf] GCS read failed", { organizationId, submissionId: id, e });
-    return NextResponse.json({ ok: false, message: "PDF の取得に失敗しました。" }, { status: 500 });
   }
+
+  console.error("[admin-published-pdf] GCS read failed", {
+    organizationId,
+    submissionId: id,
+    gcsObject,
+    buckets: bucketCandidates,
+    lastError,
+  });
+  return NextResponse.json({ ok: false, message: "PDF ファイルを取得できませんでした。" }, { status: 404 });
 }
