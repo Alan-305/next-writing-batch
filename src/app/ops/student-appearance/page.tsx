@@ -212,7 +212,7 @@ export default function OpsStudentAppearancePage() {
           </section>
 
           <div
-            className="appearance-preview-panel app-shell app-shell--student"
+            className="appearance-preview-panel"
             style={shellStyle}
             data-style-preset={activePresetId}
           >
@@ -356,7 +356,7 @@ export default function OpsStudentAppearancePage() {
             </p>
           ) : null}
 
-          <p style={{ marginTop: 20, marginBottom: 0 }}>
+          <p className="appearance-form-actions">
             <button type="submit" disabled={saving}>
               {saving ? "保存中…" : "サーバーに保存"}
             </button>

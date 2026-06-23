@@ -488,11 +488,6 @@
 
 /* 設定画面プレビュー */
 
-.appearance-preview-panel {
-  position: relative;
-  overflow: hidden;
-}
-
 .appearance-preview-shell {
   position: relative;
   z-index: 1;
