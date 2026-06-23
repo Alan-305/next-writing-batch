@@ -13,6 +13,8 @@ type ThreadSummary = {
   updatedAt: string;
   lastMessagePreview: string;
   lastMessageRole: "student" | "teacher";
+  hasTeacherReply: boolean;
+  needsReply: boolean;
 };
 
 type SupportMessage = {
@@ -33,6 +35,21 @@ function formatWhen(iso: string): string {
   }
 }
 
+function SupportThreadBadges({ thread }: { thread: ThreadSummary }) {
+  return (
+    <div className="ops-support-thread-badges" aria-label="対応状況">
+      {thread.hasTeacherReply ? (
+        <span className="ops-support-badge ops-support-badge--replied">返信済</span>
+      ) : (
+        <span className="ops-support-badge ops-support-badge--pending">未返信</span>
+      )}
+      {thread.hasTeacherReply && thread.needsReply ? (
+        <span className="ops-support-badge ops-support-badge--followup">再問い合わせ</span>
+      ) : null}
+    </div>
+  );
+}
+
 export function OpsStudentSupportPageClient() {
   const { user, authLoading } = useFirebaseAuthContext();
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -41,6 +58,7 @@ export function OpsStudentSupportPageClient() {
   const [reply, setReply] = useState("");
   const [loadErr, setLoadErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [status, setStatus] = useState("");
 
   const selectedThread = useMemo(
@@ -155,8 +173,44 @@ export function OpsStudentSupportPageClient() {
     }
   };
 
+  const onDeleteThread = async () => {
+    if (!user || !selectedThread) return;
+    const label = `${selectedThread.displayNick}（${selectedThread.redeemId}）`;
+    const ok = window.confirm(
+      `「${label}」の問い合わせを削除しますか？\nメッセージはすべて消え、生徒側のメッセージボックスからも見えなくなります。`,
+    );
+    if (!ok) return;
+
+    setDeleteBusy(true);
+    setStatus("");
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/ops/student-support-threads", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ threadId: selectedThread.threadId }),
+      });
+      const json = (await res.json()) as { ok?: boolean; message?: string };
+      if (!res.ok || !json.ok) {
+        setStatus(json.message ?? "削除に失敗しました。");
+        return;
+      }
+      setSelectedId("");
+      setMessages([]);
+      setStatus(json.message ?? "問い合わせを削除しました。");
+      await loadThreads();
+    } catch {
+      setStatus("通信エラーが発生しました。");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
-    <main>
+    <main className="ops-student-support-page">
       <h1 style={{ marginTop: 0 }}>{OPS_DASHBOARD_LABEL} — 生徒サポート</h1>
       <p className="muted" style={{ marginBottom: 20 }}>
         匿名生徒からの質問への返信は、生徒のメッセージボックスに表示されます。
@@ -164,7 +218,7 @@ export function OpsStudentSupportPageClient() {
 
       {loadErr ? <p className="error">{loadErr}</p> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 16, alignItems: "start" }}>
+      <div className="ops-student-support-layout">
         <section className="card" aria-label="スレッド一覧">
           <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>問い合わせ一覧</h2>
           {threads.length === 0 ? (
@@ -172,33 +226,21 @@ export function OpsStudentSupportPageClient() {
               まだ問い合わせはありません。
             </p>
           ) : (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+            <ul className="ops-support-thread-list">
               {threads.map((t) => (
                 <li key={t.threadId}>
                   <button
                     type="button"
+                    className={`ops-support-thread-item${selectedId === t.threadId ? " ops-support-thread-item--active" : ""}`}
                     onClick={() => setSelectedId(t.threadId)}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      minHeight: 44,
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      border: selectedId === t.threadId ? "2px solid #2563eb" : "1px solid #e2e8f0",
-                      background: selectedId === t.threadId ? "#eff6ff" : "#fff",
-                      cursor: "pointer",
-                    }}
                   >
-                    <div style={{ fontWeight: 700 }}>{t.displayNick}</div>
-                    <div className="muted" style={{ fontSize: "0.85rem", fontFamily: "monospace" }}>
-                      {t.redeemId}
+                    <div className="ops-support-thread-item__head">
+                      <div className="ops-support-thread-item__nick">{t.displayNick}</div>
+                      <SupportThreadBadges thread={t} />
                     </div>
-                    <div style={{ fontSize: "0.88rem", marginTop: 4, lineHeight: 1.4 }}>
-                      {t.lastMessageRole === "student" ? "🟡 未返信" : "✓ 返信済"} — {t.lastMessagePreview}
-                    </div>
-                    <div className="muted" style={{ fontSize: "0.8rem", marginTop: 4 }}>
-                      更新: {formatWhen(t.updatedAt)}
-                    </div>
+                    <div className="muted ops-support-thread-item__redeem">{t.redeemId}</div>
+                    <div className="ops-support-thread-item__preview">{t.lastMessagePreview}</div>
+                    <div className="muted ops-support-thread-item__updated">更新: {formatWhen(t.updatedAt)}</div>
                   </button>
                 </li>
               ))}
@@ -213,60 +255,66 @@ export function OpsStudentSupportPageClient() {
             </p>
           ) : (
             <>
-              <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>
-                {selectedThread.displayNick}
-                <span className="muted" style={{ fontWeight: 400, marginLeft: 8, fontFamily: "monospace" }}>
-                  {selectedThread.redeemId}
-                </span>
-              </h2>
+              <div className="ops-support-detail-head">
+                <div>
+                  <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>
+                    {selectedThread.displayNick}
+                    <span className="muted ops-support-detail-head__redeem">{selectedThread.redeemId}</span>
+                  </h2>
+                  <SupportThreadBadges thread={selectedThread} />
+                </div>
+                <button
+                  type="button"
+                  className="ops-btn ops-btn--danger ops-btn--compact"
+                  disabled={deleteBusy || busy}
+                  onClick={() => void onDeleteThread()}
+                >
+                  {deleteBusy ? "削除中…" : "削除"}
+                </button>
+              </div>
 
-              <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+              <div className="ops-support-messages">
                 {messages.map((m) => (
                   <div
                     key={m.id}
-                    style={{
-                      padding: "12px 14px",
-                      borderRadius: 10,
-                      border: m.role === "teacher" ? "1px solid #93c5fd" : "1px solid #fde68a",
-                      background: m.role === "teacher" ? "#f8fafc" : "#fffbeb",
-                    }}
+                    className={`ops-support-message ops-support-message--${m.role}`}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                    <div className="ops-support-message__meta">
                       <strong>{m.role === "teacher" ? "先生（あなた）" : "生徒"}</strong>
-                      <span className="muted" style={{ fontSize: "0.85rem" }}>
-                        {formatWhen(m.createdAt)}
-                      </span>
+                      <span className="muted">{formatWhen(m.createdAt)}</span>
                     </div>
                     {m.taskId ? (
-                      <p className="muted" style={{ margin: "0 0 6px", fontSize: "0.88rem" }}>
-                        課題ID: {m.taskId}
-                      </p>
+                      <p className="muted ops-support-message__task">課題ID: {m.taskId}</p>
                     ) : null}
-                    <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.65 }}>{m.content}</p>
+                    <p className="ops-support-message__body">{m.content}</p>
                   </div>
                 ))}
               </div>
 
-              <form onSubmit={onReply} style={{ display: "grid", gap: 10 }}>
+              <form onSubmit={onReply} className="ops-support-reply-form">
                 <label className="field">
                   <span>返信（生徒のメッセージボックスに届きます）</span>
                   <textarea
                     rows={5}
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}
-                    disabled={busy}
+                    disabled={busy || deleteBusy}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) e.preventDefault();
                     }}
                   />
                 </label>
-                <button type="submit" disabled={busy || !reply.trim()} style={{ minHeight: 44, justifySelf: "start" }}>
+                <button
+                  type="submit"
+                  disabled={busy || deleteBusy || !reply.trim()}
+                  className="ops-support-reply-form__submit"
+                >
                   {busy ? "送信中..." : "返信を送る"}
                 </button>
               </form>
             </>
           )}
-          {status ? <p className="success" style={{ marginTop: 12 }}>{status}</p> : null}
+          {status ? <p className="success ops-support-status">{status}</p> : null}
         </section>
       </div>
     </main>

@@ -932,6 +932,184 @@ a.ops-btn {
   border: 1px solid #fecaca;
 }
 
+.ops-student-support-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.ops-support-thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ops-support-thread-item {
+  width: 100%;
+  text-align: left;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ops-support-thread-item--active {
+  border: 2px solid #2563eb;
+  background: #eff6ff;
+}
+
+.ops-support-thread-item__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ops-support-thread-item__nick {
+  font-weight: 700;
+}
+
+.ops-support-thread-item__redeem {
+  font-size: 0.85rem;
+  font-family: monospace;
+  margin-top: 4px;
+}
+
+.ops-support-thread-item__preview {
+  font-size: 0.88rem;
+  margin-top: 6px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ops-support-thread-item__updated {
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.ops-support-thread-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.ops-support-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ops-support-badge--pending {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.ops-support-badge--replied {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.ops-support-badge--followup {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.ops-support-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ops-support-detail-head__redeem {
+  font-weight: 400;
+  margin-left: 8px;
+  font-family: monospace;
+}
+
+.ops-support-messages {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ops-support-message {
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.ops-support-message--teacher {
+  border: 1px solid #93c5fd;
+  background: #f8fafc;
+}
+
+.ops-support-message--student {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+}
+
+.ops-support-message__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ops-support-message__meta .muted {
+  font-size: 0.85rem;
+}
+
+.ops-support-message__task {
+  margin: 0 0 6px;
+  font-size: 0.88rem;
+}
+
+.ops-support-message__body {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
+
+.ops-support-reply-form {
+  display: grid;
+  gap: 10px;
+}
+
+.ops-support-reply-form__submit {
+  min-height: 44px;
+  justify-self: start;
+}
+
+.ops-support-status {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .ops-student-support-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .ops-zip-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1529,6 +1707,17 @@ a.ops-btn {
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: 10px;
   min-width: min(100%, 360px);
+}
+
+.admin-published-pdfs__lead {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.admin-published-pdfs__note {
+  margin: 12px 0 0;
+  font-size: 0.88rem;
 }
 
 .admin-stat-card {

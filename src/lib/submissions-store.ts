@@ -68,6 +68,7 @@ export type Submission = SubmissionInput & {
     audio_expires_at?: string;
     qr_path?: string;
     pdf_path?: string;
+    pdf_gcs_object?: string;
     generatedAt?: string;
     error?: string;
     operator_message?: string;
@@ -214,6 +215,28 @@ export async function getSubmissions(organizationId: string): Promise<Submission
     rows = snap2.docs.map((d) => d.data() as Submission);
   }
   return rows.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+
+/**
+ * 管理者の閲覧専用。reclaim / backfill 等の副作用なし。
+ * テナントの提出一覧・閲覧履歴（studentResultFirstViewedAt 等）を変えない。
+ */
+export async function listSubmissionsReadOnly(organizationId: string): Promise<Submission[]> {
+  noStore();
+  const snap = await orgSubmissionsCol(organizationId).orderBy("submittedAt", "desc").get();
+  return snap.docs.map((d) => d.data() as Submission).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+
+export async function getSubmissionByIdInOrganizationReadOnly(
+  organizationId: string,
+  submissionId: string,
+): Promise<Submission | null> {
+  noStore();
+  const sid = (submissionId ?? "").trim();
+  if (!sid) return null;
+  const snap = await orgSubmissionsCol(organizationId).doc(sid).get();
+  if (!snap.exists) return null;
+  return snap.data() as Submission;
 }
 
 export type TaskSubmissionCount = {

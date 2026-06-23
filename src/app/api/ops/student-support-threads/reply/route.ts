@@ -6,7 +6,7 @@ import { verifyBearerUid } from "@/lib/auth/verify-bearer-uid";
 import { normalizeRedeemLookupToken } from "@/lib/anonymous-redeem";
 import {
   appendStudentSupportMessage,
-  listStudentSupportThreadsForOrg,
+  getStudentSupportThreadById,
   studentSupportThreadId,
 } from "@/lib/student-support-thread";
 
@@ -60,8 +60,7 @@ export async function POST(request: Request) {
   let redeemIdResolved = redeemId;
 
   if (threadIdRaw) {
-    const threads = await listStudentSupportThreadsForOrg(organizationId);
-    const thread = threads.find((t) => t.threadId === threadIdRaw);
+    const thread = await getStudentSupportThreadById(organizationId, threadIdRaw);
     if (!thread) {
       return NextResponse.json({ ok: false, message: "スレッドが見つかりません。" }, { status: 404 });
     }

@@ -10,6 +10,7 @@ import { adminAdjustTicketExpiry } from "@/lib/billing/admin-adjust-ticket-expir
 import { formatTicketExpiryJa } from "@/lib/billing/ticket-lots";
 import { adminCreateStripeRefund } from "@/lib/billing/admin-create-stripe-refund";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
+import { AdminTenantPublishedPdfs } from "@/components/admin/AdminTenantPublishedPdfs";
 import { TwoStepDeleteConfirm, type TwoStepDeletePhase } from "@/components/TwoStepDeleteConfirm";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { formatDateTimeIso } from "@/lib/format-date";
@@ -584,6 +585,8 @@ export function AdminTenantDashboard() {
           <p className="admin-usage-note muted">
             <strong>累計添削</strong>は確定＆公開（Day4）でチケットを消費した件数です。チケット残数との整合確認にご利用ください。
           </p>
+
+          <AdminTenantPublishedPdfs organizationId={effectiveOrg} />
 
           {renderMemberTable(teachers, "admin-teachers-heading", "テナント本人（教員）", {
             showCumulativeProofreads: true,
