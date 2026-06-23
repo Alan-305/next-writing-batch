@@ -1,0 +1,533 @@
+/* 画面スタイル（プリセット）ごとの装飾・ボタン形状。色は --student-* 変数を継承。 */
+
+.branding-theme-decor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--student-primary, #0369a1) 55%, #64748b);
+}
+
+.branding-theme-decor--compact {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.branding-theme-decor__scene {
+  position: absolute;
+  inset: 0;
+}
+
+.app-shell--student,
+.app-shell--teacher.app-shell--ops-branded {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-shell--student > :not(.branding-theme-decor),
+.app-shell--teacher.app-shell--ops-branded > :not(.branding-theme-decor) {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- 装飾小道具の配置 --- */
+
+.branding-decor-gauge {
+  position: absolute;
+  width: clamp(56px, 10vw, 96px);
+  height: clamp(56px, 10vw, 96px);
+  opacity: 0.55;
+}
+
+.branding-decor-gauge--tl {
+  top: 72px;
+  left: 8px;
+}
+
+.branding-decor-gauge--tr {
+  top: 72px;
+  right: 8px;
+}
+
+.branding-theme-decor--compact .branding-decor-gauge {
+  width: 40px;
+  height: 40px;
+  top: 8px;
+}
+
+.branding-theme-decor--compact .branding-decor-gauge--tl {
+  left: 4px;
+}
+
+.branding-theme-decor--compact .branding-decor-gauge--tr {
+  right: 4px;
+}
+
+.branding-decor-cockpit-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--student-accent) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--student-accent) 12%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.35;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+}
+
+.branding-decor-skyline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(80px, 14vh, 140px);
+  opacity: 0.85;
+  color: var(--student-primary, #1e3a8a);
+}
+
+.branding-decor-chalk-tray {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(280px, 60%);
+  height: 8px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #a8a29e, #78716c);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  opacity: 0.5;
+}
+
+.branding-theme-decor--compact .branding-decor-chalk-tray {
+  top: 36px;
+  width: 70%;
+}
+
+.branding-decor-eraser {
+  position: absolute;
+  bottom: 12%;
+  right: 6%;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+  opacity: 0.75;
+  transform: rotate(-12deg);
+}
+
+.branding-decor-chalk {
+  position: absolute;
+  font-size: 1.25rem;
+  opacity: 0.65;
+}
+
+.branding-decor-chalk--1 {
+  bottom: 18%;
+  left: 5%;
+  transform: rotate(18deg);
+}
+
+.branding-decor-chalk--2 {
+  top: 28%;
+  right: 4%;
+  transform: rotate(-8deg);
+}
+
+.branding-decor-desk-corner {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 120px;
+  height: 48px;
+  background: linear-gradient(135deg, #92400e 0%, #78350f 55%, transparent 56%);
+  opacity: 0.25;
+  border-top-right-radius: 8px;
+}
+
+.branding-decor-shelf {
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  width: clamp(28px, 5vw, 44px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  padding-bottom: 8px;
+  opacity: 0.55;
+}
+
+.branding-decor-shelf--left {
+  left: 4px;
+}
+
+.branding-decor-shelf--right {
+  right: 4px;
+}
+
+.branding-decor-book {
+  display: block;
+  width: 100%;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: inset -2px 0 rgba(0, 0, 0, 0.15);
+}
+
+.branding-decor-stars,
+.branding-decor-petals {
+  position: absolute;
+  inset: 0;
+}
+
+.branding-decor-star,
+.branding-decor-petal {
+  position: absolute;
+  color: var(--student-accent, #7c3aed);
+}
+
+.branding-decor-petal {
+  font-size: 0.9rem;
+  opacity: 0.45;
+}
+
+.branding-decor-sports-stripe {
+  position: absolute;
+  width: 140%;
+  height: 28px;
+  left: -20%;
+  transform: rotate(-8deg);
+  opacity: 0.12;
+}
+
+.branding-decor-sports-stripe--a {
+  top: 22%;
+  background: var(--student-primary);
+}
+
+.branding-decor-sports-stripe--b {
+  top: 38%;
+  background: var(--student-accent);
+  transform: rotate(6deg);
+}
+
+.branding-decor-sports-ball {
+  position: absolute;
+  bottom: 14%;
+  left: 6%;
+  font-size: 2rem;
+  opacity: 0.55;
+}
+
+.branding-decor-rococo {
+  position: absolute;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  opacity: 0.35;
+  color: var(--student-accent, #c2410c);
+}
+
+.branding-decor-rococo--tl {
+  top: 68px;
+  left: 12px;
+}
+
+.branding-decor-rococo--tr {
+  top: 68px;
+  right: 12px;
+  transform: scaleX(-1);
+}
+
+.branding-decor-rococo--bl {
+  bottom: 8%;
+  left: 8px;
+}
+
+.branding-decor-rococo--br {
+  bottom: 8%;
+  right: 8px;
+  transform: scaleX(-1);
+}
+
+.branding-decor-showa-grain {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  opacity: 0.6;
+  mix-blend-mode: multiply;
+}
+
+.branding-decor-zen {
+  position: absolute;
+  bottom: 10%;
+  right: 6%;
+  width: clamp(64px, 12vw, 100px);
+  height: clamp(64px, 12vw, 100px);
+  opacity: 0.45;
+  color: var(--student-primary);
+}
+
+.branding-decor-exam-pass,
+.branding-decor-exam-focus,
+.branding-decor-season {
+  position: absolute;
+  bottom: 12%;
+  right: 8%;
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  opacity: 0.5;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
+}
+
+.branding-decor-season--early {
+  top: 20%;
+  left: 6%;
+  bottom: auto;
+  right: auto;
+}
+
+/* --- ヘッダー・カードのテーマ演出（本文は白背景で視認性維持） --- */
+
+.app-shell[data-style-preset="cockpit"] .app-shell-header--student {
+  border-bottom: 3px solid color-mix(in srgb, var(--student-accent) 70%, #0f172a);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.app-shell[data-style-preset="american"] .app-shell-header--student {
+  border-bottom: 4px solid var(--student-accent);
+}
+
+.app-shell[data-style-preset="chalkboard"] .app-shell-header--student {
+  background: linear-gradient(180deg, #1a3d2e 0%, #14532d 100%) !important;
+  border-bottom: 10px solid #78350f;
+}
+
+.app-shell[data-style-preset="chalkboard"] .app-shell-header--student .app-shell-brand-student,
+.app-shell[data-style-preset="chalkboard"] .app-shell-header--student .app-shell-badge-student {
+  color: #f8fafc !important;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.app-shell[data-style-preset="library"] .card,
+.app-shell[data-style-preset="library"] .appearance-preview-body {
+  border-left: 6px solid color-mix(in srgb, var(--student-primary) 75%, #052e16);
+}
+
+.app-shell[data-style-preset="rococo"] .card {
+  border-radius: 20px 4px 20px 4px;
+}
+
+/* --- ボタン形状（主要操作のみ。一覧・設定用は除外） --- */
+
+.app-shell[data-style-preset] main button:not(:disabled),
+.app-shell[data-style-preset] .appearance-preview-main button,
+.app-shell[data-style-preset] .ops-shell-main-wrap button:not(:disabled):not(.appearance-preset-card):not(
+    .ops-support-thread-item
+  ):not(.ops-btn--ghost):not(.ops-support-thread-row__hide) {
+  position: relative;
+}
+
+.app-shell[data-style-preset="cockpit"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="cockpit"] .appearance-preview-main button,
+.app-shell[data-style-preset="cockpit"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 4px;
+  border: 2px solid color-mix(in srgb, var(--student-accent) 75%, #e2e8f0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 1px rgba(15, 23, 42, 0.35),
+    0 3px 0 rgba(15, 23, 42, 0.2);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-shell[data-style-preset="american"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="american"] .appearance-preview-main button,
+.app-shell[data-style-preset="american"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 2px;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px var(--student-primary), 0 4px 0 color-mix(in srgb, var(--student-primary) 65%, #000);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.app-shell[data-style-preset="american"] main button:not(:disabled)::before,
+.app-shell[data-style-preset="american"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost)::before {
+  content: "★ ";
+  font-size: 0.85em;
+}
+
+.app-shell[data-style-preset="chalkboard"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="chalkboard"] .appearance-preview-main button,
+.app-shell[data-style-preset="chalkboard"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 6px;
+  border: 2px dashed rgba(255, 255, 255, 0.85);
+  background: linear-gradient(180deg, var(--student-accent), var(--student-primary)) !important;
+  box-shadow: 0 3px 0 #78350f;
+}
+
+.app-shell[data-style-preset="library"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="library"] .appearance-preview-main button,
+.app-shell[data-style-preset="library"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 4px 12px 4px 12px;
+  border-left: 5px solid color-mix(in srgb, var(--student-primary) 90%, #000);
+  text-align: left;
+  padding-left: 16px;
+}
+
+.app-shell[data-style-preset="library"] main button:not(:disabled)::after,
+.app-shell[data-style-preset="library"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost)::after {
+  content: " 📚";
+  font-size: 0.9em;
+}
+
+.app-shell[data-style-preset="rococo"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="rococo"] .appearance-preview-main button,
+.app-shell[data-style-preset="rococo"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 999px 8px 999px 8px;
+  border: 2px solid color-mix(in srgb, var(--student-accent) 50%, #fff);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--student-primary) 25%, transparent);
+}
+
+.app-shell[data-style-preset="space"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="space"] .appearance-preview-main button,
+.app-shell[data-style-preset="space"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 999px;
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--student-accent) 45%, transparent),
+    inset 0 0 8px rgba(255, 255, 255, 0.12);
+}
+
+.app-shell[data-style-preset="sports"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="sports"] .appearance-preview-main button,
+.app-shell[data-style-preset="sports"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 8px;
+  transform: skewX(-4deg);
+  font-style: italic;
+  font-weight: 900;
+}
+
+.app-shell[data-style-preset="sports"] main button:not(:disabled):hover,
+.app-shell[data-style-preset="sports"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost):hover {
+  transform: skewX(-4deg) scale(1.02);
+}
+
+.app-shell[data-style-preset="showa"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="showa"] .appearance-preview-main button,
+.app-shell[data-style-preset="showa"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 2px;
+  border: 2px solid #57534e;
+  box-shadow: 3px 3px 0 #44403c;
+  filter: sepia(0.12);
+}
+
+.app-shell[data-style-preset="matcha"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="matcha"] .appearance-preview-main button,
+.app-shell[data-style-preset="matcha"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--student-primary) 40%, #fff);
+}
+
+.app-shell[data-style-preset="exam-pass"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="exam-pass"] .appearance-preview-main button,
+.app-shell[data-style-preset="exam-pass"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 10px;
+  border: 2px solid #ca8a04;
+  box-shadow: inset 0 -2px 0 rgba(202, 138, 4, 0.35);
+}
+
+.app-shell[data-style-preset="exam-focus"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="exam-focus"] .appearance-preview-main button,
+.app-shell[data-style-preset="exam-focus"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 6px;
+  border: 2px solid color-mix(in srgb, var(--student-accent) 60%, #fff);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--student-accent) 18%, transparent);
+}
+
+.app-shell[data-style-preset="spring-sakura"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="spring-sakura"] .appearance-preview-main button,
+.app-shell[data-style-preset="spring-sakura"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 16px 16px 16px 4px;
+}
+
+.app-shell[data-style-preset="winter-snow"] main button:not(:disabled),
+.appearance-preview-panel[data-style-preset="winter-snow"] .appearance-preview-main button,
+.app-shell[data-style-preset="winter-snow"]
+  .ops-shell-main-wrap
+  button:not(:disabled):not(.appearance-preset-card):not(.ops-support-thread-item):not(.ops-btn--ghost) {
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.35);
+}
+
+/* 設定画面プレビュー */
+
+.appearance-preview-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.appearance-preview-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.appearance-preview-main {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+
+.appearance-preview-main button.appearance-preview-btn--primary {
+  color: #fff;
+  border: none;
+  cursor: default;
+  min-height: 44px;
+  padding: 10px 18px;
+  font-weight: 800;
+}
+
+@media print {
+  .branding-theme-decor {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .branding-decor-shelf {
+    opacity: 0.35;
+    width: 20px;
+  }
+
+  .branding-decor-gauge--tl,
+  .branding-decor-gauge--tr {
+    width: 48px;
+    height: 48px;
+  }
+}

@@ -4,6 +4,7 @@ import { FirebaseAuthProvider } from "@/components/auth/FirebaseAuthProvider";
 import { readFirebaseWebConfig } from "@/lib/firebase/config";
 import type { Metadata } from "next";
 import "./globals.css";
+import "./student-branding-themes.css";
 
 export const metadata: Metadata = {
   title: "Next Writing Batch",

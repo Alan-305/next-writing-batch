@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { StudentBrandingThemeDecor } from "@/components/branding/StudentBrandingThemeDecor";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 import {
@@ -118,6 +119,7 @@ export default function OpsStudentAppearancePage() {
       <h1>教師・生徒画面設定</h1>
       <p className="muted">
         <strong>タイトル・学校名</strong>は自由入力、<strong>色と雰囲気</strong>はスタイルから選べます。
+        各スタイルでは<strong>背景の小道具</strong>や<strong>ボタンの形</strong>もテーマに合わせて変わります（本文は読みやすさのため白背景を維持）。
         設定は<strong>教員の運用画面</strong>と<strong>生徒の提出・結果画面</strong>の両方に反映されます。
       </p>
 
@@ -209,9 +211,14 @@ export default function OpsStudentAppearancePage() {
             })}
           </section>
 
-          <div className="appearance-preview-panel" style={shellStyle}>
-            <p className="appearance-preview-panel__label">プレビュー（ボタン・見出しの視認性）</p>
+          <div
+            className="appearance-preview-panel app-shell app-shell--student"
+            style={shellStyle}
+            data-style-preset={activePresetId}
+          >
+            <p className="appearance-preview-panel__label">プレビュー（装飾・ボタン・見出し）</p>
             <div className="appearance-preview-shell">
+              <StudentBrandingThemeDecor presetId={activePresetId} compact />
               <div
                 className="appearance-preview-header"
                 style={{
@@ -227,21 +234,24 @@ export default function OpsStudentAppearancePage() {
                   background: `linear-gradient(180deg, ${branding.surfaceTintStart}, ${branding.surfaceTintEnd})`,
                 }}
               >
+                <main className="appearance-preview-main">
                 <h3 style={{ color: branding.primaryColor }}>提出・結果画面の見出し</h3>
                 <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-                  背景グラデーションとボタンのコントラストを確認できます。
+                  背景の小道具とボタンの形を確認できます。本文エリアは読みやすさのため白背景のままです。
                 </p>
                 <div className="appearance-preview-actions">
-                  <span
-                    className="appearance-preview-btn"
+                  <button
+                    type="button"
+                    className="appearance-preview-btn appearance-preview-btn--primary"
                     style={{
                       background: `linear-gradient(180deg, ${branding.accentColor}, ${branding.primaryColor})`,
                     }}
                   >
                     送信する
-                  </span>
+                  </button>
                   <span className="appearance-preview-btn appearance-preview-btn--ghost">キャンセル</span>
                 </div>
+                </main>
               </div>
             </div>
           </div>

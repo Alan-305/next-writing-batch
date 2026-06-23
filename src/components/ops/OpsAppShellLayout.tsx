@@ -8,15 +8,17 @@ import { usePathname } from "next/navigation";
 import { AuthToolbar } from "@/components/auth/AuthToolbar";
 import { RequireOpsAccess } from "@/components/auth/RequireOpsAccess";
 import { DailyMoodCelebration } from "@/components/celebrations/DailyMoodCelebration";
+import { StudentBrandingThemeDecor } from "@/components/branding/StudentBrandingThemeDecor";
 import { TeacherTicketStatusBanner } from "@/components/ops/TeacherTicketStatusBanner";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import { OPS_DASHBOARD_LABEL } from "@/lib/ops/ops-dashboard-label";
 import {
   DEFAULT_STUDENT_BRANDING,
   mergeStudentBranding,
-  studentBrandingStyle,
   type StudentBranding,
 } from "@/lib/student-branding";
+import { resolveActivePresetId } from "@/lib/student-branding-presets";
+import { studentBrandingShellProps } from "@/lib/student-branding-shell";
 
 type Props = { children: ReactNode };
 
@@ -44,12 +46,14 @@ export function OpsAppShellLayout({ children }: Props) {
     };
   }, [user, authLoading, pathname]);
 
-  const shellStyle = useMemo(() => studentBrandingStyle(branding), [branding]);
+  const shellProps = useMemo(() => studentBrandingShellProps(branding), [branding]);
+  const presetId = useMemo(() => resolveActivePresetId(branding), [branding]);
   const school = branding.schoolDisplayName.trim();
   const dashboardActive = pathname === "/ops" || pathname === "/ops/";
 
   return (
-    <div className="app-shell app-shell--teacher app-shell--ops-branded" style={shellStyle}>
+    <div className="app-shell app-shell--teacher app-shell--ops-branded" {...shellProps}>
+      <StudentBrandingThemeDecor presetId={presetId} />
       <header className="app-shell-header app-shell-header--student no-print">
         <div className="app-shell-header-inner">
           <Link href="/tensaku-kakumei" className="app-shell-brand-cluster" style={{ textDecoration: "none" }}>

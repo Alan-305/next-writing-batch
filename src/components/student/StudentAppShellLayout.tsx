@@ -8,13 +8,15 @@ import { usePathname } from "next/navigation";
 import { AuthToolbar } from "@/components/auth/AuthToolbar";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { DailyMoodCelebration } from "@/components/celebrations/DailyMoodCelebration";
+import { StudentBrandingThemeDecor } from "@/components/branding/StudentBrandingThemeDecor";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import {
   DEFAULT_STUDENT_BRANDING,
   mergeStudentBranding,
-  studentBrandingStyle,
   type StudentBranding,
 } from "@/lib/student-branding";
+import { resolveActivePresetId } from "@/lib/student-branding-presets";
+import { studentBrandingShellProps } from "@/lib/student-branding-shell";
 
 type Props = {
   children: ReactNode;
@@ -95,7 +97,8 @@ export function StudentAppShellLayout({
     };
   }, [user, authLoading, pathname, publicOrganizationId, allowAnonymous]);
 
-  const shellStyle = useMemo(() => studentBrandingStyle(branding), [branding]);
+  const shellProps = useMemo(() => studentBrandingShellProps(branding), [branding]);
+  const presetId = useMemo(() => resolveActivePresetId(branding), [branding]);
   const school = branding.schoolDisplayName.trim();
   const dailyIdentity = user?.uid?.trim()
     ? user.uid
@@ -104,7 +107,8 @@ export function StudentAppShellLayout({
       : "";
 
   return (
-    <div className="app-shell app-shell--student" style={shellStyle}>
+    <div className="app-shell app-shell--student" {...shellProps}>
+      <StudentBrandingThemeDecor presetId={presetId} />
       {dailyIdentity ? <DailyMoodCelebration audience="student" identity={dailyIdentity} /> : null}
       <header className="app-shell-header app-shell-header--student no-print">
         <div className="app-shell-header-inner">

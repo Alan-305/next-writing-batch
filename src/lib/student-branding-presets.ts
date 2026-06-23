@@ -27,7 +27,7 @@ export const STUDENT_BRANDING_PRESETS: StudentBrandingPreset[] = [
   {
     id: "cockpit",
     name: "コックピット",
-    description: "計器盤のような紺とシアン。集中した運用向け。",
+    description: "計器盤のゲージと計器風ボタン。集中した運用向け。",
     category: "classic",
     colors: {
       primaryColor: "#0c4a6e",
@@ -51,7 +51,7 @@ export const STUDENT_BRANDING_PRESETS: StudentBrandingPreset[] = [
   {
     id: "american",
     name: "アメリカン",
-    description: "ネイビーとレッド。はっきりしたコントラスト。",
+    description: "ニューヨークのシルエットと星条風ボタン。はっきりしたコントラスト。",
     category: "classic",
     colors: {
       primaryColor: "#1e3a8a",
@@ -75,7 +75,7 @@ export const STUDENT_BRANDING_PRESETS: StudentBrandingPreset[] = [
   {
     id: "library",
     name: "図書館",
-    description: "深い緑と紺。真面目な学習空間向け。",
+    description: "壁一面の本棚としおり型ボタン。真面目な学習空間向け。",
     category: "classic",
     colors: {
       primaryColor: "#14532d",
@@ -87,7 +87,7 @@ export const STUDENT_BRANDING_PRESETS: StudentBrandingPreset[] = [
   {
     id: "chalkboard",
     name: "教室の黒板",
-    description: "黒板緑とチョーク白の背景。学校らしさ重視。",
+    description: "黒板ヘッダー・黒板消し・チョーク。学校らしさ重視。",
     category: "classic",
     colors: {
       primaryColor: "#14532d",
