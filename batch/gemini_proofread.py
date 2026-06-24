@@ -18,8 +18,10 @@ from nl_essay_feedback import (  # noqa: E402
     build_final_version_refinement_prompt,
     build_nl_essay_prompt,
     content_comment_has_required_sections,
+    content_comment_uses_legacy_format,
     finalize_final_version_for_display,
     finalize_grammar_and_polish_blocks,
+    grammar_comment_has_zero_point_lines,
     grammar_body_from_merged_explanation,
     merge_feedback_coverage_audit,
     merge_proofread_explanation_for_storage,
@@ -28,6 +30,7 @@ from nl_essay_feedback import (  # noqa: E402
     polish_final_essay_paragraphs,
     rebuild_evaluation_line,
     strip_final_essay_artifacts,
+    strip_legacy_blocks_from_content_comment,
 )
 
 
@@ -86,12 +89,14 @@ def _refine_final_version_from_content_advice(
     multipart: bool,
 ) -> str:
     """
-    第1パスで生成した完成版を、content_comment（①②③・【ヒント】）と文法修正に
+    第1パスで生成した完成版を、content_comment（①良い点・②改善点・③減点箇所）と文法修正に
     忠実に沿うよう第2パスで書き直す。失敗時は下書きをそのまま返す。
     """
     draft = (draft_final or "").strip()
     cc = (content_comment or "").strip()
-    if not draft or not cc or "【ヒント】" not in cc:
+    if not draft or not cc:
+        return draft
+    if not any(m in cc for m in ("②改善点", "③減点箇所")):
         return draft
 
     prompt = build_final_version_refinement_prompt(
@@ -262,6 +267,12 @@ def proofread_one(
                         + f" chars={len(_cc)}"
                     )
 
+            if content_comment_uses_legacy_format(content_comment or ""):
+                raise RuntimeError(
+                    "content_comment_legacy_format: "
+                    + f"chars={len(content_comment or '')}"
+                )
+
             if not (final_version or "").strip() and "採点エラー" in (evaluation or ""):
                 final_version = finalize_final_version_for_display(original_essay, append_word_count=False)
 
@@ -291,6 +302,10 @@ def proofread_one(
             if not read_aloud:
                 raise ValueError("empty_read_aloud")
 
+            content_comment = strip_legacy_blocks_from_content_comment(
+                (content_comment or "").strip()
+            )
+
             (
                 explanation,
                 content_comment,
@@ -310,6 +325,20 @@ def proofread_one(
                 content_deduction=max(0, int(content_deduction)),
                 grammar_deduction=max(0, int(grammar_deduction)),
             )
+
+            if grammar_comment_has_zero_point_lines(grammar_comment or ""):
+                gc, pc, _ = finalize_grammar_and_polish_blocks(
+                    grammar_comment=(grammar_comment or "").strip(),
+                    polish_comment=(polish_comment or "").strip(),
+                    body_explanation=(explanation or "").strip(),
+                )
+                grammar_comment = gc
+                polish_comment = pc
+                explanation = ""
+
+            if grammar_comment_has_zero_point_lines(grammar_comment or ""):
+                raise RuntimeError("grammar_comment_has_zero_point_lines")
+
             evaluation = rebuild_evaluation_line(
                 content_deduction=content_deduction,
                 grammar_deduction=grammar_deduction,

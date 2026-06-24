@@ -98,7 +98,7 @@ function numericOrNull(v: unknown): number | null {
 export const GRAMMAR_SECTION_HEAD = "【文法・語法・表現】";
 
 /** 減点なしの完成版書き換えメモ（解説内の第3ブロック） */
-export const POLISH_SECTION_HEAD = "【完成版の書き換え】";
+export const POLISH_SECTION_HEAD = "【完成版】";
 
 const CONTENT_SECTION_HEAD = "【内容】";
 
@@ -163,7 +163,10 @@ export function normalizeStudentExplanation(explanation: string): string {
     const t = trimmed(s);
     return t === GRAMMAR_SECTION_HEAD || t === "【文法】";
   };
-  const isPolishHead = (s: string) => trimmed(s) === POLISH_SECTION_HEAD;
+  const isPolishHead = (s: string) => {
+    const t = trimmed(s);
+    return t === POLISH_SECTION_HEAD || t === "【完成版の書き換え】";
+  };
   const isGrammarDeductionLine = (s: string) => /^\s*文法減点\s*合計\s*[:：]/.test(s);
   const leadsJpClausePunct = (t: string) => /^[、。，．]/.test(t);
   const isContentDeductionLine = (s: string) => /^\s*内容減点\s*合計\s*[:：]/.test(s);
@@ -717,6 +720,24 @@ export function seedStudentReleaseFromProofread(pr: {
     ...(Number.isFinite(contentDed) ? { contentDeduction: Math.max(0, contentDed) } : {}),
     ...(Number.isFinite(grammarDed) ? { grammarDeduction: Math.max(0, grammarDed) } : {}),
     finalText: finalRaw,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function mergeProofreadIntoWithdrawnStudentRelease(
+  prev: StudentRelease | undefined,
+  proofread: Parameters<typeof seedStudentReleaseFromProofread>[0],
+): StudentRelease {
+  const fromProofread = seedStudentReleaseFromProofread(proofread);
+  if (!String(prev?.operatorWithdrawnAt ?? "").trim()) {
+    return fromProofread;
+  }
+  return {
+    ...fromProofread,
+    scores: prev?.scores ?? fromProofread.scores,
+    scoreTotal: prev?.scoreTotal ?? fromProofread.scoreTotal,
+    operatorWithdrawnAt: prev?.operatorWithdrawnAt,
+    operatorFinalizedAt: prev?.operatorFinalizedAt,
     updatedAt: new Date().toISOString(),
   };
 }

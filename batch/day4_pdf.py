@@ -42,7 +42,7 @@ QR_SIZE_MM = 12
 _GRAMMAR_HEAD = "【文法・語法・表現】"
 _GRAMMAR_HEAD_LEGACY = "【文法】"
 _CONTENT_HEAD = "【内容】"
-_POLISH_HEAD = "【完成版の書き換え】"
+_POLISH_HEAD = "【完成版】"
 _HINT_HEAD = "【ヒント】"
 _CIRCLED_HEAD_RE = re.compile(r"^[\u2460-\u2473]+")
 # 旧: 完成版の差分赤。現在は完成版を黒一色で統一（画面 /result と同趣旨）。

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useFirebaseAuthContext } from "@/components/auth/FirebaseAuthProvider";
 import {
   formatExplanationForPublicView,
+  mergeProofreadIntoWithdrawnStudentRelease,
   proofreadExplanationLooksSectionMerged,
   seedStudentReleaseFromProofread,
   splitExplanationToSections,
@@ -147,13 +148,17 @@ export function StudentReleaseEditor({
   onReloadComplete,
 }: Props) {
   const { user } = useFirebaseAuthContext();
+  const withdrawn = Boolean(String(initialRelease?.operatorWithdrawnAt ?? "").trim());
   const seeded = useMemo(() => {
+    if (status === "done" && proofread && withdrawn) {
+      return mergeProofreadIntoWithdrawnStudentRelease(initialRelease ?? undefined, proofread);
+    }
     if (initialRelease) return initialRelease;
     if (status === "done" && proofread) {
       return seedStudentReleaseFromProofread(proofread);
     }
     return null;
-  }, [initialRelease, proofread, status]);
+  }, [initialRelease, proofread, status, withdrawn]);
   const aiScores = useMemo(
     () => parseAiContentGrammarScores(String(proofread?.evaluation ?? "")),
     [proofread?.evaluation],

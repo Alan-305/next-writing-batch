@@ -143,6 +143,7 @@ export function OpsSubmissionsPageClient() {
         );
         const studentViewed = hasStudentViewedPublishedResult(s);
         const operatorWithdrawnAt = String(sr?.operatorWithdrawnAt ?? "").trim();
+        const proofreadStartedAt = String(s.proofread?.startedAt ?? "").trim();
         const proofreadFinishedAt = String(
           s.proofread?.finishedAt ?? s.proofread?.generated_at ?? "",
         ).trim();
@@ -159,6 +160,7 @@ export function OpsSubmissionsPageClient() {
           resultPublished: Boolean(sr?.operatorApprovedAt),
           releaseWithdrawn: Boolean(operatorWithdrawnAt),
           operatorWithdrawnAt: operatorWithdrawnAt || undefined,
+          proofreadStartedAt: proofreadStartedAt || undefined,
           proofreadFinishedAt: proofreadFinishedAt || undefined,
           studentResultFirstViewedAt: s.studentResultFirstViewedAt,
           studentReceiveMethod: s.studentReceiveMethod,

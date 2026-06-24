@@ -22,6 +22,7 @@ import { PROOFREAD_STALE_PROCESSING_MS, isStaleQueuedRow } from "@/lib/proofread
 import { classifyProofreadBatchFailure } from "@/lib/proofread-batch-error-code";
 import { createProofreadBatchDoc, maybeNotifyProofreadBatch } from "@/lib/proofread/proofread-batch-notify";
 import { runProofreadBatch } from "@/lib/run-proofread-batch";
+import { mergeProofreadIntoWithdrawnStudentRelease } from "@/lib/student-release";
 import {
   getSubmissionByIdInOrganization,
   syncSubmissionsDiskMirrorToFirestore,
@@ -490,14 +491,27 @@ export async function processProofreadJob(input: ProcessProofreadJobInput): Prom
 
     await syncSubmissionsDiskMirrorToFirestore(organizationId);
     const after = await getSubmissionByIdInOrganization(organizationId, submissionId);
-    const finalStatus = after?.status ?? "done";
+    if (
+      after?.proofread?.explanation &&
+      String(after.studentRelease?.operatorWithdrawnAt ?? "").trim()
+    ) {
+      await updateSubmissionByIdInOrganization(organizationId, submissionId, (s) => ({
+        ...s,
+        studentRelease: mergeProofreadIntoWithdrawnStudentRelease(
+          s.studentRelease,
+          s.proofread ?? {},
+        ),
+      }));
+    }
+    const afterReleaseSync = await getSubmissionByIdInOrganization(organizationId, submissionId);
+    const finalStatus = afterReleaseSync?.status ?? after?.status ?? "done";
 
     const jobFinishPatch: Partial<ProofreadJob> = {
       status: finalStatus === "done" ? "succeeded" : "failed",
       finishedAt: new Date().toISOString(),
     };
-    if (finalStatus === "failed" && after?.proofread?.error) {
-      jobFinishPatch.lastError = after.proofread.error;
+    if (finalStatus === "failed" && afterReleaseSync?.proofread?.error) {
+      jobFinishPatch.lastError = afterReleaseSync.proofread.error;
     }
     await updateProofreadJobDoc(organizationId, jobId, jobFinishPatch);
 

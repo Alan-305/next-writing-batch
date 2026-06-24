@@ -32,6 +32,7 @@ export type SubmissionListRow = {
   resultPublished?: boolean;
   releaseWithdrawn?: boolean;
   operatorWithdrawnAt?: string;
+  proofreadStartedAt?: string;
   proofreadFinishedAt?: string;
   studentResultFirstViewedAt?: string;
   studentReceiveMethod?: "web" | "teacher_meeting";
@@ -456,6 +457,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         viewedAt={item.studentResultFirstViewedAt}
                         releaseWithdrawn={item.releaseWithdrawn}
                         operatorWithdrawnAt={item.operatorWithdrawnAt}
+                        proofreadStartedAt={item.proofreadStartedAt}
                         proofreadFinishedAt={item.proofreadFinishedAt}
                         forceProcessing={forceProcessing}
                       />

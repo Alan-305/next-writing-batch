@@ -8,6 +8,7 @@ type Props = {
   viewedAt?: string;
   releaseWithdrawn?: boolean;
   operatorWithdrawnAt?: string;
+  proofreadStartedAt?: string;
   proofreadFinishedAt?: string;
   /** 一括同期添削中に pending 行を添削中表示 */
   forceProcessing?: boolean;
@@ -19,6 +20,7 @@ export function OpsSubmissionStatusBadge({
   viewedAt,
   releaseWithdrawn,
   operatorWithdrawnAt,
+  proofreadStartedAt,
   proofreadFinishedAt,
   forceProcessing,
 }: Props) {
@@ -36,6 +38,7 @@ export function OpsSubmissionStatusBadge({
     studentViewed,
     releaseWithdrawn,
     operatorWithdrawnAt,
+    proofreadStartedAt,
     proofreadFinishedAt,
   });
   const title =

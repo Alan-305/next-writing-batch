@@ -58,17 +58,28 @@ const BASE: Record<SubmissionStatusCode, Omit<SubmissionStatusMeta, "code">> = {
   },
 };
 
-function proofreadFinishedAfterWithdraw(
+function proofreadActivityAfterWithdraw(
   operatorWithdrawnAt?: string,
+  proofreadStartedAt?: string,
   proofreadFinishedAt?: string,
 ): boolean {
   const withdrawnAt = (operatorWithdrawnAt ?? "").trim();
-  const finishedAt = (proofreadFinishedAt ?? "").trim();
-  if (!withdrawnAt || !finishedAt) return false;
+  if (!withdrawnAt) return false;
   const w = Date.parse(withdrawnAt);
-  const f = Date.parse(finishedAt);
-  if (!Number.isFinite(w) || !Number.isFinite(f)) return false;
-  return f > w;
+  if (!Number.isFinite(w)) return false;
+
+  const startedAt = (proofreadStartedAt ?? "").trim();
+  if (startedAt) {
+    const s = Date.parse(startedAt);
+    if (Number.isFinite(s) && s > w) return true;
+  }
+
+  const finishedAt = (proofreadFinishedAt ?? "").trim();
+  if (finishedAt) {
+    const f = Date.parse(finishedAt);
+    if (Number.isFinite(f) && f > w) return true;
+  }
+  return false;
 }
 
 export function submissionStatusMeta(
@@ -77,6 +88,7 @@ export function submissionStatusMeta(
     studentViewed?: boolean;
     releaseWithdrawn?: boolean;
     operatorWithdrawnAt?: string;
+    proofreadStartedAt?: string;
     proofreadFinishedAt?: string;
   },
 ): SubmissionStatusMeta {
@@ -107,13 +119,20 @@ export function submissionStatusMeta(
   }
 
   if (opts?.releaseWithdrawn && status === "done") {
-    const redoDone = proofreadFinishedAfterWithdraw(
+    const redoDone = proofreadActivityAfterWithdraw(
       opts.operatorWithdrawnAt,
+      opts.proofreadStartedAt,
       opts.proofreadFinishedAt,
     );
     if (!redoDone) {
       return { code: "withdrawn", ...BASE.withdrawn };
     }
+    return {
+      code: "done",
+      label: "完了",
+      hint: "再添削が完了しました（公開は取り下げ済み）",
+      badgeClass: BASE.done.badgeClass,
+    };
   }
 
   if (status === "done" && opts?.studentViewed) {

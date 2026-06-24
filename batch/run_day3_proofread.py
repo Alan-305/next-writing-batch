@@ -268,6 +268,20 @@ def main() -> None:
                     "finishedAt": _now_iso(),
                     "submissionId": submission_id,
                 }
+                sr = s.get("studentRelease") or {}
+                if str(sr.get("operatorWithdrawnAt") or "").strip():
+                    final_text = (out.final_essay or out.final_version or "").strip()
+                    s["studentRelease"] = {
+                        **sr,
+                        "explanation": out.explanation,
+                        "contentComment": out.content_comment,
+                        "grammarComment": out.grammar_comment,
+                        "contentDeduction": out.content_deduction,
+                        "grammarDeduction": out.grammar_deduction,
+                        "finalText": final_text,
+                        "generalComment": "",
+                        "updatedAt": _now_iso(),
+                    }
                 data[idx] = s
                 _save_submissions_unlocked(data)
             return ("ok", idx, student_id)
