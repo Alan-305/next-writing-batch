@@ -3,7 +3,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Tuple
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _THIS_DIR not in sys.path:
@@ -12,13 +12,19 @@ if _THIS_DIR not in sys.path:
 from gemini_working_model import get_working_model
 
 from nl_essay_feedback import (  # noqa: E402
+    _combined_grammar_bullets_text,
+    _normalize_essay_for_compare,
+    build_feedback_coverage_audit_prompt,
     build_final_version_refinement_prompt,
     build_nl_essay_prompt,
     finalize_final_version_for_display,
     grammar_body_from_merged_explanation,
+    merge_feedback_coverage_audit,
     merge_proofread_explanation_for_storage,
+    parse_feedback_coverage_audit_response,
     parse_free_writing_feedback,
     polish_final_essay_paragraphs,
+    rebuild_evaluation_line,
     strip_final_essay_artifacts,
 )
 
@@ -113,6 +119,68 @@ def _refine_final_version_from_content_advice(
         return refined or draft
     except Exception:
         return draft
+
+
+def _sync_feedback_with_final_version(
+    *,
+    working_model: object,
+    question: str,
+    original_essay: str,
+    final_essay: str,
+    body_explanation: str,
+    content_comment: str,
+    grammar_comment: str,
+    content_deduction: int,
+    grammar_deduction: int,
+) -> Tuple[str, str, str, int, int]:
+    """
+    第3パス: 完成版と原文の差分のうち、既存指摘に無い修正を洗い出して追記する。
+    失敗時は入力をそのまま返す。
+    """
+    orig = (original_essay or "").strip()
+    final = (final_essay or "").strip()
+    if not orig or not final:
+        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+    if _normalize_essay_for_compare(orig) == _normalize_essay_for_compare(final):
+        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+
+    existing_grammar = _combined_grammar_bullets_text(body_explanation, grammar_comment)
+    prompt = build_feedback_coverage_audit_prompt(
+        question=question,
+        original_essay=orig,
+        final_essay=final,
+        existing_grammar=existing_grammar,
+        existing_content=content_comment,
+    )
+    try:
+        response = working_model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.1,
+                "top_p": 0.9,
+                "top_k": 20,
+                "max_output_tokens": 8192,
+            },
+        )
+        raw = _generation_response_text(response)
+        if not raw:
+            return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+        audit = parse_feedback_coverage_audit_response(raw)
+        add_g = audit.get("additional_grammar_bullets", "")
+        add_c = audit.get("content_comment_additions", "")
+        if not (add_g or "").strip() and not (add_c or "").strip():
+            return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+        return merge_feedback_coverage_audit(
+            body_explanation=body_explanation,
+            content_comment=content_comment,
+            grammar_comment=grammar_comment,
+            content_deduction=content_deduction,
+            grammar_deduction=grammar_deduction,
+            additional_grammar_bullets=add_g,
+            content_comment_additions=add_c,
+        )
+    except Exception:
+        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
 
 
 def _generation_error_hint(response: object) -> str:
@@ -216,6 +284,28 @@ def proofread_one(
 
             if not read_aloud:
                 raise ValueError("empty_read_aloud")
+
+            (
+                explanation,
+                content_comment,
+                grammar_comment,
+                content_deduction,
+                grammar_deduction,
+            ) = _sync_feedback_with_final_version(
+                working_model=working_model,
+                question=question,
+                original_essay=original_essay,
+                final_essay=read_aloud,
+                body_explanation=(explanation or "").strip(),
+                content_comment=(content_comment or "").strip(),
+                grammar_comment=(grammar_comment or "").strip(),
+                content_deduction=max(0, int(content_deduction)),
+                grammar_deduction=max(0, int(grammar_deduction)),
+            )
+            evaluation = rebuild_evaluation_line(
+                content_deduction=content_deduction,
+                grammar_deduction=grammar_deduction,
+            )
 
             fv_for_store = finalize_final_version_for_display(read_aloud, append_word_count=True)
             cd_i = max(0, int(content_deduction))
