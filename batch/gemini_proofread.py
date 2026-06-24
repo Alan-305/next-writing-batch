@@ -17,7 +17,9 @@ from nl_essay_feedback import (  # noqa: E402
     build_feedback_coverage_audit_prompt,
     build_final_version_refinement_prompt,
     build_nl_essay_prompt,
+    content_comment_has_required_sections,
     finalize_final_version_for_display,
+    finalize_grammar_and_polish_blocks,
     grammar_body_from_merged_explanation,
     merge_feedback_coverage_audit,
     merge_proofread_explanation_for_storage,
@@ -130,9 +132,10 @@ def _sync_feedback_with_final_version(
     body_explanation: str,
     content_comment: str,
     grammar_comment: str,
+    polish_comment: str,
     content_deduction: int,
     grammar_deduction: int,
-) -> Tuple[str, str, str, int, int]:
+) -> Tuple[str, str, str, int, int, str]:
     """
     第3パス: 完成版と原文の差分のうち、既存指摘に無い修正を洗い出して追記する。
     失敗時は入力をそのまま返す。
@@ -140,9 +143,9 @@ def _sync_feedback_with_final_version(
     orig = (original_essay or "").strip()
     final = (final_essay or "").strip()
     if not orig or not final:
-        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction, polish_comment
     if _normalize_essay_for_compare(orig) == _normalize_essay_for_compare(final):
-        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction, polish_comment
 
     existing_grammar = _combined_grammar_bullets_text(body_explanation, grammar_comment)
     prompt = build_feedback_coverage_audit_prompt(
@@ -151,6 +154,7 @@ def _sync_feedback_with_final_version(
         final_essay=final,
         existing_grammar=existing_grammar,
         existing_content=content_comment,
+        existing_polish=polish_comment,
     )
     try:
         response = working_model.generate_content(
@@ -164,23 +168,26 @@ def _sync_feedback_with_final_version(
         )
         raw = _generation_response_text(response)
         if not raw:
-            return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+            return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction, polish_comment
         audit = parse_feedback_coverage_audit_response(raw)
         add_g = audit.get("additional_grammar_bullets", "")
         add_c = audit.get("content_comment_additions", "")
-        if not (add_g or "").strip() and not (add_c or "").strip():
-            return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+        add_p = audit.get("additional_polish_bullets", "")
+        if not (add_g or "").strip() and not (add_c or "").strip() and not (add_p or "").strip():
+            return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction, polish_comment
         return merge_feedback_coverage_audit(
             body_explanation=body_explanation,
             content_comment=content_comment,
             grammar_comment=grammar_comment,
+            polish_comment=polish_comment,
             content_deduction=content_deduction,
             grammar_deduction=grammar_deduction,
             additional_grammar_bullets=add_g,
             content_comment_additions=add_c,
+            additional_polish_bullets=add_p,
         )
     except Exception:
-        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction
+        return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction, polish_comment
 
 
 def _generation_error_hint(response: object) -> str:
@@ -240,21 +247,20 @@ def proofread_one(
                 final_version,
                 content_comment,
                 grammar_comment,
+                polish_comment,
                 content_deduction,
                 grammar_deduction,
             ) = parse_free_writing_feedback(raw_text)
 
-            # 内容の指摘の完全性チェック: ①②③【ヒント】が揃っていなければリトライさせる。
-            # 単発・複数設問とも同じ要素を要求しているため共通で検査する。
-            _required_markers = ("①", "②", "③", "【ヒント】")
-            _cc = content_comment or ""
-            _missing = [m for m in _required_markers if m not in _cc]
-            if _missing:
-                raise RuntimeError(
-                    "content_comment_incomplete: missing="
-                    + ",".join(_missing)
-                    + f" chars={len(_cc)}"
-                )
+            if not content_comment_has_required_sections(content_comment or ""):
+                _cc = content_comment or ""
+                _missing = [m for m in ("①良い点", "②改善点", "③減点箇所") if m not in _cc]
+                if _missing:
+                    raise RuntimeError(
+                        "content_comment_incomplete: missing="
+                        + ",".join(_missing)
+                        + f" chars={len(_cc)}"
+                    )
 
             if not (final_version or "").strip() and "採点エラー" in (evaluation or ""):
                 final_version = finalize_final_version_for_display(original_essay, append_word_count=False)
@@ -291,6 +297,7 @@ def proofread_one(
                 grammar_comment,
                 content_deduction,
                 grammar_deduction,
+                polish_comment,
             ) = _sync_feedback_with_final_version(
                 working_model=working_model,
                 question=question,
@@ -299,6 +306,7 @@ def proofread_one(
                 body_explanation=(explanation or "").strip(),
                 content_comment=(content_comment or "").strip(),
                 grammar_comment=(grammar_comment or "").strip(),
+                polish_comment=(polish_comment or "").strip(),
                 content_deduction=max(0, int(content_deduction)),
                 grammar_deduction=max(0, int(grammar_deduction)),
             )
@@ -314,6 +322,7 @@ def proofread_one(
                 body_explanation=(explanation or "").strip(),
                 content_comment=(content_comment or "").strip(),
                 grammar_comment=(grammar_comment or "").strip(),
+                polish_comment=(polish_comment or "").strip(),
                 content_deduction=cd_i,
                 grammar_deduction=gd_i,
             )

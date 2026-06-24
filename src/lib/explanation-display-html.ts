@@ -1,7 +1,8 @@
-import { formatExplanationForPublicView } from "@/lib/student-release";
+import { formatExplanationForPublicView, POLISH_SECTION_HEAD, GRAMMAR_SECTION_HEAD as GRAMMAR_HEAD_EXPORT } from "@/lib/student-release";
 
 const CONTENT_HEAD = "【内容】";
-const GRAMMAR_HEAD = "【文法・語法・表現】";
+const GRAMMAR_HEAD = GRAMMAR_HEAD_EXPORT;
+const POLISH_HEAD = POLISH_SECTION_HEAD;
 
 function escapeHtml(s: string): string {
   return s
@@ -59,10 +60,18 @@ function formatContentExplainLine(line: string): string {
     return `${indent}<strong>【ヒント】</strong>${escapeHtml(rest)}`;
   }
   if (/^[\u2460-\u2473]/.test(strippedBullet)) {
-    const m = strippedBullet.match(/^([\u2460-\u2473]+\s*)([\s\S]*)$/);
-    if (!m) return indent + escapeHtml(t);
-    const circledRun = m[1];
-    const rest = m[2];
+    if (/良い点|改善点|減点箇所/.test(strippedBullet)) {
+      const headMatch = strippedBullet.match(/^([\u2460-\u2473]+(?:良い点|改善点|減点箇所))/);
+      if (headMatch) {
+        const head = headMatch[1] ?? "";
+        const tail = strippedBullet.slice(head.length);
+        return `${indent}<strong>${escapeHtml(head)}</strong>${escapeHtml(tail)}`;
+      }
+    }
+    const circledMatch = strippedBullet.match(/^([\u2460-\u2473]+\s*)([\s\S]*)$/);
+    if (!circledMatch) return indent + escapeHtml(t);
+    const circledRun = circledMatch[1];
+    const rest = circledMatch[2];
     let end = rest.length;
     for (const marker of ["。", "、", "（", "：", "\n"]) {
       const i = rest.indexOf(marker);
@@ -81,7 +90,7 @@ function formatContentExplainLine(line: string): string {
  */
 export function explanationFormattedPlainToDisplayHtml(plain: string): string {
   const lines = (plain ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  type Mode = "outer" | "content" | "grammar";
+  type Mode = "outer" | "content" | "grammar" | "polish";
   let mode: Mode = "outer";
   const out: string[] = [];
 
@@ -100,6 +109,11 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(GRAMMAR_HEAD)}</strong></div>`);
         continue;
       }
+      if (t === POLISH_HEAD) {
+        mode = "polish";
+        out.push(`<div class="explanation-section-head"><strong>${escapeHtml(POLISH_HEAD)}</strong></div>`);
+        continue;
+      }
       if (!t) {
         out.push('<div class="explanation-blank-line" aria-hidden="true"></div>');
         continue;
@@ -114,6 +128,11 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(GRAMMAR_HEAD)}</strong></div>`);
         continue;
       }
+      if (t === POLISH_HEAD) {
+        mode = "polish";
+        out.push(`<div class="explanation-section-head"><strong>${escapeHtml(POLISH_HEAD)}</strong></div>`);
+        continue;
+      }
       if (!t) {
         out.push('<div class="explanation-blank-line" aria-hidden="true"></div>');
         continue;
@@ -122,17 +141,33 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
       continue;
     }
 
-    // grammar
-    if (/^\s*文法減点\s*合計\s*[:：]/.test(line)) {
-      mode = "outer";
-      out.push(`<div class="explanation-line explanation-line--grammar">${escapeHtml(line)}</div>`);
+    if (mode === "grammar") {
+      if (t === POLISH_HEAD) {
+        mode = "polish";
+        out.push(`<div class="explanation-section-head"><strong>${escapeHtml(POLISH_HEAD)}</strong></div>`);
+        continue;
+      }
+      if (/^\s*文法減点\s*合計\s*[:：]/.test(line)) {
+        mode = "outer";
+        out.push(`<div class="explanation-line explanation-line--grammar">${escapeHtml(line)}</div>`);
+        continue;
+      }
+      if (!t) {
+        out.push('<div class="explanation-blank-line" aria-hidden="true"></div>');
+        continue;
+      }
+      out.push(`<div class="explanation-line explanation-line--grammar">${formatGrammarExplainLine(line)}</div>`);
       continue;
     }
-    if (!t) {
-      out.push('<div class="explanation-blank-line" aria-hidden="true"></div>');
+
+    if (mode === "polish") {
+      if (!t) {
+        out.push('<div class="explanation-blank-line" aria-hidden="true"></div>');
+        continue;
+      }
+      out.push(`<div class="explanation-line explanation-line--grammar">${formatGrammarExplainLine(line)}</div>`);
       continue;
     }
-    out.push(`<div class="explanation-line explanation-line--grammar">${formatGrammarExplainLine(line)}</div>`);
   }
 
   return `<div class="student-explanation-html" lang="ja">${out.join("")}</div>`;

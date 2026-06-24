@@ -42,6 +42,7 @@ QR_SIZE_MM = 12
 _GRAMMAR_HEAD = "【文法・語法・表現】"
 _GRAMMAR_HEAD_LEGACY = "【文法】"
 _CONTENT_HEAD = "【内容】"
+_POLISH_HEAD = "【完成版の書き換え】"
 _HINT_HEAD = "【ヒント】"
 _CIRCLED_HEAD_RE = re.compile(r"^[\u2460-\u2473]+")
 # 旧: 完成版の差分赤。現在は完成版を黒一色で統一（画面 /result と同趣旨）。
@@ -1080,6 +1081,13 @@ class _PageCtx:
             self.y -= gap
 
         if grammar_raw.strip():
+            pi = grammar_raw.find(_POLISH_HEAD)
+            if pi >= 0:
+                polish_raw = grammar_raw[pi:].rstrip()
+                grammar_raw = grammar_raw[:pi].rstrip()
+            else:
+                polish_raw = ""
+
             gw = _ensure_grammar_bullet_lines(grammar_raw)
             gf = _format_explanation_bullets(gw)
             if gf:
@@ -1098,6 +1106,19 @@ class _PageCtx:
                     if j:
                         self.y -= gap
                     self._draw_explanation_paragraph_colored(gln, max_width_mm=max_width_mm)
+
+            if polish_raw.strip():
+                self.y -= gap
+                plines = [x.strip() for x in polish_raw.split("\n") if x.strip()]
+                if plines:
+                    h0 = plines[0] if plines[0] == _POLISH_HEAD else _POLISH_HEAD
+                    self._draw_content_explanation_block(h0, max_width_mm=max_width_mm)
+                    self.y -= gap
+                    start_i = 1 if plines[0] == _POLISH_HEAD else 0
+                    for j, pln in enumerate(plines[start_i:]):
+                        if j:
+                            self.y -= gap
+                        self._draw_explanation_paragraph_colored(pln, max_width_mm=max_width_mm)
         elif not content_seg.strip() and raw3.strip():
             self._draw_wrapped_paragraph_all_lines(
                 raw3,

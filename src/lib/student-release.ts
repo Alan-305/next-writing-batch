@@ -97,6 +97,9 @@ function numericOrNull(v: unknown): number | null {
 /** PDF・テキスト添削結果と同じ文法ブロック見出し（旧「【文法】」は canonicalize で置換） */
 export const GRAMMAR_SECTION_HEAD = "【文法・語法・表現】";
 
+/** 減点なしの完成版書き換えメモ（解説内の第3ブロック） */
+export const POLISH_SECTION_HEAD = "【完成版の書き換え】";
+
 const CONTENT_SECTION_HEAD = "【内容】";
 
 /** 保存済み explanation 内の単独行「【文法】」を新見出しへ（本文中の偶然一致は行単位のため避けやすい） */
@@ -150,7 +153,7 @@ function leadsWithCircledDigit1To20(s: string): boolean {
 export function normalizeStudentExplanation(explanation: string): string {
   const raw = (explanation ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = raw.split("\n");
-  type Mode = "outer" | "content_body" | "grammar_body";
+  type Mode = "outer" | "content_body" | "grammar_body" | "polish_body";
   let mode: Mode = "outer";
   const out: string[] = [];
 
@@ -160,6 +163,7 @@ export function normalizeStudentExplanation(explanation: string): string {
     const t = trimmed(s);
     return t === GRAMMAR_SECTION_HEAD || t === "【文法】";
   };
+  const isPolishHead = (s: string) => trimmed(s) === POLISH_SECTION_HEAD;
   const isGrammarDeductionLine = (s: string) => /^\s*文法減点\s*合計\s*[:：]/.test(s);
   const leadsJpClausePunct = (t: string) => /^[、。，．]/.test(t);
   const isContentDeductionLine = (s: string) => /^\s*内容減点\s*合計\s*[:：]/.test(s);
@@ -180,6 +184,8 @@ export function normalizeStudentExplanation(explanation: string): string {
         mode = "content_body";
       } else if (isGrammarHead(line)) {
         mode = "grammar_body";
+      } else if (isPolishHead(line)) {
+        mode = "polish_body";
       }
       out.push(line);
       continue;
@@ -232,30 +238,54 @@ export function normalizeStudentExplanation(explanation: string): string {
       out.push(strippedBullet ? indent + strippedBullet : line);
       continue;
     }
-    // grammar_body
-    if (isGrammarDeductionLine(line)) {
-      mode = "outer";
-      out.push(line);
+    if (mode === "grammar_body") {
+      if (isGrammarDeductionLine(line)) {
+        mode = "outer";
+        out.push(line);
+        continue;
+      }
+      if (isPolishHead(line)) {
+        mode = "polish_body";
+        out.push(line);
+        continue;
+      }
+      const t = trimmed(line);
+      if (!t) {
+        out.push(line);
+        continue;
+      }
+      if (t.startsWith("●") || t.startsWith("○")) {
+        out.push(line);
+        continue;
+      }
+      if (isContentDeductionLine(line) || isGrammarDeductionLine(line)) {
+        out.push(line);
+        continue;
+      }
+      if (t === "（記載なし）" || t === "（該当なし）") {
+        out.push(line);
+        continue;
+      }
+      out.push(`● ${t}`);
       continue;
     }
-    const t = trimmed(line);
-    if (!t) {
-      out.push(line);
+    if (mode === "polish_body") {
+      const t = trimmed(line);
+      if (!t) {
+        out.push(line);
+        continue;
+      }
+      if (t.startsWith("●") || t.startsWith("○")) {
+        out.push(line);
+        continue;
+      }
+      if (t === "（記載なし）" || t === "（該当なし）") {
+        out.push(line);
+        continue;
+      }
+      out.push(`● ${t}`);
       continue;
     }
-    if (t.startsWith("●") || t.startsWith("○")) {
-      out.push(line);
-      continue;
-    }
-    if (isContentDeductionLine(line) || isGrammarDeductionLine(line)) {
-      out.push(line);
-      continue;
-    }
-    if (t === "（記載なし）") {
-      out.push(line);
-      continue;
-    }
-    out.push(`● ${t}`);
   }
 
   return out.join("\n");
@@ -402,6 +432,7 @@ export const splitExplanationToSections = splitExplanationIntoContentGrammarSect
 function buildExplanationFromSections(args: {
   contentComment: string;
   grammarComment: string;
+  polishComment?: string;
   contentDeduction: number | null;
   grammarDeduction: number | null;
   contentMax: number | null;
@@ -423,6 +454,9 @@ function buildExplanationFromSections(args: {
     const score = clampScore(args.grammarMax - gd, args.grammarMax);
     lines.push(`文法減点 合計: -${gd}点（${score}/${args.grammarMax}点）`);
   }
+  lines.push("");
+  lines.push(POLISH_SECTION_HEAD);
+  lines.push(args.polishComment?.trim() || "（該当なし）");
   return lines.join("\n").trim();
 }
 
