@@ -58,13 +58,64 @@ const BASE: Record<SubmissionStatusCode, Omit<SubmissionStatusMeta, "code">> = {
   },
 };
 
+function proofreadFinishedAfterWithdraw(
+  operatorWithdrawnAt?: string,
+  proofreadFinishedAt?: string,
+): boolean {
+  const withdrawnAt = (operatorWithdrawnAt ?? "").trim();
+  const finishedAt = (proofreadFinishedAt ?? "").trim();
+  if (!withdrawnAt || !finishedAt) return false;
+  const w = Date.parse(withdrawnAt);
+  const f = Date.parse(finishedAt);
+  if (!Number.isFinite(w) || !Number.isFinite(f)) return false;
+  return f > w;
+}
+
 export function submissionStatusMeta(
   status: string,
-  opts?: { studentViewed?: boolean; releaseWithdrawn?: boolean },
+  opts?: {
+    studentViewed?: boolean;
+    releaseWithdrawn?: boolean;
+    operatorWithdrawnAt?: string;
+    proofreadFinishedAt?: string;
+  },
 ): SubmissionStatusMeta {
-  if (opts?.releaseWithdrawn) {
-    return { code: "withdrawn", ...BASE.withdrawn };
+  const isActiveWorkflow = status === "queued" || status === "processing";
+
+  if (isActiveWorkflow) {
+    const code = status as "queued" | "processing";
+    const base = BASE[code];
+    if (opts?.releaseWithdrawn) {
+      if (status === "queued") {
+        return {
+          code: "queued",
+          label: "再添削待機中",
+          hint: "再添削キューで順番待ちです",
+          badgeClass: base.badgeClass,
+          running: true,
+        };
+      }
+      return {
+        code: "processing",
+        label: "再添削中",
+        hint: "AI が再添削しています",
+        badgeClass: base.badgeClass,
+        running: true,
+      };
+    }
+    return { code, ...base };
   }
+
+  if (opts?.releaseWithdrawn && status === "done") {
+    const redoDone = proofreadFinishedAfterWithdraw(
+      opts.operatorWithdrawnAt,
+      opts.proofreadFinishedAt,
+    );
+    if (!redoDone) {
+      return { code: "withdrawn", ...BASE.withdrawn };
+    }
+  }
+
   if (status === "done" && opts?.studentViewed) {
     return { code: "viewed", ...BASE.viewed };
   }
@@ -105,6 +156,8 @@ export const OPS_COPY = {
   proofreadQueueBusy: "預け中…",
   proofreadRetryNow: "今すぐ再実行",
   redoProofread: "再添削",
+  redoProofreadBusy: "再添削中…",
+  redoWaitingInQueue: "再添削待機中",
   redo: "やり直し",
   redoQueue: "預けてやり直し",
   cancel: "中止",

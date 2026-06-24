@@ -140,8 +140,23 @@ export function RedoProofreadSubmissionButton({
 
   const staleQueued = status === "queued" && isStaleQueuedRow({ status, proofreadQueuedAt });
   const activeQueued = status === "queued" && !staleQueued;
+  const activeProcessing = status === "processing";
 
-  if (activeQueued) return null;
+  if (activeQueued) {
+    return (
+      <button type="button" disabled className="ops-btn ops-btn--muted" title="再添削待機中">
+        {OPS_COPY.redoWaitingInQueue}
+      </button>
+    );
+  }
+
+  if (activeProcessing) {
+    return (
+      <button type="button" disabled className="ops-btn ops-btn--muted" title="再添削中">
+        {OPS_COPY.redoProofreadBusy}
+      </button>
+    );
+  }
 
   const onQueue = async () => {
     if (busyQueue) return;
@@ -183,7 +198,7 @@ export function RedoProofreadSubmissionButton({
       className={`ops-btn ${busyQueue ? "ops-btn--muted" : "ops-btn--warn"}`}
       onClick={() => void onQueue()}
     >
-      {busyQueue ? OPS_COPY.proofreadStartBusy : OPS_COPY.redoProofread}
+      {busyQueue ? OPS_COPY.redoProofreadBusy : OPS_COPY.redoProofread}
     </button>
   );
 }

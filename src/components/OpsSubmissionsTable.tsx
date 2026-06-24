@@ -31,6 +31,8 @@ export type SubmissionListRow = {
   hasDay4Assets?: boolean;
   resultPublished?: boolean;
   releaseWithdrawn?: boolean;
+  operatorWithdrawnAt?: string;
+  proofreadFinishedAt?: string;
   studentResultFirstViewedAt?: string;
   studentReceiveMethod?: "web" | "teacher_meeting";
   studentReceiveMethodAt?: string;
@@ -453,6 +455,8 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         studentViewed={item.studentViewed}
                         viewedAt={item.studentResultFirstViewedAt}
                         releaseWithdrawn={item.releaseWithdrawn}
+                        operatorWithdrawnAt={item.operatorWithdrawnAt}
+                        proofreadFinishedAt={item.proofreadFinishedAt}
                         forceProcessing={forceProcessing}
                       />
                     </td>
@@ -484,14 +488,21 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                     </td>
                     <td className="ops-table-actions-col">
                       <div className="ops-row-actions">
-                        <ProofreadSubmissionButton
-                          submissionId={item.submissionId}
-                          taskId={item.taskId}
-                          studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
-                          status={rawStatus}
-                          proofreadQueuedAt={item.proofreadQueuedAt}
-                          onEnqueued={onReloadSubmissions}
-                        />
+                        {!(
+                          item.releaseWithdrawn &&
+                          (rawStatus === "done" ||
+                            rawStatus === "queued" ||
+                            rawStatus === "processing")
+                        ) ? (
+                          <ProofreadSubmissionButton
+                            submissionId={item.submissionId}
+                            taskId={item.taskId}
+                            studentLabel={`${item.studentName}（${item.studentId}） / ${item.taskId}`}
+                            status={rawStatus}
+                            proofreadQueuedAt={item.proofreadQueuedAt}
+                            onEnqueued={onReloadSubmissions}
+                          />
+                        ) : null}
                         <CancelProofreadButton
                           submissionId={item.submissionId}
                           taskId={item.taskId}
@@ -500,7 +511,10 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                           proofreadQueuedAt={item.proofreadQueuedAt}
                           onCancelled={onReloadSubmissions}
                         />
-                        {rawStatus === "done" || rawStatus === "failed" || rawStatus === "queued" ? (
+                        {rawStatus === "done" ||
+                        rawStatus === "failed" ||
+                        ((rawStatus === "queued" || rawStatus === "processing") &&
+                          Boolean(item.proofreadFinishedAt)) ? (
                           <RedoProofreadSubmissionButton
                             submissionId={item.submissionId}
                             taskId={item.taskId}
