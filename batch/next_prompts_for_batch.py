@@ -32,18 +32,20 @@ DISCOURSE_MARKER_RULES = """
 VETERAN_GRAMMAR_TEACHING_RULES = """
 # ベテラン講師の必須指摘（than・時制・減点なしの書き換え）— 厳守
 
-## than と比較級（必ず指摘）
-- `than` で比較・対比するのに形容詞・副詞が**原級のまま**（例: put a **high** value ... **than** earning）は**重要な文法誤り**として**必ず**●行で指摘する（➖2点）。
-- 正しい修正は文脈に応じて次の**どちらか**（完成版ではどちらか一方を採用）:
-  1. **比較級＋than**: put a **higher** value ... **than** earning ...
-  2. **対比なら rather than**: put a high value ... **rather than** earning ...
-- 完成版で **rather than** を採用した場合も、**than のままでは比較級（higher ... than）が必要だった**こと、および**本答案では rather than で二つの選択肢の対比を明確にした**ことを●行で**必ず**説明する。`such as ... than` のような誤用を rather than に直したのに、その理由を書かないことは禁止。
-- `such as A than B` のように such as と than が不自然に結びついている場合は、**rather than** または比較級構文への直し方を示し、完成版で採用した方針を解説に明記する。
+## than と比較級（1つの●行にまとめる・重複禁止）
+- `than` / `rather than` / `such as ... than` / 原級＋than / `high value ... than` など**同一答案内の関連誤りは grammar_comment で●行1本のみ**（2行以上書く禁止。減点も1回のみ）。
+- その1行の中で、次の**2通りの直し方を簡潔に示す**（完成版で採用した方を明記）:
+  1. **rather than を使う場合**: `put a high value on ... rather than earning`（higher は使わない）
+  2. **higher を活かす場合**: `put a higher value on ... than on earning`（rather than は使わない）
+- `such as A than B` は非文法。`such as` と `than` は共存不可であることを同じ●行で説明する。
 
-## 時の副詞と動詞の時制（必ず言及）
-- 時の副詞句（**in recent years**, since ..., over the past decade, for years 等）を追加・修正したときは、**動詞の時制**との整合を**同じ●行または直後の●行で必ず言及**する。
-- 例: `recent years` → `in recent years` に直すなら、`The popularity ... is increasing` を `has been increasing` など**現在完了・現在完了進行形**に合わせる理由を述べ、完成版でも時制を整合させる。
-- 時の副詞だけ直して時制に触れない指摘は、ベテラン講師として不十分（禁止）。
+## 時の副詞と動詞の時制（1つの●行・重複禁止）
+- `in recent years` 等の副詞句と時制の整合は**1つの●行**にまとめる（前置詞 in の修正＋`has been increasing` 等への時制修正を同一行で説明）。同じ箇所を2行以上書く禁止。
+
+## 文法●行の品質（ベテラン講師）
+- **同一の誤り・同一の修正方針を繰り返し書かない**（監査追記でも重複禁止）。
+- 比較級 `more important than` も**1行のみ**。
+- grammar_comment に**見出し・減点合計行・【完成版】は書かない**。
 
 ## 減点対象でない書き換え（polish_comment へ・grammar 禁止）
 - 完成版で表現を変えても**減点基準に当たらない**場合（語彙の自然化、明瞭化、読みやすさ向上、environmental problems/issues 程度の語彙差など）は**減点しない**。**grammar_comment・本文の文法●行には絶対に書かない**。
@@ -63,10 +65,11 @@ COMPACT_FEEDBACK_LAYOUT_RULES = """
    - `②改善点` … 同上（最大4項目。完成版で直した内容面の改善を簡潔に）
    - `③減点箇所` … **内容点で減点した箇所のみ** `・` 箇条書き。各行末に `（➖N点）`。**減点が無ければ** `・（該当なし）` の1行
    - **禁止**: 意図の言語化の長段落、【ヒント】、旧形式の「①設問の条件…」長文解説、文法の●行、減点なしの細かい褒め言葉の羅列
-2. **`grammar_comment`（【文法・語法・表現】）** — **減点あり（➖1点以上）の●行のみ**。`（➖0点）` や減点表記の無い行は**絶対に入れない**。各1行簡潔（誤り → 正：理由（➖N点））
-3. **`polish_comment`（【完成版】）** — 完成版で変えたが**減点対象ではない**表現のみ。各行 `● 原文 → 完成版：理由`（**減点表記は付けない**）
+2. **`grammar_comment`（【文法・語法・表現】）** — **減点あり（➖1点以上）の●行のみ**。同一誤りの重複●行禁止。than/rather than 関連は**1行に2通りの直し方**を示す。
+3. **`polish_comment`（【完成版】）** — 減点なしの書き換え●行のみ。**見出し・減点合計・【完成版】・（該当なし）は書かない**。grammar_comment と重複する指摘は入れない。
 
 ## 自己確認（出力前）
+- grammar に同じ誤りが2行以上ないか
 - 3ブロック間で同じ修正を二重に書いていないか
 - grammar_comment に（➖0点）や減点無し行が混ざっていないか
 - polish_comment に減点表記が無いか

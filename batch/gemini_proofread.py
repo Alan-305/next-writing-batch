@@ -14,6 +14,7 @@ from gemini_working_model import get_working_model
 from nl_essay_feedback import (  # noqa: E402
     _combined_grammar_bullets_text,
     _normalize_essay_for_compare,
+    _sum_deduction_points_from_explanation,
     build_feedback_coverage_audit_prompt,
     build_final_version_refinement_prompt,
     build_nl_essay_prompt,
@@ -326,15 +327,15 @@ def proofread_one(
                 grammar_deduction=max(0, int(grammar_deduction)),
             )
 
-            if grammar_comment_has_zero_point_lines(grammar_comment or ""):
-                gc, pc, _ = finalize_grammar_and_polish_blocks(
-                    grammar_comment=(grammar_comment or "").strip(),
-                    polish_comment=(polish_comment or "").strip(),
-                    body_explanation=(explanation or "").strip(),
-                )
-                grammar_comment = gc
-                polish_comment = pc
-                explanation = ""
+            grammar_comment, polish_comment, explanation = finalize_grammar_and_polish_blocks(
+                grammar_comment=(grammar_comment or "").strip(),
+                polish_comment=(polish_comment or "").strip(),
+                body_explanation=(explanation or "").strip(),
+            )
+            grammar_deduction = max(
+                0,
+                min(25, _sum_deduction_points_from_explanation(grammar_comment or "")),
+            )
 
             if grammar_comment_has_zero_point_lines(grammar_comment or ""):
                 raise RuntimeError("grammar_comment_has_zero_point_lines")
