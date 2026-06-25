@@ -2,9 +2,10 @@ import {
   formatExplanationForPublicView,
   POLISH_SECTION_HEAD,
   GRAMMAR_SECTION_HEAD as GRAMMAR_HEAD_EXPORT,
-  EXPLANATION_BULLET,
   isExplanationDeductionSummaryLine,
   stripExplanationDeductionSummaryLine,
+  isExplanationBulletedLine,
+  stripExplanationBulletedLinePrefix,
 } from "@/lib/student-release";
 
 const CONTENT_HEAD = "【内容】";
@@ -38,10 +39,18 @@ function formatDeductionSummaryLine(line: string): string {
   return `${indent}<strong class="explanation-deduction-summary">${escapeHtml(t)}</strong>`;
 }
 
+function explanationLineDiv(classNames: string, innerHtml: string, line: string): string {
+  const bulleted = isExplanationBulletedLine(line);
+  const cls = bulleted ? `${classNames} explanation-line--bulleted` : classNames;
+  return `<div class="${cls}">${innerHtml}</div>`;
+}
+
 function formatGrammarExplainLine(line: string): string {
   const indent = line.match(/^\s*/)?.[0] ?? "";
-  const t = line.trim();
-  const body = t.replace(/^(?:●|○|・)\s*/, "");
+  const raw = line.trim();
+  const bulleted = isExplanationBulletedLine(raw);
+  const t = bulleted ? stripExplanationBulletedLinePrefix(raw) : raw;
+  const body = t;
   const arrow = "→";
   const arrowIdx = body.indexOf(arrow);
   if (arrowIdx === -1) {
@@ -50,9 +59,6 @@ function formatGrammarExplainLine(line: string): string {
   let wrong = body.slice(0, arrowIdx).trim();
   const post = body.slice(arrowIdx + arrow.length).trimStart();
   const { correct, suffix } = splitCorrectEnglishAndSuffix(post);
-  if (wrong && !/^(?:●|○|・)/.test(wrong)) {
-    wrong = `${EXPLANATION_BULLET}${wrong}`;
-  }
   const prefix = escapeHtml(`${wrong} ${arrow} `);
   const correctHtml = `<span class="grammar-correct-en">${escapeHtml(correct)}</span>`;
   return indent + prefix + correctHtml + escapeHtml(suffix);
@@ -60,11 +66,12 @@ function formatGrammarExplainLine(line: string): string {
 
 function formatContentExplainLine(line: string): string {
   const indent = line.match(/^\s*/)?.[0] ?? "";
-  const t = line.trim();
+  const raw = line.trim();
   if (isExplanationDeductionSummaryLine(line)) {
     return formatDeductionSummaryLine(line);
   }
-  const strippedBullet = t.replace(/^(?:●|○|・)\s*/, "");
+  const t = isExplanationBulletedLine(raw) ? stripExplanationBulletedLinePrefix(raw) : raw;
+  const strippedBullet = t;
   if (strippedBullet === "【ヒント】" || strippedBullet.startsWith("【ヒント】")) {
     if (strippedBullet === "【ヒント】") {
       return `${indent}<strong>【ヒント】</strong>`;
@@ -152,11 +159,21 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
       }
       if (isExplanationDeductionSummaryLine(line)) {
         out.push(
-          `<div class="explanation-line explanation-line--content explanation-line--deduction">${formatContentExplainLine(line)}</div>`,
+          explanationLineDiv(
+            "explanation-line explanation-line--content explanation-line--deduction",
+            formatContentExplainLine(line),
+            line,
+          ),
         );
         continue;
       }
-      out.push(`<div class="explanation-line explanation-line--content">${formatContentExplainLine(line)}</div>`);
+      out.push(
+        explanationLineDiv(
+          "explanation-line explanation-line--content",
+          formatContentExplainLine(line),
+          line,
+        ),
+      );
       continue;
     }
 
@@ -175,7 +192,13 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
         out.push('<div class="explanation-blank-line" aria-hidden="true"></div>');
         continue;
       }
-      out.push(`<div class="explanation-line explanation-line--grammar">${formatGrammarExplainLine(line)}</div>`);
+      out.push(
+        explanationLineDiv(
+          "explanation-line explanation-line--grammar",
+          formatGrammarExplainLine(line),
+          line,
+        ),
+      );
       continue;
     }
 
@@ -185,10 +208,22 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
         continue;
       }
       if (isExplanationDeductionSummaryLine(line)) {
-        out.push(`<div class="explanation-line explanation-line--deduction">${formatDeductionSummaryLine(line)}</div>`);
+        out.push(
+          explanationLineDiv(
+            "explanation-line explanation-line--deduction",
+            formatDeductionSummaryLine(line),
+            line,
+          ),
+        );
         continue;
       }
-      out.push(`<div class="explanation-line explanation-line--grammar">${formatGrammarExplainLine(line)}</div>`);
+      out.push(
+        explanationLineDiv(
+          "explanation-line explanation-line--grammar",
+          formatGrammarExplainLine(line),
+          line,
+        ),
+      );
       continue;
     }
   }

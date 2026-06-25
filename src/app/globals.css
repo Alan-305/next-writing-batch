@@ -268,6 +268,21 @@ select:focus-visible {
   margin: 0.12em 0;
 }
 
+.student-explanation-html .explanation-line--bulleted {
+  position: relative;
+  padding-left: 1.2em;
+}
+
+.student-explanation-html .explanation-line--bulleted::before {
+  content: "・";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 1.28em;
+  line-height: 1.05;
+  font-weight: 600;
+}
+
 .student-explanation-html .explanation-blank-line {
   height: 0.45em;
 }
@@ -340,15 +355,14 @@ select:focus-visible {
 }
 
 .student-result-page .student-result-card--score {
-  padding-right: 10px;
+  padding-right: 8px;
 }
 
 .student-result-page .student-result-score-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  min-height: 3.5rem;
+  gap: 8px;
 }
 
 .student-result-page .student-result-score-main {
@@ -357,86 +371,62 @@ select:focus-visible {
 }
 
 .student-result-page .score-eval-stamp {
-  position: relative;
   flex: 0 0 auto;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 7.5rem;
-  height: 7.5rem;
-  transform: rotate(-8deg);
+  padding: 0.28rem 0.55rem;
+  border: 2.5px solid currentColor;
+  border-radius: 3px;
+  transform: rotate(-4deg);
   user-select: none;
   pointer-events: none;
-}
-
-.student-result-page .score-eval-stamp__ring {
-  position: absolute;
-  inset: 0;
-  border: 3px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.92;
   box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
-    0 2px 10px rgba(15, 23, 42, 0.18);
-}
-
-.student-result-page .score-eval-stamp__ring::before {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border: 2px dashed currentColor;
-  border-radius: 50%;
-  opacity: 0.75;
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 1px 4px rgba(15, 23, 42, 0.12);
 }
 
 .student-result-page .score-eval-stamp__text {
-  position: relative;
-  z-index: 1;
-  max-width: 6rem;
   text-align: center;
   font-family: Century, "Century Schoolbook", Georgia, "Times New Roman", serif;
   font-weight: 800;
-  font-size: 0.95rem;
-  line-height: 1.15;
+  font-size: 0.78rem;
+  line-height: 1.2;
   letter-spacing: 0.02em;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
 }
 
 .student-result-page .score-eval-stamp--excellent {
   color: #b45309;
-  filter: drop-shadow(0 3px 6px rgba(180, 83, 9, 0.35));
 }
 
 .student-result-page .score-eval-stamp--excellent .score-eval-stamp__text {
-  font-size: 1.05rem;
+  font-size: 0.82rem;
   background: linear-gradient(135deg, #fde047 0%, #f59e0b 45%, #d97706 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  text-shadow: none;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.6));
 }
 
 .student-result-page .score-eval-stamp--very_good {
   color: #047857;
-  filter: drop-shadow(0 3px 6px rgba(4, 120, 87, 0.28));
 }
 
 .student-result-page .score-eval-stamp--very_good .score-eval-stamp__text {
-  font-size: 1rem;
+  font-size: 0.8rem;
   color: #047857;
 }
 
 .student-result-page .score-eval-stamp--good_try {
   color: #c2410c;
-  filter: drop-shadow(0 2px 5px rgba(194, 65, 12, 0.25));
 }
 
 .student-result-page .score-eval-stamp--good_try .score-eval-stamp__text {
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   line-height: 1.25;
-  color: #c2410c;
+  white-space: normal;
+  max-width: 5.5rem;
   font-family: var(--font-serif-jp, "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif);
 }
 
@@ -474,6 +464,14 @@ select:focus-visible {
 
 .student-result-page .student-explanation-html .explanation-line {
   margin: 0.04em 0;
+}
+
+.student-result-page .student-explanation-html .explanation-line--bulleted {
+  padding-left: 1.15em;
+}
+
+.student-result-page .student-explanation-html .explanation-line--bulleted::before {
+  font-size: 1.24em;
 }
 
 .student-result-page .student-explanation-html .explanation-blank-line {
@@ -2947,15 +2945,15 @@ a.ops-btn {
   }
 
   .student-result-print-fit .score-eval-stamp {
-    width: 6.5rem;
-    height: 6.5rem;
-    transform: rotate(-6deg);
+    padding: 0.2rem 0.45rem;
+    transform: rotate(-3deg);
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .student-result-print-fit .score-eval-stamp--good_try .score-eval-stamp__text {
-    font-size: 0.65rem;
+    font-size: 0.58rem;
+    max-width: 4.8rem;
   }
 
   .student-result-print-fit .student-result-score-line {

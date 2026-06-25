@@ -217,6 +217,47 @@ def _line_deduction_points(line: str) -> Optional[int]:
         return None
 
 
+def _is_explanation_bullet_line(line: str) -> bool:
+    return bool(re.match(r"^(?:●|○|・)\s*", (line or "").strip()))
+
+
+def _ensure_content_bullet_line(line: str) -> str:
+    t = (line or "").strip()
+    if not t:
+        return line
+    if re.match(r"^[\u2460-\u2473].*?(?:良い点|改善点|減点箇所)", t):
+        return line
+    if t in ("（記載なし）", "（該当なし）"):
+        return t
+    if re.match(r"^(?:内容|文法)減点\s*合計\s*[:：]", t):
+        return t
+    if t.startswith("【"):
+        return line
+    body = re.sub(r"^(?:●|○|・|-)\s*", "", t)
+    if not body:
+        return line
+    return _ensure_explanation_bullet_line_punctuation(f"・{body}")
+
+
+def _ensure_explanation_bullet_line_punctuation(line: str) -> str:
+    t = (line or "").strip()
+    if not t:
+        return line
+    if re.match(r"^(?:内容|文法)減点\s*合計\s*[:：]", t):
+        return t
+    if re.match(r"^[\u2460-\u2473].*?(?:良い点|改善点|減点箇所)", t):
+        return t
+    if t in ("（記載なし）", "（該当なし）"):
+        return t
+    if t.startswith("【"):
+        return line
+    if not re.match(r"^(?:●|○|・)", t):
+        return line
+    if re.search(r"[。．.!?！？]$", t) or re.search(r"[：:]\s*$", t):
+        return t
+    return f"{t}。"
+
+
 def partition_grammar_and_polish_bullets(text: str) -> Tuple[str, str]:
     """文法●行を減点あり／減点なし（完成版の書き換え用）に分割する。"""
     ded_lines: List[str] = []
@@ -227,10 +268,9 @@ def partition_grammar_and_polish_bullets(text: str) -> Tuple[str, str]:
         t = ln.strip()
         if not t:
             continue
-        if not t.startswith("●") and not t.startswith("○"):
+        if not _is_explanation_bullet_line(t):
             continue
-        if not t.startswith("●"):
-            t = f"● {t.lstrip('○').strip()}"
+        t = _normalize_explanation_bullet_line(ln)
         key = _grammar_bullet_key(t)
         pts = _line_deduction_points(t)
         if pts is None or pts <= 0:
@@ -337,16 +377,28 @@ def _parse_content_comment_sections(text: str) -> Tuple[List[str], List[str], Li
         kind = _content_section_kind(line)
         if kind:
             mode = kind
+            m = re.match(
+                r"^[\u2460-\u2473]+(?:良い点|改善点|減点箇所)\s*(.*)$",
+                line.strip(),
+            )
+            if m and (m.group(1) or "").strip():
+                tail = _ensure_content_bullet_line(m.group(1).strip())
+                if kind == "good":
+                    good.append(tail)
+                elif kind == "improve":
+                    improve.append(tail)
+                else:
+                    deduct.append(tail)
             continue
         t = line.strip()
         if not t:
             continue
         if mode == "good":
-            good.append(line)
+            good.append(_ensure_content_bullet_line(line))
         elif mode == "improve":
-            improve.append(line)
+            improve.append(_ensure_content_bullet_line(line))
         elif mode == "deduct":
-            deduct.append(line)
+            deduct.append(_ensure_content_bullet_line(line))
     return good, improve, deduct
 
 
@@ -364,6 +416,8 @@ def _is_improvement_junk_bullet(line: str) -> bool:
     if not t:
         return True
     if t in ("（該当なし）", "（記載なし）", "②の改善点", "②の改善点を参照"):
+        return True
+    if t in ("（内容面の減点あり）",):
         return True
     if re.match(r"^②", t):
         return True
@@ -408,6 +462,25 @@ def _distribute_content_deductions(n_bullets: int, total: int) -> List[int]:
     return marks
 
 
+def _recover_improvement_bullets_from_text(text: str) -> List[str]:
+    """②改善点が空のとき、減点表記付き行や③減点箇所行を救済する。"""
+    out: List[str] = []
+    seen: set[str] = set()
+    for line in (text or "").splitlines():
+        t = line.strip()
+        if not t or _content_section_kind(t):
+            continue
+        if _is_content_praise_bullet(t):
+            continue
+        if _CONTENT_DEDUCTION_MARK_RE.search(t):
+            base, _ = _strip_content_deduction_mark(t)
+            norm = _ensure_content_bullet_line(base)
+            if norm and not _is_improvement_junk_bullet(norm) and norm not in seen:
+                seen.add(norm)
+                out.append(norm)
+    return out
+
+
 def finalize_content_comment(content_comment: str, content_deduction: int) -> str:
     """
     content_comment を2区分（①良い点・②改善点）に整理する。
@@ -419,6 +492,11 @@ def finalize_content_comment(content_comment: str, content_deduction: int) -> st
     good, improve, deduct = _parse_content_comment_sections(cc)
     cd = max(0, min(25, int(content_deduction)))
 
+    good = [
+        ln
+        for ln in (_ensure_content_bullet_line(ln) for ln in good)
+        if ln.strip() and not _is_improvement_junk_bullet(ln)
+    ]
     improve = [ln for ln in improve if not _is_improvement_junk_bullet(ln)]
 
     if cd == 0:
@@ -432,7 +510,7 @@ def finalize_content_comment(content_comment: str, content_deduction: int) -> st
             base, pts = _strip_content_deduction_mark(ln)
             if _is_improvement_junk_bullet(base):
                 continue
-            bullets.append(base)
+            bullets.append(_ensure_content_bullet_line(base))
             marks.append(pts)
         for ln in deduct:
             if _is_improvement_junk_bullet(ln):
@@ -440,13 +518,20 @@ def finalize_content_comment(content_comment: str, content_deduction: int) -> st
             base, pts = _strip_content_deduction_mark(ln)
             if not base or _is_improvement_junk_bullet(base):
                 continue
-            norm = base if base.startswith("・") else f"・{base.lstrip('・')}"
+            norm = _ensure_content_bullet_line(base)
             if norm not in bullets:
                 bullets.append(norm)
                 marks.append(pts)
 
         if not bullets:
-            bullets = ["・（内容面の減点あり）"]
+            bullets = _recover_improvement_bullets_from_text(cc)
+            marks = []
+            for ln in bullets:
+                _, pts = _strip_content_deduction_mark(ln)
+                marks.append(pts)
+
+        if not bullets:
+            bullets = ["・内容面の論点・構成を見直してください。"]
             marks = [cd]
 
         mark_sum = sum(marks)
@@ -471,7 +556,7 @@ def grammar_comment_has_zero_point_lines(text: str) -> bool:
 
 
 def _grammar_error_phrase(line: str) -> str:
-    m = re.search(r"●\s*`?([^`→]+)`?\s*→", line or "")
+    m = re.search(r"^(?:●|○|・)\s*`?([^`→]+)`?\s*→", (line or "").strip())
     if m:
         return re.sub(r"\s+", " ", m.group(1).lower().strip())
     return _grammar_bullet_key(line)
@@ -649,12 +734,13 @@ def sanitize_polish_comment(polish_comment: str, grammar_comment: str) -> str:
             continue
         if _POLISH_JUNK_LINE_RE.match(t):
             continue
-        if "【完成版" in t and not t.startswith("●"):
+        if "【完成版" in t and not _is_explanation_bullet_line(t):
             continue
-        if "減点" in t and "合計" in t and not t.startswith("●"):
+        if "減点" in t and "合計" in t and not _is_explanation_bullet_line(t):
             continue
-        if not t.startswith("●"):
+        if not _is_explanation_bullet_line(t):
             continue
+        t = _normalize_explanation_bullet_line(ln)
         if _polish_line_overlaps_grammar_deduction(t, gc):
             continue
         key = _grammar_bullet_key(t)
@@ -693,8 +779,8 @@ def _extract_grammar_bullet_lines(text: str) -> List[str]:
     out: List[str] = []
     for ln in (text or "").splitlines():
         t = ln.strip()
-        if t.startswith("●"):
-            out.append(t)
+        if _is_explanation_bullet_line(t):
+            out.append(_normalize_explanation_bullet_line(ln))
     return out
 
 
@@ -1371,7 +1457,7 @@ def _normalize_explanation_bullet_line(line: str) -> str:
     body = re.sub(r"^(?:●|○|・)\s*", "", t)
     if not body:
         return line
-    return indent + _EXPLANATION_BULLET_PY + body
+    return indent + _ensure_explanation_bullet_line_punctuation(_EXPLANATION_BULLET_PY + body)
 
 
 def canonicalize_growth_hint_heading_explanation(text: str) -> str:
@@ -1413,6 +1499,7 @@ def normalize_student_explanation_text(text: str) -> str:
     lines = raw.split("\n")
     mode = "outer"
     out: List[str] = []
+    content_sub: Optional[str] = None
 
     def trimmed(s: str) -> str:
         return s.strip()
@@ -1451,6 +1538,7 @@ def normalize_student_explanation_text(text: str) -> str:
         if mode == "outer":
             if is_content_head(line):
                 mode = "content_body"
+                content_sub = None
                 out.append(line)
                 continue
             if is_grammar_head(line):
@@ -1466,7 +1554,13 @@ def normalize_student_explanation_text(text: str) -> str:
         if mode == "content_body":
             if is_grammar_head(line):
                 mode = "grammar_body"
+                content_sub = None
                 out.append(line)
+                continue
+            if is_polish_head(line):
+                mode = "polish_body"
+                content_sub = None
+                out.append(_POLISH_SECTION_HEAD_PY)
                 continue
             t0 = line.lstrip(" \t")
             if t0 and leads_jp_clause_punct(t0) and out:
@@ -1493,13 +1587,33 @@ def normalize_student_explanation_text(text: str) -> str:
             indent_m = re.match(r"^\s*", line)
             indent = indent_m.group(0) if indent_m else ""
             if re.match(r"^[\u2460-\u2473]", stripped_bullet):
-                out.append(indent + stripped_bullet)
+                head_m = re.match(
+                    r"^([\u2460-\u2473]+(?:良い点|改善点|減点箇所))(\s*)([\s\S]*)$",
+                    stripped_bullet,
+                )
+                if head_m:
+                    head = head_m.group(1) or ""
+                    tail = (head_m.group(3) or "").strip()
+                    if "良い点" in head:
+                        content_sub = "good"
+                    elif "改善点" in head:
+                        content_sub = "improve"
+                    else:
+                        content_sub = "deduct"
+                    out.append(indent + head)
+                    if tail:
+                        out.append(_ensure_content_bullet_line(tail))
+                else:
+                    out.append(indent + stripped_bullet)
                 continue
             if stripped_bullet == _HINT_HEAD_PY or stripped_bullet.startswith(_HINT_HEAD_PY):
                 out.append(indent + stripped_bullet)
                 continue
             if t == "（記載なし）":
                 out.append(line)
+                continue
+            if content_sub in ("good", "improve", "deduct"):
+                out.append(_ensure_content_bullet_line(stripped_bullet or t))
                 continue
             out.append(indent + stripped_bullet if stripped_bullet else line)
             continue

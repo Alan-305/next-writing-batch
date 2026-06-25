@@ -18,6 +18,7 @@ from nl_essay_feedback import (
     canonicalize_legacy_grammar_heading_explanation,
     normalize_student_explanation_text,
     strip_final_essay_artifacts,
+    _ensure_explanation_bullet_line_punctuation,
 )
 
 # Layout constants (A4 return sheet)
@@ -326,11 +327,11 @@ def _ensure_grammar_bullet_lines(text: str) -> str:
         elif s.startswith(("●", "○", "・")):
             body = re.sub(r"^(?:●|○)\s*", "", s)
             if body.startswith("・"):
-                out.append(body)
+                out.append(_ensure_explanation_bullet_line_punctuation(body))
             else:
-                out.append(f"・{body.lstrip('・')}")
+                out.append(_ensure_explanation_bullet_line_punctuation(f"・{body.lstrip('・')}"))
         else:
-            out.append(f"・{s}")
+            out.append(_ensure_explanation_bullet_line_punctuation(f"・{s}"))
     new_after = "\n".join(out).lstrip("\n")
     return before + ("\n" + new_after if new_after else "")
 

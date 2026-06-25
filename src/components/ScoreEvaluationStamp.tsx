@@ -15,7 +15,6 @@ export function ScoreEvaluationStamp({ scoreTotal, scoreMaxTotal }: Props) {
       role="img"
       aria-label={`得点率 ${stamp.percentage}パーセント — ${stamp.label}`}
     >
-      <span className="score-eval-stamp__ring" aria-hidden="true" />
       <span className="score-eval-stamp__text">{stamp.label}</span>
     </div>
   );

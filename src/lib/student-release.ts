@@ -113,6 +113,47 @@ export function stripExplanationDeductionSummaryLine(line: string): string {
   return indent + t;
 }
 
+const EXPLANATION_BULLET_LINE_RE = /^(?:●|○|・)\s*/;
+const EXPLANATION_LINE_END_PUNCT_RE = /[。．.!?！？]$/;
+const EXPLANATION_LINE_OPEN_DELIM_END_RE = /[：:]\s*$/;
+
+/** 箇条書き行の末尾に句点を付ける（見出し・減点合計・プレースホルダは除外） */
+export function ensureExplanationBulletLinePunctuation(line: string): string {
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  let t = line.trim();
+  if (!t) return line;
+  if (isExplanationDeductionSummaryLine(t)) return line;
+  if (/^[\u2460-\u2473]/.test(t) && /良い点|改善点|減点箇所/.test(t)) return line;
+  if (t === "（記載なし）" || t === "（該当なし）") return line;
+  if (t.startsWith("【")) return line;
+  if (!EXPLANATION_BULLET_LINE_RE.test(t)) return line;
+  if (EXPLANATION_LINE_END_PUNCT_RE.test(t) || EXPLANATION_LINE_OPEN_DELIM_END_RE.test(t)) {
+    return `${indent}${t}`;
+  }
+  return `${indent}${t}。`;
+}
+
+export function isExplanationBulletedLine(line: string): boolean {
+  return EXPLANATION_BULLET_LINE_RE.test(line.trim());
+}
+
+export function stripExplanationBulletedLinePrefix(line: string): string {
+  return line.trim().replace(EXPLANATION_BULLET_LINE_RE, "");
+}
+
+export function ensureContentSectionBulletLine(line: string): string {
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  let t = line.trim();
+  if (!t) return line;
+  if (/^[\u2460-\u2473]/.test(t) && /良い点|改善点|減点箇所/.test(t)) return line;
+  if (t === "（記載なし）" || t === "（該当なし）") return line;
+  if (isExplanationDeductionSummaryLine(t)) return stripExplanationDeductionSummaryLine(line);
+  if (t.startsWith("【")) return line;
+  t = t.replace(/^(?:●|○|・)\s*/, "").replace(/^[-－—]\s*/, "");
+  if (!t) return line;
+  return ensureExplanationBulletLinePunctuation(`${indent}${EXPLANATION_BULLET}${t}`);
+}
+
 /** 文法・書き換え行の先頭を小さい中黒 `・` に統一 */
 export function normalizeExplanationBulletLine(line: string): string {
   const indent = line.match(/^\s*/)?.[0] ?? "";
@@ -123,7 +164,7 @@ export function normalizeExplanationBulletLine(line: string): string {
   }
   const body = t.replace(/^(?:●|○|・)\s*/, "");
   if (!body) return line;
-  return `${indent}${EXPLANATION_BULLET}${body}`;
+  return ensureExplanationBulletLinePunctuation(`${indent}${EXPLANATION_BULLET}${body}`);
 }
 
 /** 減点なしの完成版書き換えメモ（解説内の第3ブロック。英文ブロック「完成版」と区別する） */
@@ -232,7 +273,9 @@ export function normalizeStudentExplanation(explanation: string): string {
   const raw = (explanation ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = raw.split("\n");
   type Mode = "outer" | "content_body" | "grammar_body" | "polish_body";
+  type ContentSub = "none" | "good" | "improve";
   let mode: Mode = "outer";
+  let contentSub: ContentSub = "none";
   const out: string[] = [];
 
   const trimmed = (s: string) => s.trim();
@@ -263,6 +306,7 @@ export function normalizeStudentExplanation(explanation: string): string {
     if (mode === "outer") {
       if (isContentHead(line)) {
         mode = "content_body";
+        contentSub = "none";
       } else if (isGrammarHead(line)) {
         mode = "grammar_body";
       } else if (isPolishHead(line)) {
@@ -276,7 +320,14 @@ export function normalizeStudentExplanation(explanation: string): string {
     if (mode === "content_body") {
       if (isGrammarHead(line)) {
         mode = "grammar_body";
+        contentSub = "none";
         out.push(line);
+        continue;
+      }
+      if (isPolishHead(line)) {
+        mode = "polish_body";
+        contentSub = "none";
+        out.push(POLISH_SECTION_HEAD);
         continue;
       }
       const t0 = line.trimStart();
@@ -307,7 +358,18 @@ export function normalizeStudentExplanation(explanation: string): string {
       const strippedBullet = stripContentLeadingMarkers(t);
       const indent = line.match(/^\s*/)?.[0] ?? "";
       if (leadsWithCircledDigit1To20(strippedBullet)) {
-        out.push(indent + strippedBullet);
+        const headMatch = strippedBullet.match(/^([\u2460-\u2473]+(?:良い点|改善点|減点箇所))(\s*)([\s\S]*)$/);
+        if (headMatch) {
+          const head = headMatch[1] ?? "";
+          const tail = (headMatch[3] ?? "").trim();
+          if (/良い点/.test(head)) contentSub = "good";
+          else if (/改善点/.test(head)) contentSub = "improve";
+          else contentSub = "none";
+          out.push(indent + head);
+          if (tail) out.push(ensureContentSectionBulletLine(tail));
+        } else {
+          out.push(indent + strippedBullet);
+        }
         continue;
       }
       if (strippedBullet === "【ヒント】" || strippedBullet.startsWith("【ヒント】")) {
@@ -316,6 +378,10 @@ export function normalizeStudentExplanation(explanation: string): string {
       }
       if (t === "（記載なし）") {
         out.push(line);
+        continue;
+      }
+      if (contentSub === "good" || contentSub === "improve") {
+        out.push(ensureContentSectionBulletLine(strippedBullet || t));
         continue;
       }
       out.push(strippedBullet ? indent + strippedBullet : line);
@@ -485,9 +551,11 @@ export function splitExplanationIntoContentGrammarSections(explanation: string):
   const rawLines = src.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   const isContentHead = (s: string) => /^【内容】$/.test(s);
   const isGrammarHead = (s: string) => /^【文法(?:・語法・表現)?】$/.test(s);
+  const isPolishHead = (s: string) =>
+    s === POLISH_SECTION_HEAD || s === POLISH_SECTION_HEAD_LEGACY;
   const isDeductionLine = (s: string) => /^(内容|文法)減点\s*合計\s*[:：]/.test(s);
 
-  let mode: "none" | "content" | "grammar" = "none";
+  let mode: "none" | "content" | "grammar" | "polish" = "none";
   let sawHead = false;
   const contentLines: string[] = [];
   const grammarLines: string[] = [];
@@ -500,6 +568,11 @@ export function splitExplanationIntoContentGrammarSections(explanation: string):
     }
     if (isGrammarHead(line)) {
       mode = "grammar";
+      sawHead = true;
+      continue;
+    }
+    if (isPolishHead(line)) {
+      mode = "polish";
       sawHead = true;
       continue;
     }
@@ -741,6 +814,7 @@ export function seedStudentReleaseFromProofread(pr: {
   explanation?: string;
   content_comment?: string;
   grammar_comment?: string;
+  polish_comment?: string;
   content_deduction?: number;
   grammar_deduction?: number;
   final_version?: string;
@@ -757,6 +831,7 @@ export function seedStudentReleaseFromProofread(pr: {
     : { contentComment: "", grammarComment: "" };
   const contentCommentFromApi = (pr.content_comment || "").trim();
   const grammarCommentFromApi = (pr.grammar_comment || "").trim();
+  const polishCommentFromApi = (pr.polish_comment || "").trim();
   const alreadyMerged = proofreadExplanationLooksSectionMerged(explRaw);
   /**
    * マージ済み explanation 内の本文は realign 済みで減点と一致している。
@@ -778,6 +853,7 @@ export function seedStudentReleaseFromProofread(pr: {
     !alreadyMerged &&
     (contentCommentFromApi ||
       grammarCommentFromApi ||
+      polishCommentFromApi ||
       Number.isFinite(contentDed) ||
       Number.isFinite(grammarDed) ||
       Boolean(contentComment) ||
@@ -795,6 +871,7 @@ export function seedStudentReleaseFromProofread(pr: {
         buildExplanationFromSections({
           contentComment,
           grammarComment,
+          polishComment: polishCommentFromApi,
           contentDeduction: cd,
           grammarDeduction: gd,
           contentMax: NL_ESSAY_RUBRIC_MAX_PER_AXIS,
