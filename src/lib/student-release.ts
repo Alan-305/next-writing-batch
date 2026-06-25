@@ -97,6 +97,35 @@ function numericOrNull(v: unknown): number | null {
 /** PDF・テキスト添削結果と同じ文法ブロック見出し（旧「【文法】」は canonicalize で置換） */
 export const GRAMMAR_SECTION_HEAD = "【文法・語法・表現】";
 
+/** PDF・生徒画面の解説箇条書き（文法・完成版書き換え） */
+export const EXPLANATION_BULLET = "・";
+
+/** 内容減点 / 文法減点 の合計行 */
+export function isExplanationDeductionSummaryLine(line: string): boolean {
+  const t = line.trim().replace(/^[●○・]\s*/, "");
+  return /^(内容|文法)減点\s*合計\s*[:：]/.test(t);
+}
+
+/** 減点合計行から箇条書き記号を除去 */
+export function stripExplanationDeductionSummaryLine(line: string): string {
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  const t = line.trim().replace(/^[●○・]\s*/, "");
+  return indent + t;
+}
+
+/** 文法・書き換え行の先頭を小さい中黒 `・` に統一 */
+export function normalizeExplanationBulletLine(line: string): string {
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  const t = line.trim();
+  if (!t) return line;
+  if (isExplanationDeductionSummaryLine(t)) {
+    return stripExplanationDeductionSummaryLine(line);
+  }
+  const body = t.replace(/^(?:●|○|・)\s*/, "");
+  if (!body) return line;
+  return `${indent}${EXPLANATION_BULLET}${body}`;
+}
+
 /** 減点なしの完成版書き換えメモ（解説内の第3ブロック。英文ブロック「完成版」と区別する） */
 export const POLISH_SECTION_HEAD = "【完成版の書き換え】";
 const POLISH_SECTION_HEAD_LEGACY = "【完成版】";
@@ -223,7 +252,7 @@ export function normalizeStudentExplanation(explanation: string): string {
   const stripContentLeadingMarkers = (core: string): string => {
     let t = core;
     for (;;) {
-      const n = t.replace(/^(?:●|○)\s*/, "");
+      const n = t.replace(/^(?:●|○|・)\s*/, "");
       if (n === t) break;
       t = n;
     }
@@ -272,7 +301,7 @@ export function normalizeStudentExplanation(explanation: string): string {
         continue;
       }
       if (isContentDeductionLine(line)) {
-        out.push(line);
+        out.push(stripExplanationDeductionSummaryLine(line));
         continue;
       }
       const strippedBullet = stripContentLeadingMarkers(t);
@@ -295,7 +324,7 @@ export function normalizeStudentExplanation(explanation: string): string {
     if (mode === "grammar_body") {
       if (isGrammarDeductionLine(line)) {
         mode = "outer";
-        out.push(line);
+        out.push(stripExplanationDeductionSummaryLine(line));
         continue;
       }
       if (isPolishHead(line)) {
@@ -308,19 +337,23 @@ export function normalizeStudentExplanation(explanation: string): string {
         out.push(line);
         continue;
       }
-      if (t.startsWith("●") || t.startsWith("○")) {
-        out.push(line);
+      if (isExplanationDeductionSummaryLine(line)) {
+        out.push(stripExplanationDeductionSummaryLine(line));
         continue;
       }
-      if (isContentDeductionLine(line) || isGrammarDeductionLine(line)) {
-        out.push(line);
+      if (t.startsWith("●") || t.startsWith("○") || t.startsWith("・")) {
+        out.push(normalizeExplanationBulletLine(line));
+        continue;
+      }
+      if (isContentDeductionLine(line)) {
+        out.push(stripExplanationDeductionSummaryLine(line));
         continue;
       }
       if (t === "（記載なし）" || t === "（該当なし）") {
         out.push(line);
         continue;
       }
-      out.push(`● ${t}`);
+      out.push(normalizeExplanationBulletLine(`・${t}`));
       continue;
     }
     if (mode === "polish_body") {
@@ -330,18 +363,25 @@ export function normalizeStudentExplanation(explanation: string): string {
         out.push(line);
         continue;
       }
-      if (t.startsWith("●") || t.startsWith("○")) {
-        out.push(line);
+      if (isExplanationDeductionSummaryLine(line)) {
+        out.push(stripExplanationDeductionSummaryLine(line));
+        continue;
+      }
+      if (t.startsWith("●") || t.startsWith("○") || t.startsWith("・")) {
+        out.push(normalizeExplanationBulletLine(line));
         continue;
       }
       if (t === "（記載なし）" || t === "（該当なし）") {
-        const hasBullets = out.some((x) => trimmed(x).startsWith("●") || trimmed(x).startsWith("○"));
+        const hasBullets = out.some((x) => /^[●○・]/.test(trimmed(x)));
         if (hasBullets) continue;
         out.push(line);
         continue;
       }
-      if (/減点\s*合計/.test(t)) continue;
-      out.push(`● ${t}`);
+      if (/減点\s*合計/.test(t)) {
+        out.push(stripExplanationDeductionSummaryLine(line));
+        continue;
+      }
+      out.push(normalizeExplanationBulletLine(`・${t}`));
       continue;
     }
   }
@@ -379,7 +419,7 @@ function splitExplanationNoSectionHeads(rawLines: string[]): {
   const contentLines: string[] = [];
   const grammarLines: string[] = [];
   let last: "none" | "content" | "grammar" = "none";
-  const stripLeadBullet = (s: string) => s.replace(/^(?:●|○)\s*/, "");
+  const stripLeadBullet = (s: string) => s.replace(/^(?:●|○|・)\s*/, "");
 
   for (const line of rawLines) {
     const t = line.trim();
@@ -411,7 +451,7 @@ function splitExplanationNoSectionHeads(rawLines: string[]): {
       continue;
     }
 
-    if (/^●|^○/.test(t0)) {
+    if (/^●|^○|^・/.test(t0)) {
       grammarLines.push(line);
       last = "grammar";
       continue;

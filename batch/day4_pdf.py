@@ -239,8 +239,8 @@ def _insert_jp_wrap_spaces(s: str) -> str:
 
 
 def _is_explanation_deduction_summary_line(s: str) -> bool:
-    """減点合計行には ● を付けない。"""
-    t = s.strip()
+    """減点合計行には箇条書き記号を付けない。"""
+    t = re.sub(r"^[●○・]\s*", "", s.strip())
     return bool(re.match(r"^(文法|内容)減点\s*合計\s*[:：]", t))
 
 
@@ -307,7 +307,7 @@ def _ensure_content_bullet_lines(text: str) -> str:
 
 
 def _ensure_grammar_bullet_lines(text: str) -> str:
-    """文法ブロック見出し以降の各行の先頭に ● が無ければ付与する。"""
+    """文法ブロック見出し以降の各行の先頭を小さい中黒 ・ に統一する。"""
     key = _grammar_header_marker_in(text)
     if not key:
         return text
@@ -322,11 +322,15 @@ def _ensure_grammar_bullet_lines(text: str) -> str:
             continue
         s = ln.strip()
         if _is_explanation_deduction_summary_line(s):
-            out.append(s)
-        elif s.startswith(("●", "○")):
-            out.append(s)
+            out.append(re.sub(r"^[●○・]\s*", "", s))
+        elif s.startswith(("●", "○", "・")):
+            body = re.sub(r"^(?:●|○)\s*", "", s)
+            if body.startswith("・"):
+                out.append(body)
+            else:
+                out.append(f"・{body.lstrip('・')}")
         else:
-            out.append(f"● {s}")
+            out.append(f"・{s}")
     new_after = "\n".join(out).lstrip("\n")
     return before + ("\n" + new_after if new_after else "")
 
@@ -359,7 +363,7 @@ def _format_explanation_bullets(raw: str) -> str:
     t = _normalize_deduction_marks(_norm_text(raw))
     if not t:
         return ""
-    parts = [p.strip() for p in re.split(r"\s*[●○]\s*", t) if p.strip()]
+    parts = [p.strip() for p in re.split(r"\s*[●○・]\s*", t) if p.strip()]
     blocks: List[str] = []
     for p in parts:
         p = p.strip()
@@ -378,7 +382,7 @@ def _format_explanation_bullets(raw: str) -> str:
             continue
         body_n = _normalize_deduction_marks(body) if body else ""
         if "→" in head:
-            line = f"● {head}：{body_n}" if body_n else f"● {head}"
+            line = f"・{head}：{body_n}" if body_n else f"・{head}"
             blocks.append(line)
         else:
             blocks.append(head)
@@ -786,7 +790,7 @@ class _PageCtx:
         correct = correct.strip()
         suffix = (suffix_after_correct or "").strip()
         suf_fs = suffix_font_size if suffix_font_size is not None else EXPLAIN_BODY_FONT_PT
-        prefix = f"● {wrong} → "
+        prefix = f"・{wrong} → "
         words = correct.split()
         line_h = _line_step_for_font(font_size)
         c.setFont(font, font_size)
@@ -895,9 +899,19 @@ class _PageCtx:
             )
 
     def _draw_explanation_paragraph_colored(self, para: str, *, max_width_mm: float) -> None:
-        """1段落: 先頭行が ●/○ 誤→正 なら正を赤。続きは通常の解説本文。"""
+        """1段落: 先頭行が ・ 誤→正 なら正を赤。続きは通常の解説本文。"""
         p = _normalize_deduction_marks(para.strip())
         if not p:
+            return
+        if _is_explanation_deduction_summary_line(p):
+            fs = EXPLAIN_BODY_FONT_PT
+            line_h = _line_step_for_font(fs)
+            clean = re.sub(r"^[●○・]\s*", "", p.strip())
+            self.ensure_space(line_h / mm)
+            _draw_fake_bold_string(
+                self.c, x=MARGIN_X_MM * mm, y=self.y, text=clean, font=self._font, font_size=fs
+            )
+            self.y -= line_h
             return
         x = MARGIN_X_MM * mm
         max_w = max_width_mm * mm
@@ -906,8 +920,8 @@ class _PageCtx:
         body = parts[1].strip() if len(parts) > 1 else ""
 
         parsed = False
-        if head.startswith(("●", "○")):
-            inner = head[1:].strip()
+        if head.startswith(("●", "○", "・")):
+            inner = re.sub(r"^[●○・]\s*", "", head).strip()
             if "→" in inner:
                 wrong, post_arrow = inner.split("→", 1)
                 wrong = wrong.strip()
@@ -957,7 +971,14 @@ class _PageCtx:
                 self.y -= line_h * 0.35
                 continue
             t = ln.strip()
-            stripped = re.sub(r"^[●○]\s*", "", t)
+            stripped = re.sub(r"^[●○・]\s*", "", t)
+
+            if _is_explanation_deduction_summary_line(stripped):
+                clean = re.sub(r"^[●○・]\s*", "", stripped)
+                self.ensure_space(line_h / mm)
+                _draw_fake_bold_string(c, x=x, y=self.y, text=clean, font=font, font_size=fs)
+                self.y -= line_h
+                continue
 
             if stripped.startswith(_CONTENT_HEAD):
                 self.ensure_space(line_h / mm)

@@ -90,14 +90,16 @@ def _refine_final_version_from_content_advice(
     multipart: bool,
 ) -> str:
     """
-    第1パスで生成した完成版を、content_comment（①良い点・②改善点・③減点箇所）と文法修正に
+    第1パスで生成した完成版を、content_comment（①良い点・②改善点）と文法修正に
     忠実に沿うよう第2パスで書き直す。失敗時は下書きをそのまま返す。
     """
     draft = (draft_final or "").strip()
     cc = (content_comment or "").strip()
     if not draft or not cc:
         return draft
-    if not any(m in cc for m in ("②改善点", "③減点箇所")):
+    if "改善する必要は特にありません" in cc:
+        return draft
+    if "②改善点" not in cc:
         return draft
 
     prompt = build_final_version_refinement_prompt(
@@ -260,7 +262,7 @@ def proofread_one(
 
             if not content_comment_has_required_sections(content_comment or ""):
                 _cc = content_comment or ""
-                _missing = [m for m in ("①良い点", "②改善点", "③減点箇所") if m not in _cc]
+                _missing = [m for m in ("①良い点", "②改善点") if m not in _cc]
                 if _missing:
                     raise RuntimeError(
                         "content_comment_incomplete: missing="

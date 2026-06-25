@@ -5,6 +5,7 @@ import { StudentResultAudioQr } from "@/components/StudentResultAudioQr";
 import { StudentResultPrintFit } from "@/components/StudentResultPrintFit";
 import { StudentResultViewBeacon } from "@/components/StudentResultViewBeacon";
 import { ScoreCelebrationOnResult } from "@/components/celebrations/ScoreCelebrationOnResult";
+import { ScoreEvaluationStamp } from "@/components/ScoreEvaluationStamp";
 import type { StudentResultPublishedModel } from "@/lib/student-result-published-view";
 
 type Props = {
@@ -35,16 +36,21 @@ export function StudentResultPublishedBody({
           {model.studentName} さん / taskId: {model.taskId} / 公開日時: {model.operatorApprovedAtLabel}
         </p>
 
-        <div className="card student-result-card">
+        <div className="card student-result-card student-result-card--score">
           <h2 className="student-result-section-title">得点・評価</h2>
-          {model.scoreInline ? (
-            <p className="student-result-score-line">{model.scoreInline}</p>
-          ) : (
-            <>
-              <p className="student-result-score-line">合計: {model.scoreTotal}点</p>
-              <pre className="student-result-pre">{model.evaluationText}</pre>
-            </>
-          )}
+          <div className="student-result-score-row">
+            <div className="student-result-score-main">
+              {model.scoreInline ? (
+                <p className="student-result-score-line">{model.scoreInline}</p>
+              ) : (
+                <>
+                  <p className="student-result-score-line">合計: {model.scoreTotal}点</p>
+                  <pre className="student-result-pre">{model.evaluationText}</pre>
+                </>
+              )}
+            </div>
+            <ScoreEvaluationStamp scoreTotal={model.scoreTotal} scoreMaxTotal={model.scoreMaxTotal} />
+          </div>
         </div>
 
         <div className="card student-result-card">
