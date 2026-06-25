@@ -42,7 +42,8 @@ QR_SIZE_MM = 12
 _GRAMMAR_HEAD = "【文法・語法・表現】"
 _GRAMMAR_HEAD_LEGACY = "【文法】"
 _CONTENT_HEAD = "【内容】"
-_POLISH_HEAD = "【完成版】"
+_POLISH_HEAD = "【完成版の書き換え】"
+_POLISH_HEAD_LEGACY = "【完成版】"
 _HINT_HEAD = "【ヒント】"
 _CIRCLED_HEAD_RE = re.compile(r"^[\u2460-\u2473]+")
 # 旧: 完成版の差分赤。現在は完成版を黒一色で統一（画面 /result と同趣旨）。
@@ -1081,7 +1082,11 @@ class _PageCtx:
             self.y -= gap
 
         if grammar_raw.strip():
-            pi = grammar_raw.find(_POLISH_HEAD)
+            pi = -1
+            for head in (_POLISH_HEAD, _POLISH_HEAD_LEGACY):
+                i = grammar_raw.find(head)
+                if i >= 0 and (pi < 0 or i < pi):
+                    pi = i
             if pi >= 0:
                 polish_raw = grammar_raw[pi:].rstrip()
                 grammar_raw = grammar_raw[:pi].rstrip()
@@ -1111,10 +1116,10 @@ class _PageCtx:
                 self.y -= gap
                 plines = [x.strip() for x in polish_raw.split("\n") if x.strip()]
                 if plines:
-                    h0 = plines[0] if plines[0] == _POLISH_HEAD else _POLISH_HEAD
+                    h0 = _POLISH_HEAD if plines[0] in (_POLISH_HEAD, _POLISH_HEAD_LEGACY) else _POLISH_HEAD
                     self._draw_content_explanation_block(h0, max_width_mm=max_width_mm)
                     self.y -= gap
-                    start_i = 1 if plines[0] == _POLISH_HEAD else 0
+                    start_i = 1 if plines[0] in (_POLISH_HEAD, _POLISH_HEAD_LEGACY) else 0
                     for j, pln in enumerate(plines[start_i:]):
                         if j:
                             self.y -= gap

@@ -109,7 +109,7 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(GRAMMAR_HEAD)}</strong></div>`);
         continue;
       }
-      if (t === POLISH_HEAD) {
+      if (t === POLISH_HEAD || t === "【完成版】") {
         mode = "polish";
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(POLISH_HEAD)}</strong></div>`);
         continue;
@@ -128,7 +128,7 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(GRAMMAR_HEAD)}</strong></div>`);
         continue;
       }
-      if (t === POLISH_HEAD) {
+      if (t === POLISH_HEAD || t === "【完成版】") {
         mode = "polish";
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(POLISH_HEAD)}</strong></div>`);
         continue;
@@ -142,7 +142,7 @@ export function explanationFormattedPlainToDisplayHtml(plain: string): string {
     }
 
     if (mode === "grammar") {
-      if (t === POLISH_HEAD) {
+      if (t === POLISH_HEAD || t === "【完成版】") {
         mode = "polish";
         out.push(`<div class="explanation-section-head"><strong>${escapeHtml(POLISH_HEAD)}</strong></div>`);
         continue;

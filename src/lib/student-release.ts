@@ -97,8 +97,9 @@ function numericOrNull(v: unknown): number | null {
 /** PDF・テキスト添削結果と同じ文法ブロック見出し（旧「【文法】」は canonicalize で置換） */
 export const GRAMMAR_SECTION_HEAD = "【文法・語法・表現】";
 
-/** 減点なしの完成版書き換えメモ（解説内の第3ブロック） */
-export const POLISH_SECTION_HEAD = "【完成版】";
+/** 減点なしの完成版書き換えメモ（解説内の第3ブロック。英文ブロック「完成版」と区別する） */
+export const POLISH_SECTION_HEAD = "【完成版の書き換え】";
+const POLISH_SECTION_HEAD_LEGACY = "【完成版】";
 
 const CONTENT_SECTION_HEAD = "【内容】";
 
@@ -134,9 +135,57 @@ export function canonicalizeGrowthHintHeadingInExplanation(text: string): string
     .join("\n");
 }
 
+/** 解説内の書き換えブロック見出しを正規化し、重複見出し・（該当なし）を除去する。 */
+export function cleanupPolishSectionInExplanation(explanation: string): string {
+  const lines = (explanation ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  type Mode = "outer" | "polish";
+  let mode: Mode = "outer";
+  let polishHeadSeen = false;
+  let polishHasBullets = false;
+  const out: string[] = [];
+
+  const isPolishHead = (s: string) => {
+    const t = s.trim();
+    return t === POLISH_SECTION_HEAD || t === POLISH_SECTION_HEAD_LEGACY;
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (isPolishHead(line)) {
+      if (mode === "polish") continue;
+      mode = "polish";
+      if (!polishHeadSeen) {
+        out.push(POLISH_SECTION_HEAD);
+        polishHeadSeen = true;
+      }
+      continue;
+    }
+    if (mode === "polish") {
+      if (isPolishHead(line)) continue;
+      if (t.startsWith("●") || t.startsWith("○")) {
+        polishHasBullets = true;
+        out.push(line);
+        continue;
+      }
+      if ((t === "（該当なし）" || t === "（記載なし）") && polishHasBullets) continue;
+      if (/減点\s*合計/.test(t)) continue;
+      if (!t) {
+        out.push(line);
+        continue;
+      }
+      out.push(line);
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n");
+}
+
 function preprocessExplanationBeforeNormalize(explanation: string): string {
-  return canonicalizeGrowthHintHeadingInExplanation(
-    canonicalizeLegacyGrammarHeadingInExplanation(explanation ?? ""),
+  return cleanupPolishSectionInExplanation(
+    canonicalizeGrowthHintHeadingInExplanation(
+      canonicalizeLegacyGrammarHeadingInExplanation(explanation ?? ""),
+    ),
   );
 }
 
@@ -165,7 +214,7 @@ export function normalizeStudentExplanation(explanation: string): string {
   };
   const isPolishHead = (s: string) => {
     const t = trimmed(s);
-    return t === POLISH_SECTION_HEAD || t === "【完成版の書き換え】";
+    return t === POLISH_SECTION_HEAD || t === POLISH_SECTION_HEAD_LEGACY;
   };
   const isGrammarDeductionLine = (s: string) => /^\s*文法減点\s*合計\s*[:：]/.test(s);
   const leadsJpClausePunct = (t: string) => /^[、。，．]/.test(t);
@@ -189,6 +238,8 @@ export function normalizeStudentExplanation(explanation: string): string {
         mode = "grammar_body";
       } else if (isPolishHead(line)) {
         mode = "polish_body";
+        out.push(POLISH_SECTION_HEAD);
+        continue;
       }
       out.push(line);
       continue;
@@ -249,7 +300,7 @@ export function normalizeStudentExplanation(explanation: string): string {
       }
       if (isPolishHead(line)) {
         mode = "polish_body";
-        out.push(line);
+        out.push(POLISH_SECTION_HEAD);
         continue;
       }
       const t = trimmed(line);
@@ -273,6 +324,7 @@ export function normalizeStudentExplanation(explanation: string): string {
       continue;
     }
     if (mode === "polish_body") {
+      if (isPolishHead(line)) continue;
       const t = trimmed(line);
       if (!t) {
         out.push(line);
@@ -283,9 +335,12 @@ export function normalizeStudentExplanation(explanation: string): string {
         continue;
       }
       if (t === "（記載なし）" || t === "（該当なし）") {
+        const hasBullets = out.some((x) => trimmed(x).startsWith("●") || trimmed(x).startsWith("○"));
+        if (hasBullets) continue;
         out.push(line);
         continue;
       }
+      if (/減点\s*合計/.test(t)) continue;
       out.push(`● ${t}`);
       continue;
     }
