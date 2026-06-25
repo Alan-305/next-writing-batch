@@ -459,6 +459,7 @@ export function OpsSubmissionsTable({ rows, enableZipSelection = false, onReload
                         operatorWithdrawnAt={item.operatorWithdrawnAt}
                         proofreadStartedAt={item.proofreadStartedAt}
                         proofreadFinishedAt={item.proofreadFinishedAt}
+                        proofreadQueuedAt={item.proofreadQueuedAt}
                         forceProcessing={forceProcessing}
                       />
                     </td>

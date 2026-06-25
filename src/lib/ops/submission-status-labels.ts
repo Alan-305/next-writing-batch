@@ -62,24 +62,34 @@ function proofreadActivityAfterWithdraw(
   operatorWithdrawnAt?: string,
   proofreadStartedAt?: string,
   proofreadFinishedAt?: string,
+  proofreadQueuedAt?: string,
 ): boolean {
   const withdrawnAt = (operatorWithdrawnAt ?? "").trim();
   if (!withdrawnAt) return false;
   const w = Date.parse(withdrawnAt);
   if (!Number.isFinite(w)) return false;
 
-  const startedAt = (proofreadStartedAt ?? "").trim();
-  if (startedAt) {
-    const s = Date.parse(startedAt);
-    if (Number.isFinite(s) && s > w) return true;
-  }
-
-  const finishedAt = (proofreadFinishedAt ?? "").trim();
-  if (finishedAt) {
-    const f = Date.parse(finishedAt);
-    if (Number.isFinite(f) && f > w) return true;
+  for (const ts of [proofreadStartedAt, proofreadFinishedAt, proofreadQueuedAt]) {
+    const raw = (ts ?? "").trim();
+    if (!raw) continue;
+    const t = Date.parse(raw);
+    if (Number.isFinite(t) && t >= w) return true;
   }
   return false;
+}
+
+/** 再添削完了後は「閲覧済」より「完了」を優先する */
+function proofreadCompletedAfterStudentView(
+  studentResultFirstViewedAt?: string,
+  proofreadFinishedAt?: string,
+): boolean {
+  const viewedAt = (studentResultFirstViewedAt ?? "").trim();
+  const finishedAt = (proofreadFinishedAt ?? "").trim();
+  if (!viewedAt || !finishedAt) return false;
+  const v = Date.parse(viewedAt);
+  const f = Date.parse(finishedAt);
+  if (!Number.isFinite(v) || !Number.isFinite(f)) return false;
+  return f >= v;
 }
 
 export function submissionStatusMeta(
@@ -90,6 +100,8 @@ export function submissionStatusMeta(
     operatorWithdrawnAt?: string;
     proofreadStartedAt?: string;
     proofreadFinishedAt?: string;
+    proofreadQueuedAt?: string;
+    studentResultFirstViewedAt?: string;
   },
 ): SubmissionStatusMeta {
   const isActiveWorkflow = status === "queued" || status === "processing";
@@ -123,6 +135,7 @@ export function submissionStatusMeta(
       opts.operatorWithdrawnAt,
       opts.proofreadStartedAt,
       opts.proofreadFinishedAt,
+      opts.proofreadQueuedAt,
     );
     if (!redoDone) {
       return { code: "withdrawn", ...BASE.withdrawn };
@@ -136,6 +149,14 @@ export function submissionStatusMeta(
   }
 
   if (status === "done" && opts?.studentViewed) {
+    if (
+      proofreadCompletedAfterStudentView(
+        opts.studentResultFirstViewedAt,
+        opts.proofreadFinishedAt,
+      )
+    ) {
+      return { code: "done", ...BASE.done };
+    }
     return { code: "viewed", ...BASE.viewed };
   }
   const code = status as SubmissionStatusCode;

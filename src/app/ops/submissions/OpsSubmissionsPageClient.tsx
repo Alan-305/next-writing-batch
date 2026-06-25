@@ -147,6 +147,7 @@ export function OpsSubmissionsPageClient() {
         const proofreadFinishedAt = String(
           s.proofread?.finishedAt ?? s.proofread?.generated_at ?? "",
         ).trim();
+        const proofreadQueuedAt = String(s.proofreadQueuedAt ?? "").trim();
         return {
           submissionId: s.submissionId,
           submittedAt: s.submittedAt,
@@ -155,13 +156,13 @@ export function OpsSubmissionsPageClient() {
           studentName: s.studentName,
           status: studentViewed ? "viewed" : s.status,
           rawStatus: s.status,
-          proofreadQueuedAt: s.proofreadQueuedAt,
           hasDay4Assets,
           resultPublished: Boolean(sr?.operatorApprovedAt),
           releaseWithdrawn: Boolean(operatorWithdrawnAt),
           operatorWithdrawnAt: operatorWithdrawnAt || undefined,
           proofreadStartedAt: proofreadStartedAt || undefined,
           proofreadFinishedAt: proofreadFinishedAt || undefined,
+          proofreadQueuedAt: proofreadQueuedAt || undefined,
           studentResultFirstViewedAt: s.studentResultFirstViewedAt,
           studentReceiveMethod: s.studentReceiveMethod,
           studentReceiveMethodAt: s.studentReceiveMethodAt,

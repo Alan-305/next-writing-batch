@@ -342,6 +342,9 @@ def proofread_one(
             if grammar_comment_has_zero_point_lines(grammar_comment or ""):
                 raise RuntimeError("grammar_comment_has_zero_point_lines")
 
+            if not (polish_comment or "").strip():
+                raise RuntimeError("polish_comment_empty")
+
             evaluation = rebuild_evaluation_line(
                 content_deduction=content_deduction,
                 grammar_deduction=grammar_deduction,

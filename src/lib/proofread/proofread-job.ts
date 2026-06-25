@@ -82,6 +82,7 @@ async function markSubmissionQueued(
   submissionId: string,
   jobId: string,
   requestedByUid: string,
+  forceRedo = false,
 ): Promise<Submission | null> {
   const ref = submissionRef(organizationId, submissionId);
   const db = getAdminFirestore();
@@ -89,13 +90,15 @@ async function markSubmissionQueued(
     const snap = await tx.get(ref);
     if (!snap.exists) return null;
     const current = snap.data() as Submission;
+    const { studentResultFirstViewedAt: _viewed, ...rest } = current;
     const next: Submission = {
-      ...current,
+      ...rest,
       status: "queued",
       organizationId,
       proofreadJobId: jobId,
       proofreadQueuedAt: new Date().toISOString(),
       proofreadQueuedByUid: requestedByUid,
+      ...(forceRedo ? {} : { studentResultFirstViewedAt: current.studentResultFirstViewedAt }),
     };
     tx.set(ref, next, { merge: false });
     return next;
@@ -282,7 +285,7 @@ export async function enqueueProofreadJobs(input: EnqueueProofreadInput): Promis
     };
 
     try {
-      await markSubmissionQueued(organizationId, submissionId, jobId, requestedByUid);
+      await markSubmissionQueued(organizationId, submissionId, jobId, requestedByUid, forceRedo);
       await createProofreadJobDoc(job);
       batchJobIds.push(jobId);
       const cloudTaskName = await dispatchJob({ organizationId, submissionId, jobId });
@@ -504,7 +507,15 @@ export async function processProofreadJob(input: ProcessProofreadJobInput): Prom
       }));
     }
     const afterReleaseSync = await getSubmissionByIdInOrganization(organizationId, submissionId);
-    const finalStatus = afterReleaseSync?.status ?? after?.status ?? "done";
+    let finalStatus = afterReleaseSync?.status ?? after?.status ?? "done";
+
+    if (finalStatus === "done" || job.forceRedo) {
+      const finalized = await updateSubmissionByIdInOrganization(organizationId, submissionId, (s) => {
+        const { studentResultFirstViewedAt: _viewed, ...rest } = s;
+        return { ...rest, status: "done" };
+      });
+      if (finalized) finalStatus = "done";
+    }
 
     const jobFinishPatch: Partial<ProofreadJob> = {
       status: finalStatus === "done" ? "succeeded" : "failed",

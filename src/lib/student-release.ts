@@ -127,6 +127,12 @@ export function ensureExplanationBulletLinePunctuation(line: string): string {
   if (t === "（記載なし）" || t === "（該当なし）") return line;
   if (t.startsWith("【")) return line;
   if (!EXPLANATION_BULLET_LINE_RE.test(t)) return line;
+  t = t.replace(/。+$/, "。");
+  while (t.includes("。。")) {
+    t = t.replace(/。。/g, "。");
+  }
+  t = t.replace(/（-(\d+)点）[。．]+/g, "（-$1点）");
+  if (/（-\d+点\)$/.test(t)) return `${indent}${t}`;
   if (EXPLANATION_LINE_END_PUNCT_RE.test(t) || EXPLANATION_LINE_OPEN_DELIM_END_RE.test(t)) {
     return `${indent}${t}`;
   }
@@ -232,7 +238,7 @@ export function cleanupPolishSectionInExplanation(explanation: string): string {
     }
     if (mode === "polish") {
       if (isPolishHead(line)) continue;
-      if (t.startsWith("●") || t.startsWith("○")) {
+      if (t.startsWith("●") || t.startsWith("○") || t.startsWith("・")) {
         polishHasBullets = true;
         out.push(line);
         continue;

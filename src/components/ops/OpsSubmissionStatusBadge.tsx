@@ -10,6 +10,7 @@ type Props = {
   operatorWithdrawnAt?: string;
   proofreadStartedAt?: string;
   proofreadFinishedAt?: string;
+  proofreadQueuedAt?: string;
   /** 一括同期添削中に pending 行を添削中表示 */
   forceProcessing?: boolean;
 };
@@ -22,6 +23,7 @@ export function OpsSubmissionStatusBadge({
   operatorWithdrawnAt,
   proofreadStartedAt,
   proofreadFinishedAt,
+  proofreadQueuedAt,
   forceProcessing,
 }: Props) {
   if (forceProcessing) {
@@ -40,6 +42,8 @@ export function OpsSubmissionStatusBadge({
     operatorWithdrawnAt,
     proofreadStartedAt,
     proofreadFinishedAt,
+    proofreadQueuedAt,
+    studentResultFirstViewedAt: viewedAt,
   });
   const title =
     viewedAt && meta.code === "viewed" ? `初回閲覧: ${viewedAt}` : meta.hint;
