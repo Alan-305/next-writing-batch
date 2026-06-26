@@ -20,7 +20,11 @@ export function isCloudTasksProofreadConfigured(): boolean {
 }
 
 export function shouldProcessProofreadInline(): boolean {
-  return (process.env.NWB_PROOFREAD_INLINE ?? "").trim() === "true";
+  const explicit = (process.env.NWB_PROOFREAD_INLINE ?? "").trim();
+  if (explicit === "true") return true;
+  if (explicit === "false") return false;
+  // Cloud Tasks 未設定時は同一 Cloud Run / ローカルで非同期処理（「今すぐ同期」だけ動く状態を防ぐ）
+  return !isCloudTasksProofreadConfigured();
 }
 
 export async function dispatchProofreadCloudTask(payload: {

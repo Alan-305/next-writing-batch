@@ -174,9 +174,10 @@ export function normalizeExplanationBulletLine(line: string): string {
   return ensureExplanationBulletLinePunctuation(`${indent}${EXPLANATION_BULLET}${body}`);
 }
 
-/** 減点なしの完成版書き換えメモ（解説内の第3ブロック。英文ブロック「完成版」と区別する） */
-export const POLISH_SECTION_HEAD = "【完成版の書き換え】";
+/** 減点なしの完成版の修正ポイント（解説内の第3ブロック。英文ブロック「完成版」と区別する） */
+export const POLISH_SECTION_HEAD = "【完成版のポイント】";
 const POLISH_SECTION_HEAD_LEGACY = "【完成版】";
+const POLISH_SECTION_HEAD_REWRITE_LEGACY = "【完成版の書き換え】";
 
 const CONTENT_SECTION_HEAD = "【内容】";
 
@@ -223,7 +224,11 @@ export function cleanupPolishSectionInExplanation(explanation: string): string {
 
   const isPolishHead = (s: string) => {
     const t = s.trim();
-    return t === POLISH_SECTION_HEAD || t === POLISH_SECTION_HEAD_LEGACY;
+    return (
+      t === POLISH_SECTION_HEAD ||
+      t === POLISH_SECTION_HEAD_LEGACY ||
+      t === POLISH_SECTION_HEAD_REWRITE_LEGACY
+    );
   };
 
   for (const line of lines) {
@@ -294,7 +299,11 @@ export function normalizeStudentExplanation(explanation: string): string {
   };
   const isPolishHead = (s: string) => {
     const t = trimmed(s);
-    return t === POLISH_SECTION_HEAD || t === POLISH_SECTION_HEAD_LEGACY;
+    return (
+      t === POLISH_SECTION_HEAD ||
+      t === POLISH_SECTION_HEAD_LEGACY ||
+      t === POLISH_SECTION_HEAD_REWRITE_LEGACY
+    );
   };
   const isGrammarDeductionLine = (s: string) => /^\s*文法減点\s*合計\s*[:：]/.test(s);
   const leadsJpClausePunct = (t: string) => /^[、。，．]/.test(t);
@@ -563,7 +572,9 @@ export function splitExplanationIntoContentGrammarSections(explanation: string):
   const isContentHead = (s: string) => /^【内容】$/.test(s);
   const isGrammarHead = (s: string) => /^【文法(?:・語法・表現)?】$/.test(s);
   const isPolishHead = (s: string) =>
-    s === POLISH_SECTION_HEAD || s === POLISH_SECTION_HEAD_LEGACY;
+    s === POLISH_SECTION_HEAD ||
+    s === POLISH_SECTION_HEAD_LEGACY ||
+    s === POLISH_SECTION_HEAD_REWRITE_LEGACY;
   const isDeductionLine = (s: string) => /^(内容|文法)減点\s*合計\s*[:：]/.test(s);
 
   let mode: "none" | "content" | "grammar" | "polish" = "none";

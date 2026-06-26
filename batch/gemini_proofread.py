@@ -15,11 +15,13 @@ from nl_essay_feedback import (  # noqa: E402
     _combined_grammar_bullets_text,
     _normalize_essay_for_compare,
     _sum_deduction_points_from_explanation,
+    apply_content_comment_finalization,
     build_feedback_coverage_audit_prompt,
     build_final_version_refinement_prompt,
     build_nl_essay_prompt,
     content_comment_has_required_sections,
     content_comment_uses_legacy_format,
+    ensure_polish_points_for_final_diff,
     finalize_final_version_for_display,
     finalize_grammar_and_polish_blocks,
     grammar_comment_has_zero_point_lines,
@@ -334,6 +336,17 @@ def proofread_one(
                 polish_comment=(polish_comment or "").strip(),
                 body_explanation=(explanation or "").strip(),
                 content_comment=(content_comment or "").strip(),
+            )
+            polish_comment = ensure_polish_points_for_final_diff(
+                original_essay=original_essay,
+                final_essay=read_aloud,
+                polish_comment=(polish_comment or "").strip(),
+                grammar_comment=(grammar_comment or "").strip(),
+                content_comment=(content_comment or "").strip(),
+            )
+            content_comment, _, content_deduction = apply_content_comment_finalization(
+                (content_comment or "").strip(),
+                content_deduction,
             )
             grammar_deduction = max(
                 0,
