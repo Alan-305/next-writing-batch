@@ -131,7 +131,8 @@ export function ensureExplanationBulletLinePunctuation(line: string): string {
   while (t.includes("。。")) {
     t = t.replace(/。。/g, "。");
   }
-  t = t.replace(/（-(\d+)点）[。．]+/g, "（-$1点）");
+  t = t.replace(/（-(\d+)点）\s*[。．]+/g, "（-$1点）");
+  t = t.replace(/（-(\d+)点）\s+。/g, "（-$1点）");
   if (/（-\d+点\)$/.test(t)) return `${indent}${t}`;
   if (EXPLANATION_LINE_END_PUNCT_RE.test(t) || EXPLANATION_LINE_OPEN_DELIM_END_RE.test(t)) {
     return `${indent}${t}`;
@@ -282,6 +283,7 @@ export function normalizeStudentExplanation(explanation: string): string {
   type ContentSub = "none" | "good" | "improve";
   let mode: Mode = "outer";
   let contentSub: ContentSub = "none";
+  let polishHasBullets = false;
   const out: string[] = [];
 
   const trimmed = (s: string) => s.trim();
@@ -317,6 +319,7 @@ export function normalizeStudentExplanation(explanation: string): string {
         mode = "grammar_body";
       } else if (isPolishHead(line)) {
         mode = "polish_body";
+        polishHasBullets = false;
         out.push(POLISH_SECTION_HEAD);
         continue;
       }
@@ -333,6 +336,7 @@ export function normalizeStudentExplanation(explanation: string): string {
       if (isPolishHead(line)) {
         mode = "polish_body";
         contentSub = "none";
+        polishHasBullets = false;
         out.push(POLISH_SECTION_HEAD);
         continue;
       }
@@ -401,6 +405,7 @@ export function normalizeStudentExplanation(explanation: string): string {
       }
       if (isPolishHead(line)) {
         mode = "polish_body";
+        polishHasBullets = false;
         out.push(POLISH_SECTION_HEAD);
         continue;
       }
@@ -440,12 +445,12 @@ export function normalizeStudentExplanation(explanation: string): string {
         continue;
       }
       if (t.startsWith("●") || t.startsWith("○") || t.startsWith("・")) {
+        polishHasBullets = true;
         out.push(normalizeExplanationBulletLine(line));
         continue;
       }
       if (t === "（記載なし）" || t === "（該当なし）") {
-        const hasBullets = out.some((x) => /^[●○・]/.test(trimmed(x)));
-        if (hasBullets) continue;
+        if (polishHasBullets) continue;
         out.push(line);
         continue;
       }

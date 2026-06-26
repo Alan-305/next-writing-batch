@@ -256,8 +256,8 @@ def _ensure_explanation_bullet_line_punctuation(line: str) -> str:
     t = re.sub(r"。+$", "。", t)
     while "。。" in t:
         t = t.replace("。。", "。")
-    t = re.sub(r"（-(\d+)点）[。．]+", r"（-\1点）", t)
-    if re.search(r"（-\d+点\)$", t):
+    t = re.sub(r"（-(\d+)点）\s*[。．]+", r"（-\1点）", t)
+    if re.search(r"（-\d+点）\s*$", t):
         return t
     if re.search(r"[。．.!?！？]$", t) or re.search(r"[：:]\s*$", t):
         return t
@@ -337,41 +337,64 @@ def _partition_improve_and_polish_notes(
     return content_improve, polish_notes
 
 
-def _polish_fallback_from_grammar_explanations(grammar_comment: str) -> str:
-    """polish が空のとき、文法●行の日本語解説を完成版書き換えメモとして要約。"""
+def _grammar_line_to_polish_rewrite_note(line: str) -> Optional[str]:
+    """文法●行を減点なしの完成版書き換えメモ（・ 原文 → 完成版：理由）へ変換。"""
+    body = _strip_bullet_body(_normalize_explanation_bullet_line(line))
+    if "→" not in body:
+        return None
+    body = _CONTENT_DEDUCTION_MARK_RE.sub("", body)
+    body = re.sub(r"（➖\d+点[^）]*）", "", body)
+    body = re.sub(r"（\s*-?\s*\d+\s*点\s*）", "", body).strip().rstrip("。．")
+    if not body:
+        return None
+    note = body if body.startswith("・") else f"・{body}"
+    return _ensure_explanation_bullet_line_punctuation(note)
+
+
+def _grammar_lines_to_polish_rewrite_notes(grammar_comment: str) -> str:
+    """文法減点行を、減点表記なしの【完成版の書き換え】箇条書きへ変換する。"""
     lines: List[str] = []
     seen: set[str] = set()
     for ln in _extract_grammar_bullet_lines(grammar_comment):
-        body = _strip_bullet_body(_normalize_explanation_bullet_line(ln))
-        if "：" not in body and ":" not in body:
+        note = _grammar_line_to_polish_rewrite_note(ln)
+        if not note:
             continue
-        sep = "：" if "：" in body else ":"
-        _, suffix = body.split(sep, 1)
-        suffix = _CONTENT_DEDUCTION_MARK_RE.sub("", suffix).strip().rstrip("。．")
-        if len(suffix) < 10:
-            continue
-        if "→" in body:
-            m = re.search(r"→\s*([^：:]+)[：:]", body)
-            if m:
-                correct = m.group(1).strip().strip("`")
-                wrong_m = re.search(r"^(?:●|○|・)\s*`?([^`→]+)`?\s*→", ln.strip())
-                wrong = wrong_m.group(1).strip() if wrong_m else ""
-                if wrong and correct:
-                    note = f"・{wrong} → {correct}：{suffix}"
-                else:
-                    note = f"・{suffix}"
-            else:
-                note = f"・{suffix}"
-        else:
-            note = f"・{suffix}"
         key = _grammar_bullet_key(note)
         if key in seen:
             continue
         seen.add(key)
-        lines.append(_ensure_explanation_bullet_line_punctuation(note))
-        if len(lines) >= 4:
-            break
+        lines.append(note)
     return "\n".join(lines).strip()
+
+
+def _extract_polish_from_content_good(content_comment: str) -> List[str]:
+    """①良い点のうち、完成版の書き換え・採用に触れる行を polish 候補として抽出。"""
+    good, _, _ = _parse_content_comment_sections(content_comment or "")
+    out: List[str] = []
+    seen: set[str] = set()
+    for ln in good:
+        body = _strip_bullet_body(ln).rstrip("。．")
+        if not body:
+            continue
+        if not re.search(r"完成版|書き換え|採用した|改めて|結論部.*(?:書|含|明示)", body):
+            continue
+        if "→" in body:
+            note = _ensure_explanation_bullet_line_punctuation(
+                body if body.startswith("・") else f"・{body}"
+            )
+        else:
+            note = _ensure_explanation_bullet_line_punctuation(f"・完成版：{body}")
+        key = _grammar_bullet_key(note)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(note)
+    return out
+
+
+def _polish_fallback_from_grammar_explanations(grammar_comment: str) -> str:
+    """polish が空のとき、文法行を完成版書き換えメモ形式に変換する。"""
+    return _grammar_lines_to_polish_rewrite_notes(grammar_comment)
 
 
 def ensure_nonempty_polish_comment(
@@ -899,8 +922,8 @@ def _polish_line_overlaps_grammar_deduction(polish_line: str, grammar_text: str)
 
 
 def sanitize_polish_comment(polish_comment: str, grammar_comment: str) -> str:
-    """polish_comment から見出し・合計行・重複・（該当なし）を除去する。"""
-    gc = (grammar_comment or "").strip()
+    """polish_comment から見出し・合計行・（該当なし）を除去する（文法行との意味重複は除去しない）。"""
+    _ = grammar_comment  # 文法ブロックとの重複除去は行わない（減点あり／なしで別枠）
     out: List[str] = []
     seen: set[str] = set()
     for ln in (polish_comment or "").splitlines():
@@ -913,16 +936,20 @@ def sanitize_polish_comment(polish_comment: str, grammar_comment: str) -> str:
             continue
         if "減点" in t and "合計" in t and not _is_explanation_bullet_line(t):
             continue
+        if _CONTENT_DEDUCTION_MARK_RE.search(t) or re.search(r"（➖\d+点", t):
+            continue
         if not _is_explanation_bullet_line(t):
             continue
         t = _normalize_explanation_bullet_line(ln)
-        if _polish_line_overlaps_grammar_deduction(t, gc):
+        t = _CONTENT_DEDUCTION_MARK_RE.sub("", t).strip()
+        t = re.sub(r"（➖\d+点[^）]*）", "", t).strip()
+        if not t:
             continue
         key = _grammar_bullet_key(t)
         if key in seen:
             continue
         seen.add(key)
-        out.append(t)
+        out.append(_ensure_explanation_bullet_line_punctuation(t))
     return "\n".join(out).strip()
 
 
@@ -932,6 +959,7 @@ def finalize_grammar_and_polish_blocks(
     polish_comment: str,
     body_explanation: str,
     extra_polish_lines: Optional[List[str]] = None,
+    content_comment: str = "",
 ) -> Tuple[str, str, str]:
     """grammar / polish を減点あり・減点なしに整理し、本文●行も取り込む。"""
     body = (body_explanation or "").strip()
@@ -945,7 +973,12 @@ def finalize_grammar_and_polish_blocks(
         for ln in extra_polish_lines:
             if (ln or "").strip():
                 pc = merge_polish_bullets_deduped(pc, ln)
+    for ln in _extract_polish_from_content_good(content_comment):
+        pc = merge_polish_bullets_deduped(pc, ln)
     pc = sanitize_polish_comment(pc, ded)
+    grammar_polish = _grammar_lines_to_polish_rewrite_notes(ded)
+    if grammar_polish:
+        pc = merge_polish_bullets_deduped(pc, grammar_polish)
     if not pc.strip():
         pc = _polish_fallback_from_grammar_explanations(ded)
     return ded, pc, ""
@@ -1118,6 +1151,7 @@ def merge_feedback_coverage_audit(
         polish_comment=pc,
         body_explanation=body,
         extra_polish_lines=polish_relocated,
+        content_comment=cc,
     )
     gd_new = max(0, min(25, _sum_deduction_points_from_explanation(gc)))
 
@@ -1684,6 +1718,7 @@ def normalize_student_explanation_text(text: str) -> str:
     mode = "outer"
     out: List[str] = []
     content_sub: Optional[str] = None
+    polish_has_bullets = False
 
     def trimmed(s: str) -> str:
         return s.strip()
@@ -1731,6 +1766,7 @@ def normalize_student_explanation_text(text: str) -> str:
                 continue
             if is_polish_head(line):
                 mode = "polish_body"
+                polish_has_bullets = False
                 out.append(_POLISH_SECTION_HEAD_PY)
                 continue
             out.append(line)
@@ -1744,6 +1780,7 @@ def normalize_student_explanation_text(text: str) -> str:
             if is_polish_head(line):
                 mode = "polish_body"
                 content_sub = None
+                polish_has_bullets = False
                 out.append(_POLISH_SECTION_HEAD_PY)
                 continue
             t0 = line.lstrip(" \t")
@@ -1808,6 +1845,7 @@ def normalize_student_explanation_text(text: str) -> str:
                 continue
             if is_polish_head(line):
                 mode = "polish_body"
+                polish_has_bullets = False
                 out.append(_POLISH_SECTION_HEAD_PY)
                 continue
             t = trimmed(line)
@@ -1843,10 +1881,11 @@ def normalize_student_explanation_text(text: str) -> str:
                 out.append(_strip_explanation_deduction_summary_line(line))
                 continue
             if t.startswith("●") or t.startswith("○") or t.startswith("・"):
+                polish_has_bullets = True
                 out.append(_normalize_explanation_bullet_line(line))
                 continue
             if t in ("（記載なし）", "（該当なし）"):
-                if any(trimmed(x).startswith(("●", "○", "・")) for x in out):
+                if polish_has_bullets:
                     continue
                 out.append(line)
                 continue
@@ -2029,6 +2068,7 @@ def merge_proofread_explanation_for_storage(
         grammar_comment=g,
         polish_comment=p_json,
         body_explanation="",
+        content_comment=c,
     )
     cd = max(0, int(content_deduction))
     gd = max(0, int(grammar_deduction))
@@ -2177,6 +2217,7 @@ def parse_free_writing_feedback(raw_result: str) -> Tuple[str, str, str, str, st
         polish_comment=polish_comment,
         body_explanation=explanation,
         extra_polish_lines=polish_relocated,
+        content_comment=content_comment,
     )
     general_comment = ""
 

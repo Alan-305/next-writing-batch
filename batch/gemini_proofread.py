@@ -333,6 +333,7 @@ def proofread_one(
                 grammar_comment=(grammar_comment or "").strip(),
                 polish_comment=(polish_comment or "").strip(),
                 body_explanation=(explanation or "").strip(),
+                content_comment=(content_comment or "").strip(),
             )
             grammar_deduction = max(
                 0,
