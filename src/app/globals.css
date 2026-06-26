@@ -2951,6 +2951,20 @@ a.ops-btn {
     print-color-adjust: exact;
   }
 
+  /* Excellent は画面用グラデーション文字（background-clip:text）が印刷で消えるため実色にする */
+  .student-result-print-fit .score-eval-stamp--excellent .score-eval-stamp__text {
+    background: none !important;
+    -webkit-background-clip: border-box !important;
+    background-clip: border-box !important;
+    color: #92400e !important;
+    -webkit-text-fill-color: #92400e !important;
+  }
+
+  .student-result-print-fit .score-eval-stamp--very_good .score-eval-stamp__text {
+    color: #047857 !important;
+    -webkit-text-fill-color: #047857 !important;
+  }
+
   .student-result-print-fit .score-eval-stamp--good_try .score-eval-stamp__text {
     font-size: 0.58rem;
     max-width: 4.8rem;
