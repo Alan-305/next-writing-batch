@@ -3,6 +3,10 @@ import { loadUserProfileAdmin } from "@/lib/auth/load-user-profile-admin";
 import { isTeacherByRoles, normalizeRoles } from "@/lib/auth/user-roles";
 import { parseAdminUidAllowlist } from "@/lib/firebase/admin-allowlist";
 import { getAdminAuth } from "@/lib/firebase/admin-app";
+import {
+  isProofreadWorkflowEmailEnabled,
+  logProofreadWorkflowEmailSkipped,
+} from "@/lib/notifications/proofread-workflow-email-flags";
 
 function resendFromAddress(): string {
   const explicit = (process.env.RESEND_FROM_EMAIL ?? process.env.RESEND_FROM ?? "").trim();
@@ -156,6 +160,13 @@ export async function notifyTeachersNewSubmission(input: {
   studentId: string;
   studentName: string;
 }): Promise<void> {
+  if (!isProofreadWorkflowEmailEnabled()) {
+    logProofreadWorkflowEmailSkipped("new-submission", {
+      organizationId: input.organizationId,
+      submissionId: input.submissionId,
+    });
+    return;
+  }
   const submitter = (input.submittedByUid ?? "").trim();
   const profile = submitter ? await loadUserProfileAdmin(submitter) : null;
   const roles = profile ? normalizeRoles(profile.roles) : [];
@@ -200,6 +211,14 @@ export async function notifyProofreadEnqueueReceipt(input: {
   enqueuedCount: number;
   batchId: string;
 }): Promise<void> {
+  if (!isProofreadWorkflowEmailEnabled()) {
+    logProofreadWorkflowEmailSkipped("enqueue-receipt", {
+      requestedByUid: input.requestedByUid,
+      batchId: input.batchId,
+      enqueuedCount: input.enqueuedCount,
+    });
+    return;
+  }
   const uid = (input.requestedByUid ?? "").trim();
   const count = input.enqueuedCount;
   if (!uid || count <= 0) return;

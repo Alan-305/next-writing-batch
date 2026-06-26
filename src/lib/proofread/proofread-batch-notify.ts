@@ -1,5 +1,9 @@
 import { getAdminAuth } from "@/lib/firebase/admin-app";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
+import {
+  isProofreadWorkflowEmailEnabled,
+  logProofreadWorkflowEmailSkipped,
+} from "@/lib/notifications/proofread-workflow-email-flags";
 import type { ProofreadBatch, ProofreadJob, ProofreadJobStatus } from "@/lib/proofread/proofread-job-types";
 
 const PROGRESS_EMAIL_INTERVAL_MS = 60 * 60 * 1000;
@@ -172,6 +176,11 @@ export async function maybeNotifyProofreadBatch(organizationId: string, batchId:
   const oid = (organizationId ?? "").trim();
   const bid = (batchId ?? "").trim();
   if (!oid || !bid) return;
+
+  if (!isProofreadWorkflowEmailEnabled()) {
+    logProofreadWorkflowEmailSkipped("batch-completion-or-progress", { organizationId: oid, batchId: bid });
+    return;
+  }
 
   const batchRef = orgProofreadBatchesCol(oid).doc(bid);
   const batchSnap = await batchRef.get();
