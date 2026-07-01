@@ -8,6 +8,8 @@ let db: Firestore | undefined;
 export function getAdminFirestore(): Firestore {
   if (db) return db;
   db = getFirestore(getFirebaseAdminApp());
+  // undefined フィールドを書き込まない（提出更新で studentResultFirstViewedAt 等が undefined になるのを防ぐ）
+  db.settings({ ignoreUndefinedProperties: true });
   return db;
 }
 

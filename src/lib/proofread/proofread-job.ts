@@ -99,7 +99,9 @@ async function markSubmissionQueued(
       proofreadJobId: jobId,
       proofreadQueuedAt: new Date().toISOString(),
       proofreadQueuedByUid: requestedByUid,
-      ...(forceRedo ? {} : { studentResultFirstViewedAt: current.studentResultFirstViewedAt }),
+      ...(forceRedo || !current.studentResultFirstViewedAt
+        ? {}
+        : { studentResultFirstViewedAt: current.studentResultFirstViewedAt }),
     };
     tx.set(ref, next, { merge: false });
     return next;
@@ -107,7 +109,7 @@ async function markSubmissionQueued(
 }
 
 async function createProofreadJobDoc(job: ProofreadJob): Promise<void> {
-  await orgProofreadJobsCol(job.organizationId).doc(job.jobId).set(job);
+  await orgProofreadJobsCol(job.organizationId).doc(job.jobId).set(omitUndefined(job));
 }
 
 function omitUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
