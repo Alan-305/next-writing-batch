@@ -10,6 +10,19 @@ function gcpProjectId(): string {
   );
 }
 
+function normalizeServiceBaseUrl(url: string): string {
+  return (url ?? "").trim().replace(/\/$/, "");
+}
+
+/** Worker URL と公開 URL が同一サービスか（Cloud Run 自己呼び出しの判定） */
+export function isSameServiceProofreadWorker(): boolean {
+  const worker = normalizeServiceBaseUrl(
+    process.env.NWB_PROOFREAD_WORKER_URL ?? process.env.NWB_PUBLIC_APP_URL ?? "",
+  );
+  const app = normalizeServiceBaseUrl(process.env.NWB_PUBLIC_APP_URL ?? "");
+  return Boolean(worker && app && worker === app);
+}
+
 export function isCloudTasksProofreadConfigured(): boolean {
   return Boolean(
     gcpProjectId() &&
@@ -23,7 +36,9 @@ export function shouldProcessProofreadInline(): boolean {
   const explicit = (process.env.NWB_PROOFREAD_INLINE ?? "").trim();
   if (explicit === "true") return true;
   if (explicit === "false") return false;
-  // Cloud Tasks 未設定時は同一 Cloud Run / ローカルで非同期処理（「今すぐ同期」だけ動く状態を防ぐ）
+  // 同一 Cloud Run へ Cloud Tasks で HTTP 往復すると IAM / コールドスタートで失敗しやすい
+  if (isSameServiceProofreadWorker()) return true;
+  // Cloud Tasks 未設定時は同一プロセスで非同期処理
   return !isCloudTasksProofreadConfigured();
 }
 

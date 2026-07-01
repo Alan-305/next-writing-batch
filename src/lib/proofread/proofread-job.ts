@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { after } from "next/server";
 
 import { resolveEffectiveAnthropicApiKey } from "@/lib/anthropic-key-store";
 import { getAdminFirestore } from "@/lib/firebase/admin-firestore";
@@ -202,14 +203,35 @@ async function dispatchJob(payload: {
   submissionId: string;
   jobId: string;
 }): Promise<string | null> {
-  if (isCloudTasksProofreadConfigured()) {
-    return await dispatchProofreadCloudTask(payload);
-  }
   if (shouldProcessProofreadInline()) {
     fireProofreadInlineJob(payload);
     return null;
   }
-  throw new Error("PROOFREAD_DISPATCH_NOT_CONFIGURED");
+  if (!isCloudTasksProofreadConfigured()) {
+    throw new Error("PROOFREAD_DISPATCH_NOT_CONFIGURED");
+  }
+  try {
+    return await dispatchProofreadCloudTask(payload);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[proofread][cloud-tasks-dispatch-failed] fallback=inline", msg);
+    fireProofreadInlineJob(payload);
+    return null;
+  }
+}
+
+async function rollbackQueuedSubmission(
+  organizationId: string,
+  submissionId: string,
+  previousStatus: Submission["status"],
+): Promise<void> {
+  await updateSubmissionByIdInOrganization(organizationId, submissionId, (s) => {
+    const next: Submission = { ...s, status: previousStatus };
+    delete (next as Submission & { proofreadJobId?: string }).proofreadJobId;
+    delete (next as Submission & { proofreadQueuedAt?: string }).proofreadQueuedAt;
+    delete (next as Submission & { proofreadQueuedByUid?: string }).proofreadQueuedByUid;
+    return next;
+  }).catch((e) => console.error("[proofread][rollback-queued-failed]", submissionId, e));
 }
 
 function fireBatchNotify(organizationId: string, batchId: string | undefined): void {
@@ -257,6 +279,13 @@ export async function enqueueProofreadJobs(input: EnqueueProofreadInput): Promis
   const batchCreatedAt = new Date().toISOString();
   const batchJobIds: string[] = [];
 
+  try {
+    await syncSubmissionsFileMirrorFromFirestore(organizationId);
+    await syncTaskProblemsFileMirrorFromFirestore(organizationId);
+  } catch (e) {
+    console.error("[proofread][enqueue-mirror-sync-failed]", organizationId, e);
+  }
+
   for (const submissionId of ids) {
     const row = await getSubmissionByIdInOrganization(organizationId, submissionId);
     if (!row) {
@@ -284,6 +313,7 @@ export async function enqueueProofreadJobs(input: EnqueueProofreadInput): Promis
       attempt: 0,
     };
 
+    const previousStatus = row.status;
     try {
       await markSubmissionQueued(organizationId, submissionId, jobId, requestedByUid, forceRedo);
       await createProofreadJobDoc(job);
@@ -296,6 +326,7 @@ export async function enqueueProofreadJobs(input: EnqueueProofreadInput): Promis
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       skipped.push({ submissionId, reason: msg.slice(0, 200) });
+      await rollbackQueuedSubmission(organizationId, submissionId, previousStatus);
       await updateProofreadJobDoc(organizationId, jobId, {
         status: "failed",
         finishedAt: new Date().toISOString(),
@@ -305,10 +336,16 @@ export async function enqueueProofreadJobs(input: EnqueueProofreadInput): Promis
   }
 
   if (enqueued.length === 0) {
+    const detail = skipped
+      .slice(0, 3)
+      .map((s) => `${s.submissionId.slice(0, 8)}…: ${s.reason}`)
+      .join(" / ");
     return {
       ok: false,
       code: "NOTHING_ENQUEUED",
-      message: "キューに入れられた提出がありません。",
+      message: detail
+        ? `キューに入れられた提出がありません。（${detail}）`
+        : "キューに入れられた提出がありません。",
     };
   }
 
@@ -555,13 +592,20 @@ export async function processProofreadJob(input: ProcessProofreadJobInput): Prom
   }
 }
 
-/** enqueue 後にインライン dispatch 用（開発サーバーで fire-and-forget） */
+/** enqueue 後に同一インスタンスで非同期実行（Cloud Run では after でレスポンス後も継続） */
 export function fireProofreadInlineJob(payload: {
   organizationId: string;
   submissionId: string;
   jobId: string;
 }): void {
-  void processProofreadJob(payload).catch((e) => {
-    console.error("[proofread][inline-job-failed]", payload, e);
-  });
+  const run = () =>
+    processProofreadJob(payload).catch((e) => {
+      console.error("[proofread][inline-job-failed]", payload, e);
+    });
+
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
 }

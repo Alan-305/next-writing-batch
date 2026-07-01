@@ -15,6 +15,8 @@ import { estimateProofreadTicketCost, listSubmissionsForProofreadTicketScope } f
 import { getSubmissions } from "@/lib/submissions-store";
 
 export const dynamic = "force-dynamic";
+/** キュー投入・ミラー同期の余裕 */
+export const maxDuration = 120;
 
 type Body = {
   submissionIds?: unknown;
