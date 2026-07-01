@@ -13,6 +13,7 @@ from gemini_working_model import get_working_model
 
 from nl_essay_feedback import (  # noqa: E402
     _combined_grammar_bullets_text,
+    _is_placeholder_feedback_text,
     _normalize_essay_for_compare,
     _sum_deduction_points_from_explanation,
     apply_content_comment_finalization,
@@ -356,7 +357,9 @@ def proofread_one(
             if grammar_comment_has_zero_point_lines(grammar_comment or ""):
                 raise RuntimeError("grammar_comment_has_zero_point_lines")
 
-            if not (polish_comment or "").strip():
+            if not (polish_comment or "").strip() or _is_placeholder_feedback_text(
+                polish_comment or ""
+            ):
                 raise RuntimeError("polish_comment_empty")
 
             evaluation = rebuild_evaluation_line(

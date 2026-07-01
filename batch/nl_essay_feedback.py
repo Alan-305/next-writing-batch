@@ -7,6 +7,7 @@ Next Writing Batch の自由英作文（Essay proofreading）用プロンプト�
 
 from __future__ import annotations
 
+import difflib
 import os
 import re
 import sys
@@ -57,10 +58,21 @@ JSON より前の本文は **得点1行目 → 減点あり文法の●行 → �
 - than/rather than クラスターは**1行**にまとめ、① rather than 案 ② higher+than 案の両方を簡潔に示す。
 - 各行: `● 誤り → 正：解説（➖X点）`（X≧1）。**減点合計行・見出しは書かない**。
 
-# polish_comment（【完成版のポイント】）
-- 完成版で**修正・追記した**表現（減点対象でないものも含む）。
-- 各行: `・ 原文 → 完成版：理由`（**減点表記禁止**）。理由は必須。
-- **禁止**: 見出し行、減点合計行、grammar と同じ指摘の繰り返し、`（該当なし）` を中身があるのに付けること
+# polish_comment（【完成版のポイント】）— 空欄・（該当なし）厳禁
+- 完成版で**修正・追記・削除した**表現は**すべて**ここか grammar_comment に必ず書く（無言修正は厳禁）。
+- 各行: `・ 原文 → 完成版：理由`（**減点表記禁止**）。理由は必須。矢印は `→`（`->` 禁止）。
+- grammar で減点済みの修正も、完成版で変えた箇所は**必ず** `・ 原文 → 完成版：理由` で再掲する（減点表記は付けない）。
+- **禁止**: 見出し行、減点合計行、`（該当なし）` `（記載なし）`、空文字、理由なしの1行
+
+# 必須指摘パターン（見落とし禁止・grammar または polish へ）
+- `Especially people who ..., they ...` の懸垂修饰・カンマスプライス → `Especially for people who ...`（➖2点）
+- `tired to work` → `tired from work`（➖2点）
+- `don't` を未来の文脈で `won't` に直す場合も、原文と完成版の差を必ず指摘に含める
+- `talk to him`（ペット一般）→ `talk to their pet` / `can talk to ...` など代名詞・助動詞の修正も指摘必須
+
+# 重複指摘の禁止（grammar_comment 厳守）
+- **同じ修正方針を2行以上書かない**（例: `high school` → `high schools` が答案に2回出ても●行は1本・減点1回のみ）
+- 説明文が同じ指摘を繰り返すことも禁止
 
 # 版面（厳格）
 - 解説全体（3 JSON ブロック）は **A4 印刷2ページ以内**。冗長・重複禁止。
@@ -111,6 +123,8 @@ FEEDBACK_COVERAGE_AUDIT_PROMPT = """あなたは受験英作文の超ベテラ�
 - **than / rather than / such as ... than / 原級＋than** は既存に1行でもあれば追記しない。
 - **in recent years + 時制** も既存に1行でもあれば追記しない。
 - **more important than** も既存に1行でもあれば追記しない。
+- **high school → high schools** も既存に1行でもあれば追記しない（複数箇所あっても1回）。
+- **Especially ... / tired to work / tired from work** など完成版で直したが grammar・polish に無い変更は必ず追記する。
 - **than と比較級**: 追記が必要な場合も**1行にまとめ**、① rather than 案 ② higher+than 案を示す（複数行に分割禁止）。
 - 形・用法・冠詞・語法・綴り・品詞・前置詞・コロケーション・表現の言い換え → `additional_grammar_bullets`（●行形式）
 - 論旨の明確化・具体例の追加・結論の補強・語彙の内容面向上 → `content_comment_additions`（日本語。①②のどれかに触れる内容として書く）
@@ -206,7 +220,7 @@ def build_feedback_coverage_audit_prompt(
 
 def _line_deduction_points(line: str) -> Optional[int]:
     """行末の（➖N点）等から減点幅を読む。無ければ None。"""
-    t = _normalize_explanation_deduction_marks(line or "")
+    t = _normalize_grammar_arrow_text(_normalize_explanation_deduction_marks(line or ""))
     m = re.search(r"（\s*-?\s*(\d+)\s*点\s*）", t)
     if not m:
         m = re.search(r"\(\s*-?\s*(\d+)\s*点\s*\)", t)
@@ -216,6 +230,74 @@ def _line_deduction_points(line: str) -> Optional[int]:
         return int(m.group(1))
     except ValueError:
         return None
+
+
+_PLACEHOLDER_FEEDBACK_MARKERS = ("（該当なし）", "（記載なし）", "該当なし", "記載なし")
+
+
+def _normalize_grammar_arrow_text(text: str) -> str:
+    """`->` や `(-N point)` を grammar/polish 処理用の統一表記へ。"""
+    if not text:
+        return text
+    t = text.replace("->", "→")
+    t = re.sub(
+        r"\(\s*-\s*(\d+)\s*points?\s*\)",
+        r"（➖\1点）",
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(
+        r"\(\s*-?\s*(\d+)\s*点\s*\)",
+        lambda m: f"（➖{m.group(1)}点）",
+        t,
+    )
+    return t
+
+
+def _is_placeholder_feedback_text(text: str) -> bool:
+    """空・（該当なし）のみのフィードバックブロックか。"""
+    t = (text or "").strip()
+    if not t:
+        return True
+    lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
+    if not lines:
+        return True
+    has_real = False
+    for ln in lines:
+        bare = re.sub(r"^(?:●|○|・)\s*", "", ln).strip()
+        if bare in _PLACEHOLDER_FEEDBACK_MARKERS:
+            continue
+        if _is_explanation_bullet_line(ln) or ("→" in ln and re.search(r"[A-Za-z]", ln)):
+            has_real = True
+            break
+        if bare and bare not in _PLACEHOLDER_FEEDBACK_MARKERS:
+            has_real = True
+            break
+    return not has_real
+
+
+def _arrow_pair_from_grammar_line(line: str) -> Optional[Tuple[str, str]]:
+    """grammar/polish 行から `誤り → 正` のペアを取り出す。"""
+    body = _strip_bullet_body(_normalize_grammar_arrow_text(_normalize_explanation_bullet_line(line)))
+    m = re.search(
+        r"^[`'\"]?(.+?)[`'\"]?\s*→\s*[`'\"]?(.+?)[`'\"]?\s*(?:[：:]|（|\(|$)",
+        body,
+    )
+    if not m:
+        return None
+    err = re.sub(r"\s+", " ", m.group(1).strip())
+    fix = re.sub(r"\s+", " ", m.group(2).strip())
+    if not err and not fix:
+        return None
+    return err, fix
+
+
+def _split_essay_sentences(text: str) -> List[str]:
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if not t:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", t)
+    return [p.strip() for p in parts if p.strip()]
 
 
 def _is_explanation_bullet_line(line: str) -> bool:
@@ -340,7 +422,9 @@ def _partition_improve_and_polish_notes(
 
 def _grammar_line_to_polish_rewrite_note(line: str) -> Optional[str]:
     """文法●行を減点なしの完成版書き換えメモ（・ 原文 → 完成版：理由）へ変換。"""
-    body = _strip_bullet_body(_normalize_explanation_bullet_line(line))
+    body = _strip_bullet_body(
+        _normalize_grammar_arrow_text(_normalize_explanation_bullet_line(line))
+    )
     if "→" not in body:
         return None
     body = _CONTENT_DEDUCTION_MARK_RE.sub("", body)
@@ -404,10 +488,13 @@ def ensure_nonempty_polish_comment(
     grammar_comment: str,
     extra_polish_lines: Optional[List[str]] = None,
 ) -> str:
-    pc = merge_polish_bullets_deduped((polish_comment or "").strip(), (polish_from_grammar or "").strip())
+    pc = (polish_comment or "").strip()
+    if _is_placeholder_feedback_text(pc):
+        pc = ""
+    pc = merge_polish_bullets_deduped(pc, (polish_from_grammar or "").strip())
     for ln in extra_polish_lines or []:
         pc = merge_polish_bullets_deduped(pc, ln)
-    if pc.strip():
+    if pc.strip() and not _is_placeholder_feedback_text(pc):
         return pc
     fb = _polish_fallback_from_grammar_explanations(grammar_comment)
     return fb
@@ -817,10 +904,168 @@ def grammar_comment_has_zero_point_lines(text: str) -> bool:
 
 
 def _grammar_error_phrase(line: str) -> str:
-    m = re.search(r"^(?:●|○|・)\s*`?([^`→]+)`?\s*→", (line or "").strip())
+    norm = _normalize_grammar_arrow_text((line or "").strip())
+    m = re.search(r"^(?:●|○|・)\s*`?([^`→]+)`?\s*→", norm)
     if m:
         return re.sub(r"\s+", " ", m.group(1).lower().strip())
-    return _grammar_bullet_key(line)
+    return _grammar_bullet_key(norm)
+
+
+def _grammar_explanation_signature(line: str) -> str:
+    m = re.search(r"[：:](.+?)(?:（|\(|$)", line or "")
+    if not m:
+        return ""
+    return re.sub(r"\s+", "", m.group(1))[:60].lower()
+
+
+def _correction_rule_group_id(line: str) -> Optional[str]:
+    """同一修正方針の重複（high school 複数行など）を1本にまとめる。"""
+    t = (line or "").lower()
+    pair = _arrow_pair_from_grammar_line(line)
+    if not pair:
+        return None
+    err_l, fix_l = pair[0].lower(), pair[1].lower()
+    if "high school" in err_l and "high schools" in fix_l:
+        return "corr:high_school_plural"
+    if re.search(r"especially\s+people", err_l) or (
+        "especially" in err_l and re.search(r",\s*they\b", err_l)
+    ):
+        return "corr:especially_dangling"
+    if "tired to work" in err_l or ("tired to" in err_l and "tired from" in fix_l):
+        return "corr:tired_from_work"
+    exp = _grammar_explanation_signature(line)
+    if exp and len(exp) >= 10:
+        if "複数" in (line or "") and "high school" in err_l:
+            return "corr:high_school_plural"
+        sub = ""
+        err_w = err_l.split()
+        fix_w = fix_l.split()
+        for ew, fw in zip(err_w, fix_w):
+            if ew != fw:
+                sub = f"{ew}→{fw}"
+                break
+        if sub:
+            return f"corr:{sub}:{exp[:24]}"
+    return None
+
+
+_HIGH_SCHOOL_PLURAL_CANONICAL = (
+    "● `high school` → `high schools`："
+    "一般論・制度全体を述べるときは複数形 high schools が自然。"
+    "答案内に同じ修正が複数あっても減点はこの指摘1回のみ。（➖1点）"
+)
+
+_CORRECTION_RULE_CANONICAL = {
+    "corr:high_school_plural": _HIGH_SCHOOL_PLURAL_CANONICAL,
+}
+
+
+def _resolve_correction_rule_bullet(rule_id: str, rule_lines: List[str]) -> str:
+    if len(rule_lines) == 1:
+        return rule_lines[0]
+    canonical = _CORRECTION_RULE_CANONICAL.get(rule_id)
+    if canonical:
+        return canonical
+    return max(rule_lines, key=lambda ln: len(ln or ""))
+
+
+def build_polish_bullets_from_essay_diff(
+    original: str,
+    final: str,
+    *,
+    grammar_comment: str = "",
+    polish_comment: str = "",
+    content_comment: str = "",
+) -> str:
+    """既存指摘でカバーされていない原文→完成版の差分を polish 行として生成。"""
+    orig_n = _normalize_essay_for_compare(original)
+    final_n = _normalize_essay_for_compare(final)
+    if not orig_n or not final_n or orig_n == final_n:
+        return ""
+
+    covered: set[str] = set()
+    for src in (grammar_comment, polish_comment, content_comment):
+        for ln in _extract_grammar_bullet_lines(src or ""):
+            pair = _arrow_pair_from_grammar_line(ln)
+            if pair:
+                covered.add(_grammar_bullet_key(f"{pair[0]}→{pair[1]}"))
+                covered.add(_grammar_bullet_key(pair[0]))
+                covered.add(_grammar_bullet_key(pair[1]))
+
+    bullets: List[str] = []
+    seen: set[str] = set()
+
+    def _add(orig_phrase: str, final_phrase: str, reason: str) -> None:
+        o = orig_phrase.strip()
+        f = final_phrase.strip()
+        if not f:
+            return
+        if o:
+            key = _grammar_bullet_key(f"{o}→{f}")
+            if key in covered:
+                return
+            if any(len(c) >= 8 and (c in _grammar_bullet_key(o) or _grammar_bullet_key(o) in c) for c in covered):
+                return
+            note = f"・{o} → {f}：{reason}"
+        else:
+            note = f"・（追記）{f}：{reason}"
+        nk = _grammar_bullet_key(note)
+        if nk in seen:
+            return
+        seen.add(nk)
+        bullets.append(_ensure_explanation_bullet_line_punctuation(note))
+
+    def _reason_for_pair(o_p: str, f_p: str) -> str:
+        o_l, f_l = o_p.lower(), f_p.lower()
+        if "especially" in o_l and "especially for" in f_l:
+            return "懸垂修饰・カンマスプライスを避けるため Especially for ... の形に直しました"
+        if "tired to work" in o_l or ("tired to" in o_l and "tired from" in f_l):
+            return "「仕事で疲れた」は tired from work のように from を使います"
+        if "talk to him" in o_l and ("their pet" in f_l or "can talk" in f_l):
+            return "ペット一般を指す代名詞と can talk の形に整えました"
+        if "don't feel" in o_l and "won't feel" in f_l:
+            return "未来の可能性を述べる文脈では won't の方が自然です"
+        if "go to walk" in o_l and "go for a walk" in f_l:
+            return "散歩に行くは go for a walk が自然な表現です"
+        return "完成版で整えた表現です"
+
+    o_sents = _split_essay_sentences(original)
+    f_sents = _split_essay_sentences(final)
+    replaced_sent_indices: set[int] = set()
+    sm = difflib.SequenceMatcher(None, o_sents, f_sents)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            continue
+        o_chunk = " ".join(o_sents[i1:i2])
+        f_chunk = " ".join(f_sents[j1:j2])
+        if tag == "replace":
+            _add(o_chunk, f_chunk, _reason_for_pair(o_chunk, f_chunk))
+            for idx in range(i1, i2):
+                replaced_sent_indices.add(idx)
+        elif tag == "insert":
+            _add("", f_chunk, "完成版で追加した表現です")
+
+    if len(o_sents) == len(f_sents):
+        for si, (o_s, f_s) in enumerate(zip(o_sents, f_sents)):
+            if si in replaced_sent_indices:
+                continue
+            if _normalize_essay_for_compare(o_s) == _normalize_essay_for_compare(f_s):
+                continue
+            o_words = re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\s\w]", o_s)
+            f_words = re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?|[^\s\w]", f_s)
+            wsm = difflib.SequenceMatcher(None, o_words, f_words)
+            for wtag, wi1, wi2, wj1, wj2 in wsm.get_opcodes():
+                if wtag != "replace":
+                    continue
+                o_p = " ".join(o_words[wi1:wi2]).strip()
+                f_p = " ".join(f_words[wj1:wj2]).strip()
+                if len(o_p) < 5 and len(f_p) < 5:
+                    continue
+                if len(o_p) <= 3 and len(f_p) <= 3:
+                    continue
+                _add(o_p, f_p, _reason_for_pair(o_p, f_p))
+
+    return "\n".join(bullets).strip()
 
 
 def _grammar_dedup_group_id(line: str) -> Optional[str]:
@@ -921,25 +1166,40 @@ def _resolve_grammar_group_bullet(group_id: str, group_lines: List[str]) -> str:
 
 
 def collapse_duplicate_grammar_bullets(text: str) -> str:
-    """同一誤りクラスターの grammar ●行を1本にまとめる。"""
+    """同一誤りクラスター・同一修正方針の grammar ●行を1本にまとめる。"""
     lines = _extract_grammar_bullet_lines(text)
     if not lines:
         return (text or "").strip()
 
     group_buckets: Dict[str, List[str]] = {}
+    rule_buckets: Dict[str, List[str]] = {}
     for ln in lines:
         gid = _grammar_dedup_group_id(ln)
         if gid:
             group_buckets.setdefault(gid, []).append(ln)
+        rid = _correction_rule_group_id(ln)
+        if rid:
+            rule_buckets.setdefault(rid, []).append(ln)
 
     resolved_group = {
         gid: _resolve_grammar_group_bullet(gid, gl) for gid, gl in group_buckets.items()
     }
+    resolved_rule = {
+        rid: _resolve_correction_rule_bullet(rid, rl) for rid, rl in rule_buckets.items()
+    }
 
     out: List[str] = []
     seen_g: set[str] = set()
+    seen_r: set[str] = set()
     seen_u: set[str] = set()
     for ln in lines:
+        rid = _correction_rule_group_id(ln)
+        if rid:
+            if rid in seen_r:
+                continue
+            seen_r.add(rid)
+            out.append(resolved_rule[rid])
+            continue
         gid = _grammar_dedup_group_id(ln)
         if gid:
             if gid in seen_g:
@@ -1056,26 +1316,43 @@ def ensure_polish_points_for_final_diff(
     orig_n = _normalize_essay_for_compare(original_essay)
     final_n = _normalize_essay_for_compare(final_essay)
     if not orig_n or not final_n or orig_n == final_n:
-        return (polish_comment or "").strip()
+        pc0 = (polish_comment or "").strip()
+        return "" if _is_placeholder_feedback_text(pc0) else pc0
+
+    pc = (polish_comment or "").strip()
+    if _is_placeholder_feedback_text(pc):
+        pc = ""
 
     pc = ensure_nonempty_polish_comment(
-        (polish_comment or "").strip(),
+        pc,
         "",
         grammar_comment,
         extra_polish_lines=_extract_polish_from_content_good(content_comment),
     )
-    if _extract_grammar_bullet_lines(pc):
-        return pc
+    if _is_placeholder_feedback_text(pc):
+        pc = ""
 
     grammar_notes = _grammar_lines_to_polish_rewrite_notes(grammar_comment)
     if grammar_notes:
-        return merge_polish_bullets_deduped(pc, grammar_notes)
+        pc = merge_polish_bullets_deduped(pc, grammar_notes)
 
-    summary = (
-        "・完成版では原文を整え、内容・文法の指摘を反映して"
-        "読みやすく自然な英文に仕上げました。"
+    diff_notes = build_polish_bullets_from_essay_diff(
+        original_essay,
+        final_essay,
+        grammar_comment=grammar_comment,
+        polish_comment=pc,
+        content_comment=content_comment,
     )
-    return merge_polish_bullets_deduped(pc, summary)
+    if diff_notes:
+        pc = merge_polish_bullets_deduped(pc, diff_notes)
+
+    if not pc.strip():
+        summary = (
+            "・完成版では原文を整え、内容・文法の指摘を反映して"
+            "読みやすく自然な英文に仕上げました。"
+        )
+        return merge_polish_bullets_deduped("", summary)
+    return pc
 
 
 def _grammar_bullet_key(line: str) -> str:
@@ -1089,7 +1366,9 @@ def _extract_grammar_bullet_lines(text: str) -> List[str]:
     for ln in (text or "").splitlines():
         t = ln.strip()
         if _is_explanation_bullet_line(t):
-            out.append(_normalize_explanation_bullet_line(ln))
+            out.append(
+                _normalize_explanation_bullet_line(_normalize_grammar_arrow_text(ln))
+            )
     return out
 
 
@@ -2046,7 +2325,7 @@ def _normalize_ai_grammar_comment_block(text: str) -> str:
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     out: List[str] = []
     for line in lines:
-        t = line.strip()
+        t = _normalize_grammar_arrow_text(line.strip())
         if not t:
             out.append(line)
             continue
@@ -2054,7 +2333,7 @@ def _normalize_ai_grammar_comment_block(text: str) -> str:
             out.append(line)
             continue
         if t.startswith("●") or t.startswith("○") or t.startswith("・"):
-            out.append(_normalize_explanation_bullet_line(line))
+            out.append(_normalize_explanation_bullet_line(t))
             continue
         out.append(_normalize_explanation_bullet_line(f"・{t}"))
     return "\n".join(out)
