@@ -42,11 +42,13 @@ VETERAN_GRAMMAR_TEACHING_RULES = """
 ## 同一修正方針の重複禁止（最重要）
 - **同じ直し方・同じ説明を2行以上書かない**。減点も1回のみ。
 - 例: `high school` → `high schools` が答案内に2箇所あっても、grammar_comment は**●行1本**（「答案内に複数あっても減点は1回」と明記可）。2行目以降は絶対に書かない。
-- 説明文が同じ指摘（複数形が自然、など）の繰り返しも禁止。
+- 例: `Not only you can ... but also ...` の倒置ミスが答案内に複数あっても**●行1本・減点1回のみ**（`to feed him` など後半の語句が違っても同じ構文ミスとして1行にまとめる）。
+- 説明文が同じ指摘（倒置が必要、など）の繰り返しも禁止。
 
 ## 必須指摘パターン（見落とし禁止）
 - `Especially people who ..., they ...` の懸垂修饰・カンマスプライス → `Especially for people who ...`（重要ミス➖2点）
 - `tired to work` → `tired from work`（重要ミス➖2点）
+- `Not only you can ... but also ...` → `Not only can you ... but you can also ...`（倒置＋but also 節の主語補完。重要ミス➖2点。**答案内に同構文が複数あっても●行1本・減点1回**）
 - 完成版で上記のように直した場合、**grammar_comment に必ず減点行を書く**。無言で完成版だけ直すことは厳禁。
 
 ## 時の副詞と動詞の時制（1つの●行・重複禁止）
