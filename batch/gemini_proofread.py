@@ -196,6 +196,7 @@ def _sync_feedback_with_final_version(
             additional_grammar_bullets=add_g,
             content_comment_additions=add_c,
             additional_polish_bullets=add_p,
+            original_essay=orig,
         )
     except Exception:
         return body_explanation, content_comment, grammar_comment, content_deduction, grammar_deduction, polish_comment
@@ -337,6 +338,7 @@ def proofread_one(
                 polish_comment=(polish_comment or "").strip(),
                 body_explanation=(explanation or "").strip(),
                 content_comment=(content_comment or "").strip(),
+                original_essay=original_essay,
             )
             polish_comment = ensure_polish_points_for_final_diff(
                 original_essay=original_essay,
@@ -377,6 +379,7 @@ def proofread_one(
                 polish_comment=(polish_comment or "").strip(),
                 content_deduction=cd_i,
                 grammar_deduction=gd_i,
+                original_essay=original_essay,
             )
             grammar_synced = grammar_body_from_merged_explanation(explanation_merged)
             grammar_for_api = (
