@@ -460,7 +460,7 @@ export function OpsReportsPageClient() {
                       </p>
                       {w.sampleReason ? <p className="ops-report-handout-reason">{w.sampleReason}</p> : null}
                       {w.sources?.length ? (
-                        <div className="ops-reports-source-actions no-print no-print">
+                        <div className="ops-reports-source-actions no-print">
                           <button
                             type="button"
                             className="ops-reports-open-source"
