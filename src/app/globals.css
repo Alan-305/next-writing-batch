@@ -5392,10 +5392,21 @@ a.ops-btn {
   margin: 0;
 }
 
+.ops-reports-tab-hint {
+  margin: -0.35rem 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.ops-reports-print-sheet {
+  display: none;
+}
+
 @media print {
   .app-shell-header,
   .ops-reports-filters,
   .ops-reports-tabs,
+  .ops-reports-tab-hint,
   .ops-reports-meta,
   .ops-reports-filters-actions,
   .ops-reports > .muted:first-child,
@@ -5407,12 +5418,13 @@ a.ops-btn {
   .ops-reports-status,
   .ops-reports-error,
   .ops-report-source-overlay,
+  .ops-reports-panel,
   .no-print {
     display: none !important;
   }
 
-  .ops-reports-panel:not(.ops-reports-panel--print) {
-    display: none !important;
+  .ops-reports-print-sheet {
+    display: block !important;
   }
 
   .ops-report-handout {

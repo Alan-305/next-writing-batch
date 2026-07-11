@@ -42,7 +42,7 @@ type WeaknessesPayload = {
   weaknesses?: ReportWeaknessesResult;
 };
 
-type ViewMode = "overview" | "weaknesses" | "personal" | "handout-class" | "handout-personal";
+type ViewMode = "overview" | "weaknesses" | "personal";
 
 function focusLabel(focus: string): string {
   switch (focus) {
@@ -213,17 +213,15 @@ export function OpsReportsPageClient() {
     e.preventDefault();
   };
 
-  /** 重い画面（グラフ等）を避け、配布ビューだけを印刷してダイアログ起動を速くする */
+  /** 画面上のグラフ等は印刷せず、専用の配布シートだけを印刷する */
   const handlePrint = () => {
     if (printPreparing) return;
     setSourceViewer(null);
-    const target: ViewMode = student.trim() ? "handout-personal" : "handout-class";
     setPrintPreparing(true);
-    setView(target);
     window.setTimeout(() => {
       window.print();
       setPrintPreparing(false);
-    }, 80);
+    }, 50);
   };
 
   return (
@@ -234,7 +232,7 @@ export function OpsReportsPageClient() {
       <header className="ops-reports-hero">
         <h1>集計レポート</h1>
         <p className="ops-reports-lead">
-          公開済みの添削結果から、内容点・文法点の傾向と頻出の伸びしろをまとめ、授業や個別指導の資料にします。
+          画面で傾向を確認し、「印刷 / PDF」で生徒配布用の資料を出します。生徒欄が空ならクラス用、氏名を入れると個人用になります。
         </p>
       </header>
 
@@ -302,10 +300,8 @@ export function OpsReportsPageClient() {
         {(
           [
             ["overview", "クラス概要"],
-            ["weaknesses", "弱点・授業ネタ"],
+            ["weaknesses", "弱点"],
             ["personal", "個人カルテ"],
-            ["handout-class", "配布（クラス）"],
-            ["handout-personal", "配布（個人）"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -319,6 +315,9 @@ export function OpsReportsPageClient() {
           </button>
         ))}
       </nav>
+      <p className="ops-reports-tab-hint muted no-print">
+        クラス概要＝点数の傾向　／　弱点＝頻出ミスと授業ネタ　／　個人カルテ＝1人の推移（生徒を指定）
+      </p>
 
       {loading ? <p className="muted ops-reports-status">集計中…</p> : null}
       {error ? (
@@ -622,15 +621,17 @@ export function OpsReportsPageClient() {
             </section>
           ) : null}
 
-          {view === "handout-class" ? (
-            <section className="ops-reports-panel ops-reports-panel--print" aria-label="クラス配布">
-              <div className="ops-reports-print-controls no-print">
-                <OpsReportCategoryFilter
-                  categories={weaknesses?.categories ?? []}
-                  selectedIds={categoryFilterForUi}
-                  onChange={setSelectedCategories}
-                />
-              </div>
+          {/* 印刷専用シート（画面では非表示。「印刷 / PDF」でここだけ出る） */}
+          <div className="ops-reports-print-sheet" aria-hidden>
+            {student.trim() ? (
+              <OpsReportPersonalHandout
+                studentName={personalName}
+                studentId={personalId}
+                periodLabel={`${periodLabel} ／ ${taskLabel}`}
+                trend={summary.personalTrend}
+                personalGrammar={filteredPersonalGrammar}
+              />
+            ) : (
               <OpsReportClassHandout
                 title="答案分析・授業ネタ"
                 periodLabel={periodLabel}
@@ -639,33 +640,8 @@ export function OpsReportsPageClient() {
                 topGrammar={filteredTopGrammar}
                 contentThemes={weaknesses?.contentThemes ?? []}
               />
-            </section>
-          ) : null}
-
-          {view === "handout-personal" ? (
-            <section className="ops-reports-panel ops-reports-panel--print" aria-label="個人配布">
-              {!student.trim() ? (
-                <p className="muted">個人配布には「生徒」の指定が必要です。</p>
-              ) : (
-                <>
-                  <div className="ops-reports-print-controls no-print">
-                    <OpsReportCategoryFilter
-                      categories={weaknesses?.categories ?? []}
-                      selectedIds={categoryFilterForUi}
-                      onChange={setSelectedCategories}
-                    />
-                  </div>
-                  <OpsReportPersonalHandout
-                    studentName={personalName}
-                    studentId={personalId}
-                    periodLabel={`${periodLabel} ／ ${taskLabel}`}
-                    trend={summary.personalTrend}
-                    personalGrammar={filteredPersonalGrammar}
-                  />
-                </>
-              )}
-            </section>
-          ) : null}
+            )}
+          </div>
         </>
       ) : null}
 
