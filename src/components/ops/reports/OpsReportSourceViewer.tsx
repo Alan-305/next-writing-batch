@@ -26,9 +26,32 @@ const ZOOM_MIN = 70;
 const ZOOM_MAX = 200;
 const ZOOM_STEP = 10;
 const ZOOM_DEFAULT = 100;
+const ESSAY_ZOOM_STORAGE_KEY = "nwb-ops-report-source-essay-zoom";
+const PDF_ZOOM_STORAGE_KEY = "nwb-ops-report-source-pdf-zoom";
 
 function clampZoom(value: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+}
+
+function readStoredZoom(key: string): number {
+  if (typeof window === "undefined") return ZOOM_DEFAULT;
+  try {
+    const raw = localStorage.getItem(key);
+    const n = raw ? Number(raw) : NaN;
+    if (!Number.isFinite(n)) return ZOOM_DEFAULT;
+    // 10% 刻みに揃える
+    return clampZoom(Math.round(n / ZOOM_STEP) * ZOOM_STEP);
+  } catch {
+    return ZOOM_DEFAULT;
+  }
+}
+
+function writeStoredZoom(key: string, value: number) {
+  try {
+    localStorage.setItem(key, String(clampZoom(value)));
+  } catch {
+    /* ignore quota / private mode */
+  }
 }
 
 function ZoomControls({
@@ -87,9 +110,26 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
   const [essayError, setEssayError] = useState("");
   const [essayPct, setEssayPct] = useState(ESSAY_PCT_DEFAULT);
   const [dragging, setDragging] = useState(false);
-  const [essayZoom, setEssayZoom] = useState(ZOOM_DEFAULT);
-  const [pdfZoom, setPdfZoom] = useState(ZOOM_DEFAULT);
+  const [essayZoom, setEssayZoomState] = useState(ZOOM_DEFAULT);
+  const [pdfZoom, setPdfZoomState] = useState(ZOOM_DEFAULT);
   const splitRef = useRef<HTMLDivElement>(null);
+
+  const setEssayZoom = useCallback((next: number) => {
+    const value = clampZoom(next);
+    setEssayZoomState(value);
+    writeStoredZoom(ESSAY_ZOOM_STORAGE_KEY, value);
+  }, []);
+
+  const setPdfZoom = useCallback((next: number) => {
+    const value = clampZoom(next);
+    setPdfZoomState(value);
+    writeStoredZoom(PDF_ZOOM_STORAGE_KEY, value);
+  }, []);
+
+  useEffect(() => {
+    setEssayZoomState(readStoredZoom(ESSAY_ZOOM_STORAGE_KEY));
+    setPdfZoomState(readStoredZoom(PDF_ZOOM_STORAGE_KEY));
+  }, []);
 
   const active = sources.find((s) => s.submissionId === activeId) ?? sources[0] ?? null;
 
