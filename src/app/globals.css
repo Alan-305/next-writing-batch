@@ -4622,12 +4622,25 @@ a.ops-btn {
   cursor: pointer;
   color: #fff;
   background: #0e7490;
+  filter: none;
   transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-btn {
+  color: #fff;
+  background: #0e7490;
+  filter: none;
 }
 
 .ops-reports-btn:hover:not(:disabled) {
   background: #155e75;
   transform: translateY(-1px);
+  filter: none;
+}
+
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-btn:hover:not(:disabled) {
+  background: #155e75;
+  filter: none;
 }
 
 .ops-reports-btn:focus-visible {
@@ -4640,13 +4653,17 @@ a.ops-btn {
   cursor: not-allowed;
 }
 
-.ops-reports-btn--ghost {
+.ops-reports-btn--ghost,
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-btn--ghost {
   color: #0f172a;
   background: #e2e8f0;
+  filter: none;
 }
 
-.ops-reports-btn--ghost:hover:not(:disabled) {
+.ops-reports-btn--ghost:hover:not(:disabled),
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-btn--ghost:hover:not(:disabled) {
   background: #cbd5e1;
+  filter: none;
 }
 
 .ops-reports-tabs {
@@ -4666,12 +4683,22 @@ a.ops-btn {
   font-size: 0.92rem;
   color: #334155;
   cursor: pointer;
+  filter: none;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.ops-reports-tab:hover {
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-tab {
+  background: #fff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  filter: none;
+}
+
+.ops-reports-tab:hover,
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-tab:hover {
   border-color: #94a3b8;
   background: #f8fafc;
+  filter: none;
 }
 
 .ops-reports-tab:focus-visible {
@@ -4679,11 +4706,13 @@ a.ops-btn {
   box-shadow: var(--focus-ring, 0 0 0 3px rgba(14, 116, 144, 0.35));
 }
 
-.ops-reports-tab.is-active {
+.ops-reports-tab.is-active,
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-tab.is-active {
   border-color: #0e7490;
   background: #ecfeff;
   color: #155e75;
   font-weight: 700;
+  filter: none;
 }
 
 .ops-reports-status,
@@ -4909,7 +4938,8 @@ a.ops-btn {
   color: #475569;
 }
 
-.ops-report-cat-filter-trigger {
+.ops-report-cat-filter-trigger,
+.app-shell--teacher.app-shell--ops-branded button.ops-report-cat-filter-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4917,17 +4947,22 @@ a.ops-btn {
   width: 100%;
   min-height: 44px;
   padding: 0.5rem 0.85rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #94a3b8;
   border-radius: 10px;
-  background: #fff;
+  background: #f8fafc;
+  color: #0f172a;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  filter: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
-.ops-report-cat-filter-trigger:hover {
-  border-color: #94a3b8;
+.ops-report-cat-filter-trigger:hover,
+.app-shell--teacher.app-shell--ops-branded button.ops-report-cat-filter-trigger:hover:not(:disabled) {
+  border-color: #64748b;
+  background: #fff;
+  filter: none;
 }
 
 .ops-report-cat-filter-trigger:focus-visible {
@@ -4938,11 +4973,11 @@ a.ops-btn {
 
 .ops-report-cat-filter-summary {
   color: #0f172a;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .ops-report-cat-filter-chevron {
-  color: #64748b;
+  color: #475569;
   font-size: 0.75rem;
 }
 
@@ -4968,7 +5003,8 @@ a.ops-btn {
   margin-bottom: 0.55rem;
 }
 
-.ops-report-cat-filter-mini {
+.ops-report-cat-filter-mini,
+.app-shell--teacher.app-shell--ops-branded button.ops-report-cat-filter-mini {
   min-height: 36px;
   padding: 0.25rem 0.75rem;
   border: 1px solid #cbd5e1;
@@ -4979,10 +5015,13 @@ a.ops-btn {
   font-weight: 600;
   color: #334155;
   cursor: pointer;
+  filter: none;
 }
 
-.ops-report-cat-filter-mini:hover {
+.ops-report-cat-filter-mini:hover,
+.app-shell--teacher.app-shell--ops-branded button.ops-report-cat-filter-mini:hover:not(:disabled) {
   background: #e2e8f0;
+  filter: none;
 }
 
 .ops-report-cat-filter-mini:focus-visible {
@@ -5044,7 +5083,8 @@ a.ops-btn {
   margin-top: 0.45rem;
 }
 
-.ops-reports-open-source {
+.ops-reports-open-source,
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-open-source {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5058,12 +5098,15 @@ a.ops-btn {
   font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
+  filter: none;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.ops-reports-open-source:hover {
+.ops-reports-open-source:hover,
+.app-shell--teacher.app-shell--ops-branded button.ops-reports-open-source:hover:not(:disabled) {
   background: #cffafe;
   border-color: #0891b2;
+  filter: none;
 }
 
 .ops-reports-open-source:focus-visible {
@@ -5357,7 +5400,18 @@ a.ops-btn {
   .ops-reports-filters-actions,
   .ops-reports > .muted:first-child,
   .ops-reports-hero,
+  .ops-reports-charts,
+  .ops-report-chart,
+  .ops-report-cat-filter,
+  .ops-reports-stat-row,
+  .ops-reports-status,
+  .ops-reports-error,
+  .ops-report-source-overlay,
   .no-print {
+    display: none !important;
+  }
+
+  .ops-reports-panel:not(.ops-reports-panel--print) {
     display: none !important;
   }
 
@@ -5368,6 +5422,10 @@ a.ops-btn {
 
   .ops-reports-btn {
     display: none !important;
+  }
+
+  .ops-reports {
+    max-width: none;
   }
 }
 

@@ -87,6 +87,7 @@ export function OpsReportsPageClient() {
     sources: WeaknessSourceRef[];
     title: string;
   } | null>(null);
+  const [printPreparing, setPrintPreparing] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -212,6 +213,19 @@ export function OpsReportsPageClient() {
     e.preventDefault();
   };
 
+  /** 重い画面（グラフ等）を避け、配布ビューだけを印刷してダイアログ起動を速くする */
+  const handlePrint = () => {
+    if (printPreparing) return;
+    setSourceViewer(null);
+    const target: ViewMode = student.trim() ? "handout-personal" : "handout-class";
+    setPrintPreparing(true);
+    setView(target);
+    window.setTimeout(() => {
+      window.print();
+      setPrintPreparing(false);
+    }, 80);
+  };
+
   return (
     <main className="ops-reports">
       <p className="muted" style={{ marginTop: 0 }}>
@@ -276,9 +290,10 @@ export function OpsReportsPageClient() {
           <button
             type="button"
             className="ops-reports-btn ops-reports-btn--ghost"
-            onClick={() => window.print()}
+            onClick={handlePrint}
+            disabled={loading || printPreparing}
           >
-            印刷 / PDF
+            {printPreparing ? "印刷準備中…" : "印刷 / PDF"}
           </button>
         </div>
       </form>
