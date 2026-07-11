@@ -9,7 +9,11 @@ import type { ReportWeaknessesResult } from "@/lib/ops/reports/build-report-weak
 import { OpsReportHistogram, OpsReportScatter, OpsReportTrend } from "@/components/ops/reports/OpsReportCharts";
 import { OpsReportClassHandout, OpsReportPersonalHandout } from "@/components/ops/reports/OpsReportHandouts";
 import { OpsReportCategoryFilter } from "@/components/ops/reports/OpsReportCategoryFilter";
-import { filterGrammarWeaknessesByCategories } from "@/lib/ops/reports/parse-grammar-bullets";
+import { OpsReportSourceViewer } from "@/components/ops/reports/OpsReportSourceViewer";
+import {
+  filterGrammarWeaknessesByCategories,
+  type WeaknessSourceRef,
+} from "@/lib/ops/reports/parse-grammar-bullets";
 import type { GrammarCategoryId } from "@/lib/ops/reports/grammar-categories";
 
 type TaskOption = { taskId: string; displayLabel: string };
@@ -79,6 +83,10 @@ export function OpsReportsPageClient() {
   /** null = 未選択初期（全件表示）。[] = 全解除 */
   const [selectedCategories, setSelectedCategories] = useState<GrammarCategoryId[] | null>(null);
   const categoriesPrimedRef = useRef(false);
+  const [sourceViewer, setSourceViewer] = useState<{
+    sources: WeaknessSourceRef[];
+    title: string;
+  } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -428,7 +436,7 @@ export function OpsReportsPageClient() {
               />
 
               <h2 className="ops-reports-h2">
-                頻出の文法・語法
+                文法・語法・表現のミス
                 <span className="ops-reports-h2-count">
                   （表示 {filteredTopGrammar.length} / {weaknesses?.grammarItemCount ?? 0}）
                 </span>
@@ -451,6 +459,23 @@ export function OpsReportsPageClient() {
                         <span className="ops-report-handout-count">{w.count}件</span>
                       </p>
                       {w.sampleReason ? <p className="ops-report-handout-reason">{w.sampleReason}</p> : null}
+                      {w.sources?.length ? (
+                        <div className="ops-reports-source-actions no-print no-print">
+                          <button
+                            type="button"
+                            className="ops-reports-open-source"
+                            onClick={() =>
+                              setSourceViewer({
+                                sources: w.sources,
+                                title: `${w.wrong} → ${w.correct}`,
+                              })
+                            }
+                          >
+                            元データを開く
+                            {w.sources.length > 1 ? `（${w.sources.length}件）` : ""}
+                          </button>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ol>
@@ -463,8 +488,25 @@ export function OpsReportsPageClient() {
                 <ul className="ops-reports-theme-list">
                   {weaknesses.contentThemes.map((t) => (
                     <li key={t.key}>
-                      {t.label}
+                      <span>{t.label}</span>
                       <span className="ops-report-handout-count">{t.count}</span>
+                      {t.sources?.length ? (
+                        <div className="ops-reports-source-actions no-print">
+                          <button
+                            type="button"
+                            className="ops-reports-open-source"
+                            onClick={() =>
+                              setSourceViewer({
+                                sources: t.sources,
+                                title: t.label,
+                              })
+                            }
+                          >
+                            元データを開く
+                            {t.sources.length > 1 ? `（${t.sources.length}件）` : ""}
+                          </button>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -540,6 +582,22 @@ export function OpsReportsPageClient() {
                             <span className="ops-report-handout-correct">{w.correct}</span>
                           </p>
                           {w.sampleReason ? <p className="ops-report-handout-reason">{w.sampleReason}</p> : null}
+                          {w.sources?.length ? (
+                            <div className="ops-reports-source-actions no-print">
+                              <button
+                                type="button"
+                                className="ops-reports-open-source"
+                                onClick={() =>
+                                  setSourceViewer({
+                                    sources: w.sources,
+                                    title: `${w.wrong} → ${w.correct}`,
+                                  })
+                                }
+                              >
+                                元データを開く
+                              </button>
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ol>
@@ -594,6 +652,14 @@ export function OpsReportsPageClient() {
             </section>
           ) : null}
         </>
+      ) : null}
+
+      {sourceViewer ? (
+        <OpsReportSourceViewer
+          sources={sourceViewer.sources}
+          title={sourceViewer.title}
+          onClose={() => setSourceViewer(null)}
+        />
       ) : null}
     </main>
   );

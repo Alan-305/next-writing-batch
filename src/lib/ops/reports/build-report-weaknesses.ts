@@ -10,6 +10,8 @@ import {
   parseContentImprovementLines,
   parseGrammarBulletLines,
   type AggregatedGrammarWeakness,
+  type ContentThemeItem,
+  type WeaknessSourceRef,
 } from "@/lib/ops/reports/parse-grammar-bullets";
 import {
   parseReportFilterSearchParams,
@@ -33,10 +35,25 @@ export type ReportWeaknessesResult = {
   grammarItemCount: number;
   categories: GrammarCategoryStat[];
   topGrammar: AggregatedGrammarWeakness[];
-  contentThemes: Array<{ key: string; label: string; count: number }>;
+  contentThemes: ContentThemeItem[];
   /** 個人フィルタ時: その生徒のミス一覧（氏名は呼び出し側で付与） */
   personalGrammar: AggregatedGrammarWeakness[];
 };
+
+function pdfIsDeliverable(s: Submission): boolean {
+  const d4 = s.day4;
+  if (!d4 || String(d4.error ?? "").trim()) return false;
+  return Boolean(String(d4.pdf_path ?? "").trim());
+}
+
+function sourceFromSubmission(s: Submission): WeaknessSourceRef {
+  return {
+    submissionId: s.submissionId,
+    taskId: String(s.taskId ?? "").trim() || "—",
+    studentName: String(s.studentName ?? "").trim() || "—",
+    pdfAvailable: pdfIsDeliverable(s),
+  };
+}
 
 function grammarTextFromSubmission(s: Submission): string {
   const sr = s.studentRelease;
@@ -83,11 +100,23 @@ export function buildReportWeaknesses(
   options?: { topN?: number },
 ): ReportWeaknessesResult {
   const matched = submissions.filter((s) => submissionMatchesReportFilters(s, filters));
-  const allBullets = matched.flatMap((s) => parseGrammarBulletLines(grammarTextFromSubmission(s)));
-  const contentLines = matched.flatMap((s) => parseContentImprovementLines(contentTextFromSubmission(s)));
+  const allBullets = matched.flatMap((s) => {
+    const source = sourceFromSubmission(s);
+    return parseGrammarBulletLines(grammarTextFromSubmission(s)).map((b) => ({
+      ...b,
+      submissionId: source.submissionId,
+      taskId: source.taskId,
+      studentName: source.studentName,
+      pdfAvailable: source.pdfAvailable,
+    }));
+  });
+  const contentLines = matched.flatMap((s) => {
+    const source = sourceFromSubmission(s);
+    return parseContentImprovementLines(contentTextFromSubmission(s)).map((text) => ({ text, source }));
+  });
   const topN = options?.topN ?? 200;
   const topGrammar = aggregateGrammarWeaknesses(allBullets, { topN });
-  const contentThemes = aggregateContentThemes(contentLines, { topN: 15 });
+  const contentThemes = aggregateContentThemes(contentLines, { topN: 50 });
   const categories = buildCategoryStats(allBullets, topGrammar);
 
   const studentQ = (filters.studentQuery ?? "").trim();
@@ -107,4 +136,4 @@ export function buildReportWeaknesses(
 }
 
 export { grammarCategoryLabel, parseReportFilterSearchParams };
-export type { GrammarCategoryId };
+export type { GrammarCategoryId, WeaknessSourceRef };

@@ -16,6 +16,17 @@ export type GrammarBullet = {
   deduction: number | null;
   raw: string;
   category: GrammarCategoryId;
+  submissionId?: string;
+  taskId?: string;
+  studentName?: string;
+  pdfAvailable?: boolean;
+};
+
+export type WeaknessSourceRef = {
+  submissionId: string;
+  taskId: string;
+  studentName: string;
+  pdfAvailable: boolean;
 };
 
 export type AggregatedGrammarWeakness = {
@@ -27,6 +38,8 @@ export type AggregatedGrammarWeakness = {
   sampleReason: string;
   category: GrammarCategoryId;
   categoryLabel: string;
+  /** この表現が出た提出（最大件数で打ち切り） */
+  sources: WeaknessSourceRef[];
   /** 匿名ハンドアウト用の代表例（氏名なし） */
   examples: Array<{ wrong: string; correct: string; reason: string }>;
 };
@@ -117,10 +130,11 @@ export function parseGrammarBulletLines(text: string): GrammarBullet[] {
 
 export function aggregateGrammarWeaknesses(
   bullets: GrammarBullet[],
-  options?: { topN?: number; maxExamplesPerKey?: number },
+  options?: { topN?: number; maxExamplesPerKey?: number; maxSourcesPerKey?: number },
 ): AggregatedGrammarWeakness[] {
   const topN = options?.topN ?? 200;
   const maxExamples = options?.maxExamplesPerKey ?? 3;
+  const maxSources = options?.maxSourcesPerKey ?? 12;
   const map = new Map<
     string,
     {
@@ -131,6 +145,8 @@ export function aggregateGrammarWeaknesses(
       sampleReason: string;
       category: GrammarCategoryId;
       categoryVotes: Map<GrammarCategoryId, number>;
+      sources: WeaknessSourceRef[];
+      sourceIds: Set<string>;
       examples: Array<{ wrong: string; correct: string; reason: string }>;
     }
   >();
@@ -139,8 +155,24 @@ export function aggregateGrammarWeaknesses(
     const key = normalizeWrongPhrase(b.wrong);
     if (!key) continue;
     const cur = map.get(key);
+    const source: WeaknessSourceRef | null =
+      b.submissionId && b.submissionId.trim()
+        ? {
+            submissionId: b.submissionId.trim(),
+            taskId: (b.taskId ?? "").trim() || "—",
+            studentName: (b.studentName ?? "").trim() || "—",
+            pdfAvailable: Boolean(b.pdfAvailable),
+          }
+        : null;
+
     if (!cur) {
       const categoryVotes = new Map<GrammarCategoryId, number>([[b.category, 1]]);
+      const sources: WeaknessSourceRef[] = [];
+      const sourceIds = new Set<string>();
+      if (source) {
+        sources.push(source);
+        sourceIds.add(source.submissionId);
+      }
       map.set(key, {
         wrong: b.wrong,
         correct: b.correct,
@@ -149,6 +181,8 @@ export function aggregateGrammarWeaknesses(
         sampleReason: b.reason,
         category: b.category,
         categoryVotes,
+        sources,
+        sourceIds,
         examples: [{ wrong: b.wrong, correct: b.correct, reason: b.reason }],
       });
       continue;
@@ -156,7 +190,6 @@ export function aggregateGrammarWeaknesses(
     cur.count += 1;
     cur.totalDeduction += b.deduction ?? 0;
     cur.categoryVotes.set(b.category, (cur.categoryVotes.get(b.category) ?? 0) + 1);
-    // 最多票のカテゴリを採用
     let bestCat = cur.category;
     let bestVotes = 0;
     for (const [cat, votes] of cur.categoryVotes) {
@@ -167,6 +200,13 @@ export function aggregateGrammarWeaknesses(
     }
     cur.category = bestCat;
     if (!cur.sampleReason && b.reason) cur.sampleReason = b.reason;
+    if (source && !cur.sourceIds.has(source.submissionId) && cur.sources.length < maxSources) {
+      cur.sources.push(source);
+      cur.sourceIds.add(source.submissionId);
+    } else if (source && cur.sourceIds.has(source.submissionId) && source.pdfAvailable) {
+      const hit = cur.sources.find((s) => s.submissionId === source.submissionId);
+      if (hit) hit.pdfAvailable = true;
+    }
     if (cur.examples.length < maxExamples) {
       const dup = cur.examples.some(
         (e) => normalizeWrongPhrase(e.wrong) === key && e.correct === b.correct,
@@ -177,7 +217,7 @@ export function aggregateGrammarWeaknesses(
 
   return Array.from(map.entries())
     .map(([key, v]) => {
-      const { categoryVotes: _votes, ...rest } = v;
+      const { categoryVotes: _votes, sourceIds: _ids, ...rest } = v;
       return {
         key,
         ...rest,
@@ -225,21 +265,51 @@ export function parseContentImprovementLines(text: string): string[] {
   return lines;
 }
 
+export type ContentThemeItem = {
+  key: string;
+  label: string;
+  count: number;
+  sources: WeaknessSourceRef[];
+};
+
 export function aggregateContentThemes(
-  lines: string[],
-  options?: { topN?: number },
-): Array<{ key: string; label: string; count: number }> {
+  lines: Array<{ text: string; source?: WeaknessSourceRef }>,
+  options?: { topN?: number; maxSourcesPerKey?: number },
+): ContentThemeItem[] {
   const topN = options?.topN ?? 15;
-  const map = new Map<string, { label: string; count: number }>();
-  for (const line of lines) {
+  const maxSources = options?.maxSourcesPerKey ?? 12;
+  const map = new Map<
+    string,
+    { label: string; count: number; sources: WeaknessSourceRef[]; sourceIds: Set<string> }
+  >();
+  for (const row of lines) {
+    const line = row.text;
     const key = normalizeWrongPhrase(line).slice(0, 80);
     if (!key) continue;
     const cur = map.get(key);
-    if (!cur) map.set(key, { label: line.trim().slice(0, 120), count: 1 });
-    else cur.count += 1;
+    if (!cur) {
+      const sources: WeaknessSourceRef[] = [];
+      const sourceIds = new Set<string>();
+      if (row.source) {
+        sources.push(row.source);
+        sourceIds.add(row.source.submissionId);
+      }
+      map.set(key, { label: line.trim().slice(0, 120), count: 1, sources, sourceIds });
+      continue;
+    }
+    cur.count += 1;
+    if (row.source && !cur.sourceIds.has(row.source.submissionId) && cur.sources.length < maxSources) {
+      cur.sources.push(row.source);
+      cur.sourceIds.add(row.source.submissionId);
+    }
   }
   return Array.from(map.entries())
-    .map(([key, v]) => ({ key, label: v.label, count: v.count }))
+    .map(([key, v]) => ({
+      key,
+      label: v.label,
+      count: v.count,
+      sources: v.sources,
+    }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ja"))
     .slice(0, topN);
 }
