@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import type { WeaknessSourceRef } from "@/lib/ops/reports/parse-grammar-bullets";
@@ -18,6 +18,10 @@ type SubmissionLite = {
   taskId?: string;
 };
 
+const ESSAY_PCT_MIN = 22;
+const ESSAY_PCT_MAX = 72;
+const ESSAY_PCT_DEFAULT = 40;
+
 export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
   const [activeId, setActiveId] = useState(sources[0]?.submissionId ?? "");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -27,6 +31,9 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
   const [loadingEssay, setLoadingEssay] = useState(false);
   const [pdfError, setPdfError] = useState("");
   const [essayError, setEssayError] = useState("");
+  const [essayPct, setEssayPct] = useState(ESSAY_PCT_DEFAULT);
+  const [dragging, setDragging] = useState(false);
+  const splitRef = useRef<HTMLDivElement>(null);
 
   const active = sources.find((s) => s.submissionId === activeId) ?? sources[0] ?? null;
 
@@ -115,6 +122,41 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
     };
   }, [pdfUrl]);
 
+  const updateSplitFromClientX = useCallback((clientX: number) => {
+    const el = splitRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    setEssayPct(Math.min(ESSAY_PCT_MAX, Math.max(ESSAY_PCT_MIN, pct)));
+  }, []);
+
+  const onSplitterPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updateSplitFromClientX(e.clientX);
+  };
+
+  const onSplitterPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    updateSplitFromClientX(e.clientX);
+  };
+
+  const onSplitterPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    setDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+  };
+
+  const nudgeSplit = (delta: number) => {
+    setEssayPct((prev) => Math.min(ESSAY_PCT_MAX, Math.max(ESSAY_PCT_MIN, prev + delta)));
+  };
+
   if (!active) return null;
 
   return (
@@ -152,7 +194,11 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
           </div>
         ) : null}
 
-        <div className="ops-report-source-split">
+        <div
+          ref={splitRef}
+          className={`ops-report-source-split${dragging ? " is-dragging" : ""}`}
+          style={{ ["--essay-pct" as string]: `${essayPct}%` }}
+        >
           <section className="ops-report-source-essay" aria-label="生徒の答案">
             <h3 className="ops-report-source-section-title">あなたの解答</h3>
             {question ? <p className="ops-report-source-question muted">{question}</p> : null}
@@ -173,6 +219,38 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
               )
             ) : null}
           </section>
+
+          <div
+            className="ops-report-source-splitter"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="左右の幅を調整"
+            aria-valuemin={ESSAY_PCT_MIN}
+            aria-valuemax={ESSAY_PCT_MAX}
+            aria-valuenow={Math.round(essayPct)}
+            tabIndex={0}
+            onPointerDown={onSplitterPointerDown}
+            onPointerMove={onSplitterPointerMove}
+            onPointerUp={onSplitterPointerUp}
+            onPointerCancel={onSplitterPointerUp}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                nudgeSplit(-3);
+              } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                nudgeSplit(3);
+              } else if (e.key === "Home") {
+                e.preventDefault();
+                setEssayPct(ESSAY_PCT_MIN);
+              } else if (e.key === "End") {
+                e.preventDefault();
+                setEssayPct(ESSAY_PCT_MAX);
+              }
+            }}
+          >
+            <span className="ops-report-source-splitter-grip" aria-hidden />
+          </div>
 
           <section className="ops-report-source-pdf" aria-label="添削結果 PDF">
             <h3 className="ops-report-source-section-title">添削結果 PDF</h3>
