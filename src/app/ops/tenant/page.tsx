@@ -93,7 +93,7 @@ export default function OpsTenantPage() {
       <h1>テナント（検証）</h1>
       <p className="muted">
         API とディスクは <code>{"users/{uid}.organizationId"}</code> を正規化した値で{" "}
-        <code>{"data/orgs/{id}/"}</code> に分離されます。色・文言の変更は「教師・生徒画面設定」でテナントごとに保存されます。
+        <code>{"data/orgs/{id}/"}</code> に分離されます。色・文言の変更は「画面設定」でテナントごとに保存されます。
       </p>
 
       {loading ? (

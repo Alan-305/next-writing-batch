@@ -83,7 +83,7 @@ export function RegisteredTaskIdField({
       {fetchErr ? <p className="error">{fetchErr}</p> : null}
       {!hasTasks && tasks !== null && !fetchErr ? (
         <p className="error">
-          登録済みの課題がありません。運用の「課題・添削設定」で<strong>サーバーに保存（課題ID）</strong>すると、ここに課題が表示されます。
+          登録済みの課題がありません。運用の「添削課題設定」で<strong>サーバーに保存（課題ID）</strong>すると、ここに課題が表示されます。
         </p>
       ) : null}
 

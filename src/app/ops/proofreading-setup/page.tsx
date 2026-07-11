@@ -309,7 +309,7 @@ export default function ProofreadingSetupPage() {
 
   return (
     <main>
-      <h1>課題・添削設定</h1>
+      <h1>添削課題設定</h1>
       <p>
         <Link href="/ops">{OPS_DASHBOARD_LABEL}</Link> · <Link href="/submit">提出（生徒）</Link>
       </p>

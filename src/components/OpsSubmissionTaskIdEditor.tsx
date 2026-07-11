@@ -127,7 +127,7 @@ export function OpsSubmissionTaskIdEditor({
       {!registryErr && tasks && tasks.length === 0 ? (
         <div style={{ marginBottom: 10 }}>
           <p className="error" style={{ marginBottom: 6 }}>
-            登録済みの課題がありません。「課題・添削設定」でサーバーに保存すると、ここにプルダウンが表示されます。
+            登録済みの課題がありません。「添削課題設定」でサーバーに保存すると、ここにプルダウンが表示されます。
           </p>
           {initialTaskId.trim() ? (
             <p className="muted" style={{ marginBottom: 0 }}>

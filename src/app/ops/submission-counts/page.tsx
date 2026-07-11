@@ -13,7 +13,7 @@ export default function OpsSubmissionCountsPage() {
       <p className="muted" style={{ marginTop: 0 }}>
         <Link href="/ops">← 教員ダッシュボード</Link>
       </p>
-      <h1>提出状況（課題別）</h1>
+      <h1>提出状況</h1>
 
       {loading ? <p className="muted">読み込み中…</p> : null}
       {error ? (

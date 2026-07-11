@@ -122,7 +122,7 @@ export function OpsPackageZipTaskPanel({ embedded = false }: Props) {
       {loadErr ? <p className="error">{loadErr}</p> : null}
       {tasks === null && !loadErr ? <p className="muted">課題一覧を読み込み中…</p> : null}
       {tasks && tasks.length === 0 ? (
-        <p className="muted">登録課題がありません。課題・添削設定から保存してください。</p>
+        <p className="muted">登録課題がありません。添削課題設定から保存してください。</p>
       ) : null}
 
       {tasks && tasks.length > 0 ? (

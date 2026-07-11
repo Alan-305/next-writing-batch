@@ -116,7 +116,7 @@ export default function OpsStudentAppearancePage() {
       <p className="muted" style={{ marginTop: 0 }}>
         <Link href="/ops">← {OPS_DASHBOARD_LABEL}</Link>
       </p>
-      <h1>教師・生徒画面設定</h1>
+      <h1>画面設定</h1>
       <p className="muted">
         <strong>タイトル・学校名</strong>は自由入力、<strong>色と雰囲気</strong>はスタイルから選べます。
         各スタイルでは<strong>背景の小道具</strong>や<strong>ボタンの形</strong>もテーマに合わせて変わります（本文は読みやすさのため白背景を維持）。

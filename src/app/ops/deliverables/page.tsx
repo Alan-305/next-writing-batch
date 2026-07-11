@@ -19,7 +19,7 @@ export default async function DeliverablesPage() {
 
   return (
     <main>
-      <h1>納品ZIP（ダウンロード）</h1>
+      <h1>納品ZIP</h1>
       <p className="muted">
         課題単位・個別選択で作成した ZIP がここに並びます。フォルダ実体は <code>output/zips/</code> です。
         ファイル名は <code>課題ID_生徒_件数pdfs_日時.pdf.zip</code> 形式です（課題まとめは生徒名を省略）。
