@@ -43,6 +43,13 @@ export type TaskScoreSummary = {
   lowScoreRate: number | null;
   viewedCount: number;
   publishedCount: number;
+  /** 元データ閲覧用（件数上限あり） */
+  sources: Array<{
+    submissionId: string;
+    taskId: string;
+    studentName: string;
+    pdfAvailable: boolean;
+  }>;
 };
 
 export type ReportSummaryResult = {
@@ -68,6 +75,7 @@ export type ReportSummaryResult = {
     contentDeduction: number | null;
     grammarDeduction: number | null;
     focus: "content" | "grammar" | "both" | "total";
+    pdfAvailable: boolean;
   }>;
   personalTrend: ReportScoreRow[];
   students: Array<{ key: string; studentId: string; studentName: string; count: number }>;
@@ -135,6 +143,12 @@ function pickContentGrammar(scores: Record<string, number> | undefined): {
 
 function isPublished(s: Submission): boolean {
   return Boolean(String(s.studentRelease?.operatorApprovedAt ?? "").trim());
+}
+
+function pdfIsDeliverable(s: Submission): boolean {
+  const d4 = s.day4;
+  if (!d4 || String(d4.error ?? "").trim()) return false;
+  return Boolean(String(d4.pdf_path ?? "").trim());
 }
 
 function rowDateMs(s: Submission, publishedOnly: boolean): number | null {
@@ -248,6 +262,10 @@ export function buildReportSummary(
   options?: { lowScoreThresholdRatio?: number },
 ): ReportSummaryResult {
   const matched = submissions.filter((s) => submissionMatchesReportFilters(s, filters));
+  const pdfById = new Map<string, boolean>();
+  for (const s of matched) {
+    pdfById.set(s.submissionId, pdfIsDeliverable(s));
+  }
   const rows = matched.map(toReportScoreRow);
   const scored = rows.filter((r) => r.scoreTotal != null || r.content != null || r.grammar != null);
   const totals = scored.map((r) => r.scoreTotal).filter((n): n is number => n != null);
@@ -267,6 +285,7 @@ export function buildReportSummary(
       grammars: number[];
       viewedCount: number;
       publishedCount: number;
+      sources: TaskScoreSummary["sources"];
     }
   >();
 
@@ -278,6 +297,7 @@ export function buildReportSummary(
       grammars: [],
       viewedCount: 0,
       publishedCount: 0,
+      sources: [],
     };
     cur.count += 1;
     if (r.approvedAt) cur.publishedCount += 1;
@@ -285,6 +305,14 @@ export function buildReportSummary(
     if (r.scoreTotal != null) cur.totals.push(r.scoreTotal);
     if (r.content != null) cur.contents.push(r.content);
     if (r.grammar != null) cur.grammars.push(r.grammar);
+    if (cur.sources.length < 12) {
+      cur.sources.push({
+        submissionId: r.submissionId,
+        taskId: r.taskId,
+        studentName: r.studentName,
+        pdfAvailable: pdfById.get(r.submissionId) ?? false,
+      });
+    }
     byTaskMap.set(r.taskId, cur);
   }
 
@@ -309,6 +337,7 @@ export function buildReportSummary(
         lowScoreRate: v.totals.length ? round1((lowCount / v.totals.length) * 100) : null,
         viewedCount: v.viewedCount,
         publishedCount: v.publishedCount,
+        sources: v.sources,
       };
     })
     .sort((a, b) => (b.avgTotal ?? -1) - (a.avgTotal ?? -1) || a.taskId.localeCompare(b.taskId, "ja"));
@@ -332,6 +361,7 @@ export function buildReportSummary(
         contentDeduction: r.contentDeduction,
         grammarDeduction: r.grammarDeduction,
         focus,
+        pdfAvailable: pdfById.get(r.submissionId) ?? false,
       };
     })
     .filter((x): x is NonNullable<typeof x> => x != null)

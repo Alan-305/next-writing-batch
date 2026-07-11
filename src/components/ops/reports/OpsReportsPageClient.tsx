@@ -88,6 +88,8 @@ export function OpsReportsPageClient() {
     title: string;
   } | null>(null);
   const [printPreparing, setPrintPreparing] = useState(false);
+  const [weaknessSearch, setWeaknessSearch] = useState("");
+  const [weaknessLimit, setWeaknessLimit] = useState<number | "all">(20);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,6 +168,33 @@ export function OpsReportsPageClient() {
     () => filterGrammarWeaknessesByCategories(weaknesses?.personalGrammar ?? [], categoryFilterIds),
     [weaknesses?.personalGrammar, categoryFilterIds],
   );
+
+  const displayedTopGrammar = useMemo(() => {
+    const q = weaknessSearch.trim().toLowerCase();
+    let list = filteredTopGrammar;
+    if (q) {
+      list = list.filter((w) => {
+        const hay = `${w.wrong} ${w.correct} ${w.sampleReason} ${w.categoryLabel}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (weaknessLimit === "all") return list;
+    return list.slice(0, weaknessLimit);
+  }, [filteredTopGrammar, weaknessSearch, weaknessLimit]);
+
+  const displayedContentThemes = useMemo(() => {
+    const themes = weaknesses?.contentThemes ?? [];
+    const q = weaknessSearch.trim().toLowerCase();
+    let list = themes;
+    if (q) list = list.filter((t) => t.label.toLowerCase().includes(q));
+    if (weaknessLimit === "all") return list;
+    return list.slice(0, weaknessLimit);
+  }, [weaknesses?.contentThemes, weaknessSearch, weaknessLimit]);
+
+  const openSources = (sources: WeaknessSourceRef[], title: string) => {
+    if (!sources.length) return;
+    setSourceViewer({ sources, title });
+  };
 
   const periodLabel = useMemo(() => {
     if (from && to) return `${from} 〜 ${to}`;
@@ -375,6 +404,7 @@ export function OpsReportsPageClient() {
                         <th>平均文法</th>
                         <th>低得点率</th>
                         <th>閲覧</th>
+                        <th className="no-print">元データ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -391,6 +421,22 @@ export function OpsReportsPageClient() {
                           <td>{row.lowScoreRate != null ? `${row.lowScoreRate}%` : "—"}</td>
                           <td>
                             {row.viewedCount}/{row.publishedCount}
+                          </td>
+                          <td className="no-print">
+                            {row.sources?.length ? (
+                              <button
+                                type="button"
+                                className="ops-reports-open-source"
+                                onClick={() =>
+                                  openSources(row.sources, `課題 ${row.displayLabel || row.taskId}`)
+                                }
+                              >
+                                開く
+                                {row.sources.length > 1 ? `（${row.sources.length}）` : ""}
+                              </button>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -413,6 +459,7 @@ export function OpsReportsPageClient() {
                         <th>内容減点</th>
                         <th>文法減点</th>
                         <th>観点</th>
+                        <th className="no-print">元データ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -427,6 +474,27 @@ export function OpsReportsPageClient() {
                           <td>{fmt(r.contentDeduction)}</td>
                           <td>{fmt(r.grammarDeduction)}</td>
                           <td>{focusLabel(r.focus)}</td>
+                          <td className="no-print">
+                            <button
+                              type="button"
+                              className="ops-reports-open-source"
+                              onClick={() =>
+                                openSources(
+                                  [
+                                    {
+                                      submissionId: r.submissionId,
+                                      taskId: r.taskId,
+                                      studentName: r.studentName,
+                                      pdfAvailable: r.pdfAvailable,
+                                    },
+                                  ],
+                                  `${r.studentName} / ${r.taskId}`,
+                                )
+                              }
+                            >
+                              開く
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -449,19 +517,52 @@ export function OpsReportsPageClient() {
                 onChange={setSelectedCategories}
               />
 
+              <div className="ops-reports-weak-tools no-print">
+                <label className="ops-reports-field ops-reports-weak-tools-search">
+                  <span>キーワード検索</span>
+                  <input
+                    type="search"
+                    value={weaknessSearch}
+                    onChange={(e) => setWeaknessSearch(e.target.value)}
+                    placeholder="誤表現・修正・理由で絞り込み"
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="ops-reports-field">
+                  <span>表示件数</span>
+                  <select
+                    value={weaknessLimit === "all" ? "all" : String(weaknessLimit)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setWeaknessLimit(v === "all" ? "all" : Number(v));
+                    }}
+                  >
+                    <option value="10">10件</option>
+                    <option value="20">20件</option>
+                    <option value="30">30件</option>
+                    <option value="50">50件</option>
+                    <option value="100">100件</option>
+                    <option value="all">すべて</option>
+                  </select>
+                </label>
+              </div>
+
               <h2 className="ops-reports-h2">
                 文法・語法・表現のミス
                 <span className="ops-reports-h2-count">
-                  （表示 {filteredTopGrammar.length} / {weaknesses?.grammarItemCount ?? 0}）
+                  （表示 {displayedTopGrammar.length} / 該当 {filteredTopGrammar.length}／全体{" "}
+                  {weaknesses?.grammarItemCount ?? 0}）
                 </span>
               </h2>
               {!weaknesses?.topGrammar?.length ? (
                 <p className="muted">抽出できる文法箇条書きがありませんでした。</p>
               ) : filteredTopGrammar.length === 0 ? (
                 <p className="muted">選択中のカテゴリに該当する項目がありません。プルダウンで種類を選んでください。</p>
+              ) : displayedTopGrammar.length === 0 ? (
+                <p className="muted">キーワードに一致する項目がありません。</p>
               ) : (
                 <ol className="ops-reports-weak-list">
-                  {filteredTopGrammar.map((w) => (
+                  {displayedTopGrammar.map((w) => (
                     <li key={w.key}>
                       <p className="ops-reports-weak-cat">
                         <span className="ops-reports-cat-badge">{w.categoryLabel}</span>
@@ -478,12 +579,7 @@ export function OpsReportsPageClient() {
                           <button
                             type="button"
                             className="ops-reports-open-source"
-                            onClick={() =>
-                              setSourceViewer({
-                                sources: w.sources,
-                                title: `${w.wrong} → ${w.correct}`,
-                              })
-                            }
+                            onClick={() => openSources(w.sources, `${w.wrong} → ${w.correct}`)}
                           >
                             元データを開く
                             {w.sources.length > 1 ? `（${w.sources.length}件）` : ""}
@@ -495,12 +591,19 @@ export function OpsReportsPageClient() {
                 </ol>
               )}
 
-              <h2 className="ops-reports-h2">内容の改善テーマ</h2>
+              <h2 className="ops-reports-h2">
+                内容の改善テーマ
+                <span className="ops-reports-h2-count">
+                  （表示 {displayedContentThemes.length}）
+                </span>
+              </h2>
               {!weaknesses?.contentThemes?.length ? (
                 <p className="muted">内容コメントから抽出できる改善点はありませんでした。</p>
+              ) : displayedContentThemes.length === 0 ? (
+                <p className="muted">キーワードに一致する改善テーマがありません。</p>
               ) : (
                 <ul className="ops-reports-theme-list">
-                  {weaknesses.contentThemes.map((t) => (
+                  {displayedContentThemes.map((t) => (
                     <li key={t.key}>
                       <span>{t.label}</span>
                       <span className="ops-report-handout-count">{t.count}</span>
@@ -509,12 +612,7 @@ export function OpsReportsPageClient() {
                           <button
                             type="button"
                             className="ops-reports-open-source"
-                            onClick={() =>
-                              setSourceViewer({
-                                sources: t.sources,
-                                title: t.label,
-                              })
-                            }
+                            onClick={() => openSources(t.sources, t.label)}
                           >
                             元データを開く
                             {t.sources.length > 1 ? `（${t.sources.length}件）` : ""}
