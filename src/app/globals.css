@@ -5206,6 +5206,78 @@ a.ops-btn {
   background: #0f172a;
 }
 
+.ops-report-source-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(18rem, 1.35fr);
+  gap: 0;
+  background: #e2e8f0;
+}
+
+.ops-report-source-essay,
+.ops-report-source-pdf {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: #fff;
+}
+
+.ops-report-source-essay {
+  border-right: 1px solid #cbd5e1;
+  padding: 0.85rem 1rem 1rem;
+  overflow: auto;
+}
+
+.ops-report-source-pdf {
+  background: #0f172a;
+}
+
+.ops-report-source-pdf .ops-report-source-section-title {
+  margin: 0;
+  padding: 0.75rem 1rem 0.5rem;
+  color: #e2e8f0;
+  background: #0f172a;
+}
+
+.ops-report-source-section-title {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-ja);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ops-report-source-question {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.ops-report-source-essay-spacer {
+  height: 1.15em;
+}
+
+.ops-report-source-essay-text {
+  margin: 0;
+  padding: 0;
+  font-family: Century, "Century Schoolbook", "Times New Roman", serif;
+  font-size: 1.02rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #0f172a;
+  background: transparent;
+  border: 0;
+}
+
+.ops-report-source-inline-error {
+  margin: 0;
+  color: #991b1b;
+}
+
 .ops-report-source-status,
 .ops-report-source-fallback {
   margin: 0;
@@ -5223,7 +5295,7 @@ a.ops-btn {
 .ops-report-source-iframe {
   flex: 1;
   width: 100%;
-  min-height: 60vh;
+  min-height: 50vh;
   border: 0;
   background: #fff;
 }
@@ -5246,6 +5318,18 @@ a.ops-btn {
   text-underline-offset: 3px;
 }
 
+@media (max-width: 900px) {
+  .ops-report-source-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(12rem, 35vh) minmax(16rem, 1fr);
+  }
+
+  .ops-report-source-essay {
+    border-right: 0;
+    border-bottom: 1px solid #cbd5e1;
+  }
+}
+
 @media (max-width: 720px) {
   .ops-report-source-overlay {
     padding: 0;
@@ -5256,7 +5340,7 @@ a.ops-btn {
   }
 
   .ops-report-source-iframe {
-    min-height: 50vh;
+    min-height: 40vh;
   }
 }
 

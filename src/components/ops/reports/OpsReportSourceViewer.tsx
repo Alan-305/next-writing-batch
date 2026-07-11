@@ -11,53 +11,95 @@ type Props = {
   onClose: () => void;
 };
 
+type SubmissionLite = {
+  essayText?: string;
+  question?: string;
+  studentName?: string;
+  taskId?: string;
+};
+
 export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
   const [activeId, setActiveId] = useState(sources[0]?.submissionId ?? "");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [essayText, setEssayText] = useState("");
+  const [question, setQuestion] = useState("");
+  const [loadingPdf, setLoadingPdf] = useState(false);
+  const [loadingEssay, setLoadingEssay] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+  const [essayError, setEssayError] = useState("");
 
   const active = sources.find((s) => s.submissionId === activeId) ?? sources[0] ?? null;
 
-  const loadPdf = useCallback(async (submissionId: string, pdfAvailable: boolean) => {
-    setError("");
-    setPdfUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
-    if (!pdfAvailable) {
-      setError("この提出には公開済み PDF がありません。確認＆修正画面から内容を確認できます。");
-      return;
-    }
-    setLoading(true);
-    try {
-      const user = getFirebaseAuth()?.currentUser;
-      if (!user) {
-        setError("ログイン情報を取得できませんでした。");
-        return;
-      }
-      const token = await user.getIdToken();
-      const res = await fetch(`/api/ops/reports/submissions/${encodeURIComponent(submissionId)}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => null)) as { message?: string } | null;
-        setError(j?.message ?? "PDF を開けませんでした。");
-        return;
-      }
-      const blob = await res.blob();
-      setPdfUrl(URL.createObjectURL(blob));
-    } catch {
-      setError("通信エラーで PDF を取得できませんでした。");
-    } finally {
-      setLoading(false);
-    }
+  const authHeaders = useCallback(async () => {
+    const user = getFirebaseAuth()?.currentUser;
+    if (!user) throw new Error("ログイン情報を取得できませんでした。");
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
   }, []);
+
+  const loadEssay = useCallback(
+    async (submissionId: string) => {
+      setEssayError("");
+      setEssayText("");
+      setQuestion("");
+      setLoadingEssay(true);
+      try {
+        const headers = await authHeaders();
+        const res = await fetch(`/api/ops/submissions/${encodeURIComponent(submissionId)}`, { headers });
+        const j = (await res.json()) as { ok?: boolean; message?: string; submission?: SubmissionLite };
+        if (!res.ok || !j?.ok || !j.submission) {
+          setEssayError(j?.message ?? "生徒の答案を取得できませんでした。");
+          return;
+        }
+        setEssayText(String(j.submission.essayText ?? "").trim());
+        setQuestion(String(j.submission.question ?? "").trim());
+      } catch {
+        setEssayError("通信エラーで答案を取得できませんでした。");
+      } finally {
+        setLoadingEssay(false);
+      }
+    },
+    [authHeaders],
+  );
+
+  const loadPdf = useCallback(
+    async (submissionId: string, pdfAvailable: boolean) => {
+      setPdfError("");
+      setPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      if (!pdfAvailable) {
+        setPdfError("この提出には公開済み PDF がありません。");
+        return;
+      }
+      setLoadingPdf(true);
+      try {
+        const headers = await authHeaders();
+        const res = await fetch(`/api/ops/reports/submissions/${encodeURIComponent(submissionId)}/pdf`, {
+          headers,
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => null)) as { message?: string } | null;
+          setPdfError(j?.message ?? "PDF を開けませんでした。");
+          return;
+        }
+        const blob = await res.blob();
+        setPdfUrl(URL.createObjectURL(blob));
+      } catch {
+        setPdfError("通信エラーで PDF を取得できませんでした。");
+      } finally {
+        setLoadingPdf(false);
+      }
+    },
+    [authHeaders],
+  );
 
   useEffect(() => {
     if (!active) return;
+    void loadEssay(active.submissionId);
     void loadPdf(active.submissionId, active.pdfAvailable);
-  }, [active, loadPdf]);
+  }, [active, loadEssay, loadPdf]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -81,7 +123,7 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
         <header className="ops-report-source-header">
           <div className="ops-report-source-header-text">
             <p className="ops-report-source-kicker">元データ</p>
-            <h2 className="ops-report-source-title">{title || "添削結果 PDF"}</h2>
+            <h2 className="ops-report-source-title">{title || "答案と添削結果"}</h2>
             <p className="ops-report-source-meta muted">
               {active.studentName} ／ 課題 {active.taskId}
             </p>
@@ -110,24 +152,50 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
           </div>
         ) : null}
 
-        <div className="ops-report-source-body">
-          {loading ? <p className="muted ops-report-source-status">PDF を読み込み中…</p> : null}
-          {error ? (
-            <div className="ops-report-source-fallback" role="alert">
-              <p>{error}</p>
-              <a
-                className="ops-reports-btn"
-                href={`/ops/submissions/${encodeURIComponent(active.submissionId)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                確認＆修正を開く
-              </a>
+        <div className="ops-report-source-split">
+          <section className="ops-report-source-essay" aria-label="生徒の答案">
+            <h3 className="ops-report-source-section-title">あなたの解答</h3>
+            {question ? <p className="ops-report-source-question muted">{question}</p> : null}
+            {loadingEssay ? <p className="muted">答案を読み込み中…</p> : null}
+            {essayError ? (
+              <p className="ops-report-source-inline-error" role="alert">
+                {essayError}
+              </p>
+            ) : null}
+            {!loadingEssay && !essayError ? (
+              essayText ? (
+                <>
+                  <div className="ops-report-source-essay-spacer" aria-hidden />
+                  <pre className="ops-report-source-essay-text">{essayText}</pre>
+                </>
+              ) : (
+                <p className="muted">答案テキストがありません。</p>
+              )
+            ) : null}
+          </section>
+
+          <section className="ops-report-source-pdf" aria-label="添削結果 PDF">
+            <h3 className="ops-report-source-section-title">添削結果 PDF</h3>
+            <div className="ops-report-source-body">
+              {loadingPdf ? <p className="muted ops-report-source-status">PDF を読み込み中…</p> : null}
+              {pdfError ? (
+                <div className="ops-report-source-fallback" role="alert">
+                  <p>{pdfError}</p>
+                  <a
+                    className="ops-reports-btn"
+                    href={`/ops/submissions/${encodeURIComponent(active.submissionId)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    確認＆修正を開く
+                  </a>
+                </div>
+              ) : null}
+              {pdfUrl && !loadingPdf ? (
+                <iframe title="添削結果 PDF" src={pdfUrl} className="ops-report-source-iframe" />
+              ) : null}
             </div>
-          ) : null}
-          {pdfUrl && !loading ? (
-            <iframe title="添削結果 PDF" src={pdfUrl} className="ops-report-source-iframe" />
-          ) : null}
+          </section>
         </div>
 
         <footer className="ops-report-source-footer">
