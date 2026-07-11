@@ -22,6 +22,60 @@ const ESSAY_PCT_MIN = 22;
 const ESSAY_PCT_MAX = 72;
 const ESSAY_PCT_DEFAULT = 40;
 
+const ZOOM_MIN = 70;
+const ZOOM_MAX = 200;
+const ZOOM_STEP = 10;
+const ZOOM_DEFAULT = 100;
+
+function clampZoom(value: number) {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+}
+
+function ZoomControls({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="ops-report-source-zoom" role="group" aria-label={label}>
+      <button
+        type="button"
+        className="ops-report-source-zoom-btn"
+        aria-label="縮小"
+        disabled={value <= ZOOM_MIN}
+        onClick={() => onChange(clampZoom(value - ZOOM_STEP))}
+      >
+        −
+      </button>
+      <span className="ops-report-source-zoom-value" aria-live="polite">
+        {value}%
+      </span>
+      <button
+        type="button"
+        className="ops-report-source-zoom-btn"
+        aria-label="拡大"
+        disabled={value >= ZOOM_MAX}
+        onClick={() => onChange(clampZoom(value + ZOOM_STEP))}
+      >
+        ＋
+      </button>
+      {value !== ZOOM_DEFAULT ? (
+        <button
+          type="button"
+          className="ops-report-source-zoom-reset"
+          onClick={() => onChange(ZOOM_DEFAULT)}
+        >
+          リセット
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
   const [activeId, setActiveId] = useState(sources[0]?.submissionId ?? "");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -33,6 +87,8 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
   const [essayError, setEssayError] = useState("");
   const [essayPct, setEssayPct] = useState(ESSAY_PCT_DEFAULT);
   const [dragging, setDragging] = useState(false);
+  const [essayZoom, setEssayZoom] = useState(ZOOM_DEFAULT);
+  const [pdfZoom, setPdfZoom] = useState(ZOOM_DEFAULT);
   const splitRef = useRef<HTMLDivElement>(null);
 
   const active = sources.find((s) => s.submissionId === activeId) ?? sources[0] ?? null;
@@ -159,6 +215,8 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
 
   if (!active) return null;
 
+  const pdfScale = pdfZoom / 100;
+
   return (
     <div className="ops-report-source-overlay" role="dialog" aria-modal="true" aria-label="元データの閲覧">
       <div className="ops-report-source-panel">
@@ -199,8 +257,15 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
           className={`ops-report-source-split${dragging ? " is-dragging" : ""}`}
           style={{ ["--essay-pct" as string]: `${essayPct}%` }}
         >
-          <section className="ops-report-source-essay" aria-label="生徒の答案">
-            <h3 className="ops-report-source-section-title">あなたの解答</h3>
+          <section
+            className="ops-report-source-essay"
+            aria-label="生徒の答案"
+            style={{ ["--pane-zoom" as string]: String(essayZoom / 100) }}
+          >
+            <div className="ops-report-source-section-bar">
+              <h3 className="ops-report-source-section-title">あなたの解答</h3>
+              <ZoomControls label="答案の文字サイズ" value={essayZoom} onChange={setEssayZoom} />
+            </div>
             {question ? <p className="ops-report-source-question muted">{question}</p> : null}
             {loadingEssay ? <p className="muted">答案を読み込み中…</p> : null}
             {essayError ? (
@@ -253,7 +318,10 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
           </div>
 
           <section className="ops-report-source-pdf" aria-label="添削結果 PDF">
-            <h3 className="ops-report-source-section-title">添削結果 PDF</h3>
+            <div className="ops-report-source-section-bar ops-report-source-section-bar--pdf">
+              <h3 className="ops-report-source-section-title">添削結果 PDF</h3>
+              <ZoomControls label="PDFの表示倍率" value={pdfZoom} onChange={setPdfZoom} />
+            </div>
             <div className="ops-report-source-body">
               {loadingPdf ? <p className="muted ops-report-source-status">PDF を読み込み中…</p> : null}
               {pdfError ? (
@@ -270,7 +338,19 @@ export function OpsReportSourceViewer({ sources, title, onClose }: Props) {
                 </div>
               ) : null}
               {pdfUrl && !loadingPdf ? (
-                <iframe title="添削結果 PDF" src={pdfUrl} className="ops-report-source-iframe" />
+                <div className="ops-report-source-pdf-zoom-viewport">
+                  <iframe
+                    title="添削結果 PDF"
+                    src={pdfUrl}
+                    className="ops-report-source-iframe"
+                    style={{
+                      width: `${100 / pdfScale}%`,
+                      height: `${100 / pdfScale}%`,
+                      transform: `scale(${pdfScale})`,
+                      transformOrigin: "top left",
+                    }}
+                  />
+                </div>
               ) : null}
             </div>
           </section>
